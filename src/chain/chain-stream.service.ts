@@ -11,6 +11,7 @@ import type {
 } from './interfaces/rpc-provider.interface';
 import { ProviderFailoverService } from './providers/provider-failover.service';
 import { ProviderFactory } from './providers/provider.factory';
+import { ChainCheckpointsRepository } from '../storage/repositories/chain-checkpoints.repository';
 import { ProcessedEventsRepository } from '../storage/repositories/processed-events.repository';
 import { SubscriptionsRepository } from '../storage/repositories/subscriptions.repository';
 
@@ -35,6 +36,7 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
     private readonly appConfigService: AppConfigService,
     private readonly providerFactory: ProviderFactory,
     private readonly providerFailoverService: ProviderFailoverService,
+    private readonly chainCheckpointsRepository: ChainCheckpointsRepository,
     private readonly subscriptionsRepository: SubscriptionsRepository,
     private readonly processedEventsRepository: ProcessedEventsRepository,
     private readonly eventClassifierService: EventClassifierService,
@@ -48,10 +50,17 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
     }
 
     await this.logStartupProviderChecks();
+    await this.recoverFromCheckpoint();
 
     this.subscriptionHandle = await this.providerFailoverService.execute((provider) =>
       provider.subscribeBlocks(async (blockNumber: number): Promise<void> => {
-        this.enqueueBlock(blockNumber);
+        const finalizedBlockNumber: number | null = this.resolveFinalizedBlockNumber(blockNumber);
+
+        if (finalizedBlockNumber === null) {
+          return;
+        }
+
+        this.enqueueBlock(finalizedBlockNumber);
       }),
     );
 
@@ -66,6 +75,64 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
       await this.subscriptionHandle.stop();
       this.subscriptionHandle = null;
     }
+  }
+
+  private async recoverFromCheckpoint(): Promise<void> {
+    const latestBlockNumber: number = await this.providerFailoverService.execute((provider) =>
+      provider.getLatestBlockNumber(),
+    );
+    const checkpointBlockNumber: number | null =
+      await this.chainCheckpointsRepository.getLastProcessedBlock(ChainId.ETHEREUM_MAINNET);
+
+    if (checkpointBlockNumber === null) {
+      this.logger.log(
+        `checkpoint not found for chain=${String(ChainId.ETHEREUM_MAINNET)} latest=${latestBlockNumber}`,
+      );
+      return;
+    }
+
+    this.lastProcessedBlockNumber = checkpointBlockNumber;
+
+    const finalizedLatestBlock: number = Math.max(
+      latestBlockNumber - this.appConfigService.chainReorgConfirmations,
+      0,
+    );
+
+    if (finalizedLatestBlock <= checkpointBlockNumber) {
+      this.logger.log(
+        `checkpoint up-to-date checkpoint=${checkpointBlockNumber} latestFinalized=${finalizedLatestBlock}`,
+      );
+      return;
+    }
+
+    const maxBackfillBlocks: number = this.appConfigService.chainBlockQueueMax;
+    const backfillFromBlock: number = Math.max(
+      checkpointBlockNumber + 1,
+      finalizedLatestBlock - maxBackfillBlocks + 1,
+    );
+
+    this.logger.log(
+      `checkpoint recovery start from=${backfillFromBlock} to=${finalizedLatestBlock} latest=${latestBlockNumber} confirmations=${this.appConfigService.chainReorgConfirmations}`,
+    );
+
+    for (
+      let blockNumber: number = backfillFromBlock;
+      blockNumber <= finalizedLatestBlock;
+      blockNumber += 1
+    ) {
+      this.enqueueBlock(blockNumber);
+    }
+  }
+
+  private resolveFinalizedBlockNumber(observedBlockNumber: number): number | null {
+    const confirmations: number = this.appConfigService.chainReorgConfirmations;
+    const finalizedBlockNumber: number = observedBlockNumber - confirmations;
+
+    if (finalizedBlockNumber <= 0) {
+      return null;
+    }
+
+    return finalizedBlockNumber;
   }
 
   private enqueueBlock(blockNumber: number): void {
@@ -116,6 +183,10 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
         try {
           await this.processBlock(nextBlockNumber);
           this.lastProcessedBlockNumber = nextBlockNumber;
+          await this.chainCheckpointsRepository.saveLastProcessedBlock(
+            ChainId.ETHEREUM_MAINNET,
+            nextBlockNumber,
+          );
         } catch (error: unknown) {
           const errorMessage: string = error instanceof Error ? error.message : String(error);
           this.logger.warn(
@@ -326,7 +397,7 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
           : null;
       const currentBackoffMs: number = this.providerFailoverService.getCurrentBackoffMs();
       this.logger.log(
-        `heartbeat observedBlock=${this.lastObservedBlockNumber ?? 'n/a'} processedBlock=${this.lastProcessedBlockNumber ?? 'n/a'} lag=${lag ?? 'n/a'} queueSize=${this.blockQueue.length} backoffMs=${currentBackoffMs}`,
+        `heartbeat observedBlock=${this.lastObservedBlockNumber ?? 'n/a'} processedBlock=${this.lastProcessedBlockNumber ?? 'n/a'} lag=${lag ?? 'n/a'} queueSize=${this.blockQueue.length} confirmations=${this.appConfigService.chainReorgConfirmations} backoffMs=${currentBackoffMs}`,
       );
     }, intervalMs);
 

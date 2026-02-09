@@ -1,5 +1,5 @@
 import type { TransactionReceipt, TransactionResponse } from 'ethers';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { ChainStreamService } from './chain-stream.service';
 import {
@@ -20,6 +20,7 @@ import type { ProviderFailoverService } from './providers/provider-failover.serv
 import type { ProviderFactory } from './providers/provider.factory';
 import type { AlertDispatcherService } from '../alerts/alert-dispatcher.service';
 import type { AppConfigService } from '../config/app-config.service';
+import type { ChainCheckpointsRepository } from '../storage/repositories/chain-checkpoints.repository';
 import type { ProcessedEventsRepository } from '../storage/repositories/processed-events.repository';
 import type { SubscriptionsRepository } from '../storage/repositories/subscriptions.repository';
 
@@ -27,6 +28,8 @@ class ProviderStub {
   public blockHandler: ((blockNumber: number) => Promise<void>) | null = null;
   public getTransactionCalls: number = 0;
   public receiptCalls: string[] = [];
+  public blockRequestCalls: number[] = [];
+  public latestBlockNumber: number = 200;
   private readonly blocks: Map<number, BlockWithTransactions> = new Map<
     number,
     BlockWithTransactions
@@ -55,7 +58,12 @@ class ProviderStub {
   public async getBlockWithTransactions(
     blockNumber: number,
   ): Promise<BlockWithTransactions | null> {
+    this.blockRequestCalls.push(blockNumber);
     return this.blocks.get(blockNumber) ?? null;
+  }
+
+  public async getLatestBlockNumber(): Promise<number> {
+    return this.latestBlockNumber;
   }
 
   public async getBlock(): Promise<null> {
@@ -131,6 +139,10 @@ describe('ChainStreamService', (): void => {
     const subscriptionsRepository: SubscriptionsRepository = {
       listTrackedAddresses: async (): Promise<readonly string[]> => [trackedAddress],
     } as unknown as SubscriptionsRepository;
+    const chainCheckpointsRepository: ChainCheckpointsRepository = {
+      getLastProcessedBlock: async (): Promise<number | null> => null,
+      saveLastProcessedBlock: async (): Promise<void> => undefined,
+    } as unknown as ChainCheckpointsRepository;
     const processedEventsRepository: ProcessedEventsRepository = {
       hasProcessed: async (): Promise<boolean> => false,
       markProcessed: async (): Promise<void> => undefined,
@@ -164,12 +176,14 @@ describe('ChainStreamService', (): void => {
       chainBlockQueueMax: 20,
       chainReceiptConcurrency: 2,
       chainHeartbeatIntervalSec: 3600,
+      chainReorgConfirmations: 0,
     } as unknown as AppConfigService;
 
     const service: ChainStreamService = new ChainStreamService(
       appConfigService,
       providerFactory,
       providerFailoverService,
+      chainCheckpointsRepository,
       subscriptionsRepository,
       processedEventsRepository,
       eventClassifierService,
@@ -194,6 +208,211 @@ describe('ChainStreamService', (): void => {
     expect(providerStub.getTransactionCalls).toBe(0);
     expect(providerStub.receiptCalls).toEqual(['0x1', '0x2']);
     expect(dispatched).toHaveLength(2);
+
+    await service.onModuleDestroy();
+  });
+
+  it('processes only finalized block based on reorg confirmations', async (): Promise<void> => {
+    const trackedAddress: string = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const providerStub: ProviderStub = new ProviderStub();
+    providerStub.setBlock(121, {
+      prefetchedTransactions: [
+        {
+          hash: '0xfinalized',
+          from: trackedAddress,
+          to: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        } as TransactionResponse,
+      ],
+    } as BlockWithTransactions);
+
+    const providerFailoverService: ProviderFailoverService = {
+      execute: async <T>(operation: ProviderOperation<T>): Promise<T> => operation(providerStub),
+      getCurrentBackoffMs: (): number => 0,
+    } as unknown as ProviderFailoverService;
+    const providerFactory: ProviderFactory = {
+      createPrimary: (): ProviderStub => providerStub,
+      createFallback: (): ProviderStub => providerStub,
+    } as unknown as ProviderFactory;
+    const chainCheckpointsRepository: ChainCheckpointsRepository = {
+      getLastProcessedBlock: async (): Promise<number | null> => null,
+      saveLastProcessedBlock: async (): Promise<void> => undefined,
+    } as unknown as ChainCheckpointsRepository;
+    const subscriptionsRepository: SubscriptionsRepository = {
+      listTrackedAddresses: async (): Promise<readonly string[]> => [trackedAddress],
+    } as unknown as SubscriptionsRepository;
+    const processedEventsRepository: ProcessedEventsRepository = {
+      hasProcessed: async (): Promise<boolean> => false,
+      markProcessed: async (): Promise<void> => undefined,
+    } as unknown as ProcessedEventsRepository;
+    const eventClassifierService: EventClassifierService = {
+      classify: (event: ObservedTransaction): ClassifiedEvent => ({
+        chainId: ChainId.ETHEREUM_MAINNET,
+        txHash: event.txHash,
+        logIndex: 0,
+        trackedAddress: event.trackedAddress,
+        eventType: ClassifiedEventType.TRANSFER,
+        direction: EventDirection.OUT,
+        contractAddress: '0x9999999999999999999999999999999999999999',
+        tokenAddress: '0x9999999999999999999999999999999999999999',
+        tokenSymbol: null,
+        tokenDecimals: null,
+        tokenAmountRaw: null,
+        valueFormatted: null,
+        dex: null,
+        pair: null,
+      }),
+    } as unknown as EventClassifierService;
+    const alertDispatcherService: AlertDispatcherService = {
+      dispatch: async (): Promise<void> => undefined,
+    } as unknown as AlertDispatcherService;
+    const appConfigService: AppConfigService = {
+      chainWatcherEnabled: true,
+      chainBlockQueueMax: 20,
+      chainReceiptConcurrency: 2,
+      chainHeartbeatIntervalSec: 3600,
+      chainReorgConfirmations: 2,
+    } as unknown as AppConfigService;
+
+    const service: ChainStreamService = new ChainStreamService(
+      appConfigService,
+      providerFactory,
+      providerFailoverService,
+      chainCheckpointsRepository,
+      subscriptionsRepository,
+      processedEventsRepository,
+      eventClassifierService,
+      alertDispatcherService,
+    );
+
+    await service.onModuleInit();
+
+    if (!providerStub.blockHandler) {
+      throw new Error('Block handler was not registered.');
+    }
+
+    await providerStub.blockHandler(123);
+
+    for (let attempt: number = 0; attempt < 20; attempt += 1) {
+      if (providerStub.blockRequestCalls.includes(121)) {
+        break;
+      }
+      await sleep(10);
+    }
+
+    expect(providerStub.blockRequestCalls).toContain(121);
+
+    await service.onModuleDestroy();
+  });
+
+  it('replays missed finalized blocks from checkpoint on startup', async (): Promise<void> => {
+    const trackedAddress: string = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const providerStub: ProviderStub = new ProviderStub();
+    providerStub.latestBlockNumber = 125;
+    providerStub.setBlock(121, {
+      prefetchedTransactions: [
+        {
+          hash: '0x121',
+          from: trackedAddress,
+          to: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        } as TransactionResponse,
+      ],
+    } as BlockWithTransactions);
+    providerStub.setBlock(122, {
+      prefetchedTransactions: [
+        {
+          hash: '0x122',
+          from: trackedAddress,
+          to: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        } as TransactionResponse,
+      ],
+    } as BlockWithTransactions);
+    providerStub.setBlock(123, {
+      prefetchedTransactions: [
+        {
+          hash: '0x123',
+          from: trackedAddress,
+          to: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        } as TransactionResponse,
+      ],
+    } as BlockWithTransactions);
+
+    const saveLastProcessedBlock: ReturnType<typeof vi.fn> = vi.fn().mockResolvedValue(undefined);
+    const chainCheckpointsRepository: ChainCheckpointsRepository = {
+      getLastProcessedBlock: async (): Promise<number | null> => 120,
+      saveLastProcessedBlock,
+    } as unknown as ChainCheckpointsRepository;
+    const providerFailoverService: ProviderFailoverService = {
+      execute: async <T>(operation: ProviderOperation<T>): Promise<T> => operation(providerStub),
+      getCurrentBackoffMs: (): number => 0,
+    } as unknown as ProviderFailoverService;
+    const providerFactory: ProviderFactory = {
+      createPrimary: (): ProviderStub => providerStub,
+      createFallback: (): ProviderStub => providerStub,
+    } as unknown as ProviderFactory;
+    const subscriptionsRepository: SubscriptionsRepository = {
+      listTrackedAddresses: async (): Promise<readonly string[]> => [trackedAddress],
+    } as unknown as SubscriptionsRepository;
+    const processedEventsRepository: ProcessedEventsRepository = {
+      hasProcessed: async (): Promise<boolean> => false,
+      markProcessed: async (): Promise<void> => undefined,
+    } as unknown as ProcessedEventsRepository;
+    const eventClassifierService: EventClassifierService = {
+      classify: (event: ObservedTransaction): ClassifiedEvent => ({
+        chainId: ChainId.ETHEREUM_MAINNET,
+        txHash: event.txHash,
+        logIndex: 0,
+        trackedAddress: event.trackedAddress,
+        eventType: ClassifiedEventType.TRANSFER,
+        direction: EventDirection.OUT,
+        contractAddress: '0x9999999999999999999999999999999999999999',
+        tokenAddress: '0x9999999999999999999999999999999999999999',
+        tokenSymbol: null,
+        tokenDecimals: null,
+        tokenAmountRaw: null,
+        valueFormatted: null,
+        dex: null,
+        pair: null,
+      }),
+    } as unknown as EventClassifierService;
+    const alertDispatcherService: AlertDispatcherService = {
+      dispatch: async (): Promise<void> => undefined,
+    } as unknown as AlertDispatcherService;
+    const appConfigService: AppConfigService = {
+      chainWatcherEnabled: true,
+      chainBlockQueueMax: 20,
+      chainReceiptConcurrency: 2,
+      chainHeartbeatIntervalSec: 3600,
+      chainReorgConfirmations: 2,
+    } as unknown as AppConfigService;
+
+    const service: ChainStreamService = new ChainStreamService(
+      appConfigService,
+      providerFactory,
+      providerFailoverService,
+      chainCheckpointsRepository,
+      subscriptionsRepository,
+      processedEventsRepository,
+      eventClassifierService,
+      alertDispatcherService,
+    );
+
+    await service.onModuleInit();
+
+    for (let attempt: number = 0; attempt < 30; attempt += 1) {
+      if (
+        providerStub.blockRequestCalls.includes(121) &&
+        providerStub.blockRequestCalls.includes(122) &&
+        providerStub.blockRequestCalls.includes(123)
+      ) {
+        break;
+      }
+      await sleep(10);
+    }
+
+    expect(providerStub.blockRequestCalls).toContain(121);
+    expect(providerStub.blockRequestCalls).toContain(122);
+    expect(providerStub.blockRequestCalls).toContain(123);
+    expect(saveLastProcessedBlock).toHaveBeenCalled();
 
     await service.onModuleDestroy();
   });

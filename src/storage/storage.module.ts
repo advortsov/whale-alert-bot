@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { DatabaseService } from './database.service';
+import { ChainCheckpointsRepository } from './repositories/chain-checkpoints.repository';
 import { ProcessedEventsRepository } from './repositories/processed-events.repository';
 import { SubscriptionsRepository } from './repositories/subscriptions.repository';
 import { TrackedWalletsRepository } from './repositories/tracked-wallets.repository';
@@ -10,6 +11,7 @@ import { UsersRepository } from './repositories/users.repository';
 @Module({
   providers: [
     DatabaseService,
+    ChainCheckpointsRepository,
     UsersRepository,
     TrackedWalletsRepository,
     SubscriptionsRepository,
@@ -18,6 +20,7 @@ import { UsersRepository } from './repositories/users.repository';
   ],
   exports: [
     DatabaseService,
+    ChainCheckpointsRepository,
     UsersRepository,
     TrackedWalletsRepository,
     SubscriptionsRepository,

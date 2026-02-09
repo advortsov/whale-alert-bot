@@ -14,6 +14,7 @@ export type AppConfig = {
   readonly chainBackoffMaxMs: number;
   readonly chainBlockQueueMax: number;
   readonly chainHeartbeatIntervalSec: number;
+  readonly chainReorgConfirmations: number;
   readonly botToken: string | null;
   readonly databaseUrl: string;
   readonly ethAlchemyWssUrl: string | null;

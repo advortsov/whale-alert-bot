@@ -27,6 +27,7 @@ const envSchema = z.object({
   CHAIN_BACKOFF_MAX_MS: z.coerce.number().int().positive().default(30000),
   CHAIN_BLOCK_QUEUE_MAX: z.coerce.number().int().positive().default(120),
   CHAIN_HEARTBEAT_INTERVAL_SEC: z.coerce.number().int().positive().default(60),
+  CHAIN_REORG_CONFIRMATIONS: z.coerce.number().int().min(0).default(2),
   BOT_TOKEN: z.string().trim().min(1).optional(),
   DATABASE_URL: z.url(),
   ETH_ALCHEMY_WSS_URL: z.url().optional(),
@@ -65,6 +66,7 @@ export class AppConfigService {
       chainBackoffMaxMs: parsedEnv.CHAIN_BACKOFF_MAX_MS,
       chainBlockQueueMax: parsedEnv.CHAIN_BLOCK_QUEUE_MAX,
       chainHeartbeatIntervalSec: parsedEnv.CHAIN_HEARTBEAT_INTERVAL_SEC,
+      chainReorgConfirmations: parsedEnv.CHAIN_REORG_CONFIRMATIONS,
       botToken: parsedEnv.BOT_TOKEN ?? null,
       databaseUrl: parsedEnv.DATABASE_URL,
       ethAlchemyWssUrl: parsedEnv.ETH_ALCHEMY_WSS_URL ?? null,
@@ -124,6 +126,10 @@ export class AppConfigService {
 
   public get chainHeartbeatIntervalSec(): number {
     return this.config.chainHeartbeatIntervalSec;
+  }
+
+  public get chainReorgConfirmations(): number {
+    return this.config.chainReorgConfirmations;
   }
 
   public get botToken(): string | null {

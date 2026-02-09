@@ -55,6 +55,11 @@ abstract class BaseRpcProvider implements IRpcProvider {
     return wsProvider.getBlock(blockNumber);
   }
 
+  public async getLatestBlockNumber(): Promise<number> {
+    const wsProvider: WebSocketProvider = this.getOrCreateProvider();
+    return wsProvider.getBlockNumber();
+  }
+
   public async getBlockWithTransactions(
     blockNumber: number,
   ): Promise<BlockWithTransactions | null> {

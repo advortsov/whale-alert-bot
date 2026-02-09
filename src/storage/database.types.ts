@@ -53,12 +53,19 @@ export interface UserAlertPreferencesTable {
   updated_at: UpdatableTimestampColumn;
 }
 
+export interface ChainCheckpointsTable {
+  chain_id: number;
+  last_processed_block: string;
+  updated_at: UpdatableTimestampColumn;
+}
+
 export interface Database {
   users: UsersTable;
   tracked_wallets: TrackedWalletsTable;
   user_wallet_subscriptions: UserWalletSubscriptionsTable;
   processed_events: ProcessedEventsTable;
   user_alert_preferences: UserAlertPreferencesTable;
+  chain_checkpoints: ChainCheckpointsTable;
 }
 
 export type UserRow = Selectable<UsersTable>;
@@ -75,3 +82,6 @@ export type NewProcessedEventRow = Insertable<ProcessedEventsTable>;
 
 export type UserAlertPreferenceRow = Selectable<UserAlertPreferencesTable>;
 export type NewUserAlertPreferenceRow = Insertable<UserAlertPreferencesTable>;
+
+export type ChainCheckpointRow = Selectable<ChainCheckpointsTable>;
+export type NewChainCheckpointRow = Insertable<ChainCheckpointsTable>;

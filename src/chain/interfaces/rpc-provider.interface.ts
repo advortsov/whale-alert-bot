@@ -21,6 +21,7 @@ export interface ISubscriptionHandle {
 export interface IRpcProvider {
   getName(): string;
   subscribeBlocks(handler: BlockHandler): Promise<ISubscriptionHandle>;
+  getLatestBlockNumber(): Promise<number>;
   getBlock(blockNumber: number): Promise<Block | null>;
   getBlockWithTransactions(blockNumber: number): Promise<BlockWithTransactions | null>;
   getTransaction(txHash: string): Promise<TransactionResponse | null>;

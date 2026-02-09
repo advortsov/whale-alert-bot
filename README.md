@@ -85,6 +85,7 @@ CHAIN_BACKOFF_BASE_MS=1000
 CHAIN_BACKOFF_MAX_MS=30000
 CHAIN_BLOCK_QUEUE_MAX=120
 CHAIN_HEARTBEAT_INTERVAL_SEC=60
+CHAIN_REORG_CONFIRMATIONS=2
 ETHERSCAN_API_BASE_URL=https://api.etherscan.io/v2/api
 ETHERSCAN_API_KEY=your_free_key
 HISTORY_CACHE_TTL_SEC=120
@@ -120,6 +121,8 @@ docker compose up --build
 2. Проверить heartbeat лог watcher: lag/queue/backoff.
 3. При росте `backoffMs` сервис не падает, а снижает темп и продолжает обработку.
 4. Если lag долго растет, временно увеличить `CHAIN_RPC_MIN_INTERVAL_MS` и/или уменьшить `CHAIN_RECEIPT_CONCURRENCY`.
+5. `CHAIN_REORG_CONFIRMATIONS` задает сколько подтверждений ждать перед обработкой блока.
+6. На старте watcher восстанавливается из `chain_checkpoints` и догоняет пропущенные finalized блоки.
 
 ## History rate-limit/cache runbook
 

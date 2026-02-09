@@ -33,6 +33,10 @@ class PrimaryProviderStub implements IPrimaryRpcProvider {
     return null;
   }
 
+  public async getLatestBlockNumber(): Promise<number> {
+    return 1;
+  }
+
   public async getBlockWithTransactions(): Promise<BlockWithTransactions | null> {
     return null;
   }
@@ -69,6 +73,10 @@ class FallbackProviderStub implements IFallbackRpcProvider {
 
   public async getBlock(): Promise<null> {
     return null;
+  }
+
+  public async getLatestBlockNumber(): Promise<number> {
+    return 1;
   }
 
   public async getBlockWithTransactions(): Promise<BlockWithTransactions | null> {

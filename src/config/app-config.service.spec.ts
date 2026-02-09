@@ -60,6 +60,7 @@ describe('AppConfigService', (): void => {
 
       expect(config.alertMinSendIntervalSec).toBe(10);
       expect(config.tokenMetaCacheTtlSec).toBe(3600);
+      expect(config.chainReorgConfirmations).toBe(2);
     });
   });
 });
