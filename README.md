@@ -17,7 +17,7 @@ Telegram-бот на `NestJS + TypeScript` для отслеживания ак�
 - `/list`
 - `/wallet <#id>`
 - `/untrack <address|id>`
-- `/history <address> [limit]`
+- `/history <address|#id> [limit] [kind] [direction]`
 - `/status`
 - `/filters`
 - `/walletfilters <#id>`
@@ -79,6 +79,23 @@ npm run db:migrate
 - `RpcThrottlerService` ограничивает темп RPC и включает backoff при rate-limit/timeout.
 - v1 провайдеры: Alchemy (primary), Infura (fallback).
 
+## Multichain-ready архитектура (Core + Adapters, домены)
+
+Текущий runtime остается только Ethereum, но код подготовлен к подключению других сетей (Solana/TRON) через порты и chain-key.
+
+- `src/core/chains`: ключи сетей и базовые chain-контракты (`ChainKey`).
+- `src/core/ports/rpc`: доменный порт RPC/block stream.
+- `src/core/ports/explorers`: доменный порт истории транзакций.
+- `src/core/ports/token-metadata`: доменный порт метаданных токенов.
+- `src/integrations/*`: реализации адаптеров по доменам (а не по вендорам).
+- `src/features/*`: бизнес-логика Telegram/Tracking без прямых зависимостей на конкретный API-вендор.
+
+Технические ограничения этапа:
+
+- live watcher только `ethereum_mainnet`;
+- контракты уже учитывают `solana_mainnet` и `tron_mainnet`, но без runtime-обработчика;
+- все chain-specific данные в БД помечаются `chain_key`.
+
 ## Параметры watcher (безопасные defaults для free API)
 
 ```env
@@ -110,6 +127,34 @@ Fail-fast правило: если `CHAIN_WATCHER_ENABLED=true`, то `ETH_ALCHE
 2. Проверить доступность через `curl`/`wscat`.
 3. Если smoke-check не прошел, интеграцию не начинать.
 4. Кодировать только после успешной проверки.
+
+### Smoke-check примеры (free tier)
+
+Alchemy (HTTP):
+
+```bash
+curl https://eth-mainnet.g.alchemy.com/v2/<API_KEY> \
+  --request POST \
+  --header 'accept: application/json' \
+  --header 'content-type: application/json' \
+  --data '{"id":1,"jsonrpc":"2.0","method":"eth_blockNumber"}'
+```
+
+Infura (HTTP):
+
+```bash
+curl https://mainnet.infura.io/v3/<API_KEY> \
+  --request POST \
+  --header 'accept: application/json' \
+  --header 'content-type: application/json' \
+  --data '{"id":1,"jsonrpc":"2.0","method":"eth_blockNumber"}'
+```
+
+Etherscan history endpoint:
+
+```bash
+curl "https://api.etherscan.io/v2/api?chainid=1&module=account&action=txlist&address=0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045&sort=desc&page=1&offset=5&apikey=<API_KEY>"
+```
 
 ## Docker
 
@@ -148,6 +193,16 @@ npm run test:telegram:harness
 2. Лимиты на пользователя: `HISTORY_RATE_LIMIT_PER_MINUTE`.
 3. Для inline-кнопок действует отдельный cooldown: `HISTORY_BUTTON_COOLDOWN_SEC`.
 4. При лимите/временной ошибке Etherscan бот пытается отдать stale-кэш, иначе возвращает `retryAfter` сообщение.
+
+## UX сценарии карточки кошелька
+
+Основной tap-flow без ручного ввода адреса:
+
+1. `/list` -> тап по `📁 #id label`.
+2. Открывается карточка кошелька с сетью, фильтрами и последними локальными событиями.
+3. Доступные inline-действия:
+   `📜 История` (all), `🪙 ERC20`, `⚙️ Фильтры`, `🔄 Обновить`, `🗑 Удалить`.
+4. Пагинация/обновление истории выполняются callback-кнопками и учитывают limit/cooldown/rate-limit политику.
 
 ## Live alert quality runbook
 
