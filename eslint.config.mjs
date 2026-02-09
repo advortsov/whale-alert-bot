@@ -26,7 +26,6 @@ export default tseslint.config(
       },
       globals: {
         ...globals.node,
-        ...globals.jest,
       },
     },
     settings: {
@@ -111,6 +110,11 @@ export default tseslint.config(
   },
   {
     files: ['**/*.spec.ts', 'test/**/*.ts'],
+    languageOptions: {
+      globals: {
+        ...globals.vitest,
+      },
+    },
     rules: {
       '@typescript-eslint/no-unsafe-argument': 'off',
     },

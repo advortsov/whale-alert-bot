@@ -33,6 +33,8 @@ const envSchema = z.object({
   ETH_INFURA_WSS_URL: z.url().optional(),
   UNISWAP_SWAP_ALLOWLIST: z.string().trim().optional(),
   ETHERSCAN_TX_BASE_URL: z.url().default('https://etherscan.io/tx/'),
+  ETHERSCAN_API_BASE_URL: z.url().default('https://api.etherscan.io/v2/api'),
+  ETHERSCAN_API_KEY: z.string().trim().min(1).optional(),
 });
 
 type ParsedEnv = z.infer<typeof envSchema>;
@@ -63,6 +65,8 @@ export class AppConfigService {
       ethInfuraWssUrl: parsedEnv.ETH_INFURA_WSS_URL ?? null,
       uniswapSwapAllowlist: this.parseAllowlist(parsedEnv.UNISWAP_SWAP_ALLOWLIST),
       etherscanTxBaseUrl: parsedEnv.ETHERSCAN_TX_BASE_URL,
+      etherscanApiBaseUrl: parsedEnv.ETHERSCAN_API_BASE_URL,
+      etherscanApiKey: parsedEnv.ETHERSCAN_API_KEY ?? null,
     };
   }
 
@@ -132,6 +136,14 @@ export class AppConfigService {
 
   public get etherscanTxBaseUrl(): string {
     return this.config.etherscanTxBaseUrl;
+  }
+
+  public get etherscanApiBaseUrl(): string {
+    return this.config.etherscanApiBaseUrl;
+  }
+
+  public get etherscanApiKey(): string | null {
+    return this.config.etherscanApiKey;
   }
 
   private assertWatcherConfig(parsedEnv: ParsedEnv): void {

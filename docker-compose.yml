@@ -37,6 +37,8 @@ services:
       ETH_ALCHEMY_WSS_URL: ${ETH_ALCHEMY_WSS_URL:-wss://example.invalid/alchemy}
       ETH_INFURA_WSS_URL: ${ETH_INFURA_WSS_URL:-wss://example.invalid/infura}
       ETHERSCAN_TX_BASE_URL: ${ETHERSCAN_TX_BASE_URL:-https://etherscan.io/tx/}
+      ETHERSCAN_API_BASE_URL: ${ETHERSCAN_API_BASE_URL:-https://api.etherscan.io/v2/api}
+      ETHERSCAN_API_KEY: ${ETHERSCAN_API_KEY:-}
     ports:
       - '3000:3000'
     restart: unless-stopped

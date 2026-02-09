@@ -9,13 +9,14 @@ Telegram-бот на `NestJS + TypeScript` для отслеживания ак�
 - Telegram: `telegraf` + `nestjs-telegraf`
 - Postgres + Kysely
 - SQL миграции: Postgrator (`checksum` включен)
-- Тесты: `vitest` (без `jest`)
+- Тесты: `vitest`
 
 ## Команды бота
 
 - `/track <address> [label]`
 - `/list`
 - `/untrack <address|id>`
+- `/history <address> [limit]`
 - `/help`
 
 ## Быстрый старт
@@ -80,6 +81,8 @@ CHAIN_BACKOFF_BASE_MS=1000
 CHAIN_BACKOFF_MAX_MS=30000
 CHAIN_BLOCK_QUEUE_MAX=120
 CHAIN_HEARTBEAT_INTERVAL_SEC=60
+ETHERSCAN_API_BASE_URL=https://api.etherscan.io/v2/api
+ETHERSCAN_API_KEY=your_free_key
 ```
 
 Fail-fast правило: если `CHAIN_WATCHER_ENABLED=true`, то `ETH_ALCHEMY_WSS_URL` и `ETH_INFURA_WSS_URL` обязательны.
