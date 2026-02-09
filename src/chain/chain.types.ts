@@ -8,6 +8,12 @@ export enum ClassifiedEventType {
   UNKNOWN = 'UNKNOWN',
 }
 
+export enum EventDirection {
+  IN = 'IN',
+  OUT = 'OUT',
+  UNKNOWN = 'UNKNOWN',
+}
+
 export type ObservedTransaction = {
   readonly chainId: ChainId;
   readonly txHash: string;
@@ -28,8 +34,13 @@ export type ClassifiedEvent = {
   readonly logIndex: number;
   readonly trackedAddress: string;
   readonly eventType: ClassifiedEventType;
+  readonly direction: EventDirection;
   readonly contractAddress: string | null;
+  readonly tokenAddress: string | null;
+  readonly tokenSymbol: string | null;
+  readonly tokenDecimals: number | null;
   readonly tokenAmountRaw: string | null;
+  readonly valueFormatted: string | null;
   readonly dex: string | null;
   readonly pair: string | null;
 };

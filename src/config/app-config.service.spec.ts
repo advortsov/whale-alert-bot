@@ -53,4 +53,13 @@ describe('AppConfigService', (): void => {
       },
     );
   });
+
+  it('uses default values for alert throttling and token metadata cache config', (): void => {
+    withEnv(createBaseEnv(), (): void => {
+      const config: AppConfigService = new AppConfigService();
+
+      expect(config.alertMinSendIntervalSec).toBe(10);
+      expect(config.tokenMetaCacheTtlSec).toBe(3600);
+    });
+  });
 });

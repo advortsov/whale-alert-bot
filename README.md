@@ -87,6 +87,8 @@ HISTORY_CACHE_TTL_SEC=120
 HISTORY_RATE_LIMIT_PER_MINUTE=12
 HISTORY_BUTTON_COOLDOWN_SEC=3
 HISTORY_STALE_ON_ERROR_SEC=600
+ALERT_MIN_SEND_INTERVAL_SEC=10
+TOKEN_META_CACHE_TTL_SEC=3600
 ```
 
 Fail-fast правило: если `CHAIN_WATCHER_ENABLED=true`, то `ETH_ALCHEMY_WSS_URL` и `ETH_INFURA_WSS_URL` обязательны.
@@ -121,6 +123,14 @@ docker compose up --build
 2. Лимиты на пользователя: `HISTORY_RATE_LIMIT_PER_MINUTE`.
 3. Для inline-кнопок действует отдельный cooldown: `HISTORY_BUTTON_COOLDOWN_SEC`.
 4. При лимите/временной ошибке Etherscan бот пытается отдать stale-кэш, иначе возвращает `retryAfter` сообщение.
+
+## Live alert quality runbook
+
+1. Перед отправкой алерт проходит anti-noise suppression:
+   `ALERT_MIN_SEND_INTERVAL_SEC` защищает от повторов одного типа события по кошельку/контракту.
+2. Нулевые ERC20 transfer события подавляются как шум.
+3. Для популярных токенов (USDT/USDC/DAI/WETH) символ и decimals берутся из локального справочника.
+4. Метаданные токенов кэшируются in-memory с TTL `TOKEN_META_CACHE_TTL_SEC`.
 
 ## Важно по Telegram polling
 

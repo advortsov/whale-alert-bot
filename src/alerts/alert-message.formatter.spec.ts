@@ -1,6 +1,11 @@
 import { AlertMessageFormatter } from './alert-message.formatter';
 import { applyTestEnv } from '../../test/helpers/test-env';
-import { ClassifiedEventType, ChainId, type ClassifiedEvent } from '../chain/chain.types';
+import {
+  ClassifiedEventType,
+  ChainId,
+  EventDirection,
+  type ClassifiedEvent,
+} from '../chain/chain.types';
 import { AppConfigService } from '../config/app-config.service';
 
 describe('AlertMessageFormatter', (): void => {
@@ -17,8 +22,13 @@ describe('AlertMessageFormatter', (): void => {
       logIndex: 1,
       trackedAddress: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       eventType: ClassifiedEventType.TRANSFER,
+      direction: EventDirection.OUT,
       contractAddress: '0xcccccccccccccccccccccccccccccccccccccccc',
+      tokenAddress: '0xcccccccccccccccccccccccccccccccccccccccc',
+      tokenSymbol: 'USDT',
+      tokenDecimals: 6,
       tokenAmountRaw: '1000',
+      valueFormatted: '0.001000',
       dex: null,
       pair: null,
     };
@@ -26,6 +36,8 @@ describe('AlertMessageFormatter', (): void => {
     const result: string = formatter.format(event);
 
     expect(result).toContain('TRANSFER');
+    expect(result).toContain('Направление: OUT');
+    expect(result).toContain('Сумма: 0.001000 USDT');
     expect(result).toContain('0xabc');
   });
 });

@@ -5,6 +5,7 @@ import { ChainStreamService } from './chain-stream.service';
 import {
   ChainId,
   ClassifiedEventType,
+  EventDirection,
   type ClassifiedEvent,
   type ObservedTransaction,
 } from './chain.types';
@@ -141,8 +142,13 @@ describe('ChainStreamService', (): void => {
         logIndex: 0,
         trackedAddress: event.trackedAddress,
         eventType: ClassifiedEventType.TRANSFER,
+        direction: EventDirection.OUT,
         contractAddress: '0x9999999999999999999999999999999999999999',
+        tokenAddress: '0x9999999999999999999999999999999999999999',
+        tokenSymbol: null,
+        tokenDecimals: null,
         tokenAmountRaw: null,
+        valueFormatted: null,
         dex: null,
         pair: null,
       }),

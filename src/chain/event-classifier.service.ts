@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 import {
   ChainId,
   ClassifiedEventType,
+  EventDirection,
   type ClassifiedEvent,
   type ObservedTransaction,
 } from './chain.types';
@@ -44,14 +45,22 @@ export class EventClassifierService {
           fromAddress === normalizedTrackedAddress || toAddress === normalizedTrackedAddress;
 
         if (isTrackedTransfer) {
+          const transferDirection: EventDirection =
+            fromAddress === normalizedTrackedAddress ? EventDirection.OUT : EventDirection.IN;
+
           return {
             chainId: ChainId.ETHEREUM_MAINNET,
             txHash: event.txHash,
             logIndex: log.logIndex,
             trackedAddress: normalizedTrackedAddress,
             eventType: ClassifiedEventType.TRANSFER,
+            direction: transferDirection,
             contractAddress: log.address,
+            tokenAddress: log.address,
+            tokenSymbol: null,
+            tokenDecimals: null,
             tokenAmountRaw: this.tryDecodeUint256(log.data),
+            valueFormatted: null,
             dex: null,
             pair: null,
           };
@@ -63,14 +72,25 @@ export class EventClassifierService {
         this.swapAllowlist.size === 0 || this.swapAllowlist.has(log.address);
 
       if (isSwapTopic && isAllowedPool) {
+        const swapDirection: EventDirection = this.resolveSwapDirection(
+          event.txFrom.toLowerCase(),
+          event.txTo?.toLowerCase() ?? null,
+          normalizedTrackedAddress,
+        );
+
         return {
           chainId: event.chainId,
           txHash: event.txHash,
           logIndex: log.logIndex,
           trackedAddress: normalizedTrackedAddress,
           eventType: ClassifiedEventType.SWAP,
+          direction: swapDirection,
           contractAddress: log.address,
+          tokenAddress: null,
+          tokenSymbol: null,
+          tokenDecimals: null,
           tokenAmountRaw: null,
+          valueFormatted: null,
           dex: this.mapDex(topic0),
           pair: null,
         };
@@ -83,8 +103,13 @@ export class EventClassifierService {
       logIndex: 0,
       trackedAddress: normalizedTrackedAddress,
       eventType: ClassifiedEventType.UNKNOWN,
+      direction: EventDirection.UNKNOWN,
       contractAddress: null,
+      tokenAddress: null,
+      tokenSymbol: null,
+      tokenDecimals: null,
       tokenAmountRaw: null,
+      valueFormatted: null,
       dex: null,
       pair: null,
     };
@@ -120,5 +145,21 @@ export class EventClassifierService {
     }
 
     return 'Unknown DEX';
+  }
+
+  private resolveSwapDirection(
+    txFrom: string,
+    txTo: string | null,
+    trackedAddress: string,
+  ): EventDirection {
+    if (txFrom === trackedAddress) {
+      return EventDirection.OUT;
+    }
+
+    if (txTo === trackedAddress) {
+      return EventDirection.IN;
+    }
+
+    return EventDirection.UNKNOWN;
   }
 }

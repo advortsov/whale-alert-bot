@@ -35,6 +35,8 @@ const envSchema = z.object({
   ETHERSCAN_TX_BASE_URL: z.url().default('https://etherscan.io/tx/'),
   ETHERSCAN_API_BASE_URL: z.url().default('https://api.etherscan.io/v2/api'),
   ETHERSCAN_API_KEY: z.string().trim().min(1).optional(),
+  ALERT_MIN_SEND_INTERVAL_SEC: z.coerce.number().int().min(0).default(10),
+  TOKEN_META_CACHE_TTL_SEC: z.coerce.number().int().positive().default(3600),
   HISTORY_CACHE_TTL_SEC: z.coerce.number().int().positive().default(120),
   HISTORY_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(12),
   HISTORY_BUTTON_COOLDOWN_SEC: z.coerce.number().int().min(0).default(3),
@@ -71,6 +73,8 @@ export class AppConfigService {
       etherscanTxBaseUrl: parsedEnv.ETHERSCAN_TX_BASE_URL,
       etherscanApiBaseUrl: parsedEnv.ETHERSCAN_API_BASE_URL,
       etherscanApiKey: parsedEnv.ETHERSCAN_API_KEY ?? null,
+      alertMinSendIntervalSec: parsedEnv.ALERT_MIN_SEND_INTERVAL_SEC,
+      tokenMetaCacheTtlSec: parsedEnv.TOKEN_META_CACHE_TTL_SEC,
       historyCacheTtlSec: parsedEnv.HISTORY_CACHE_TTL_SEC,
       historyRateLimitPerMinute: parsedEnv.HISTORY_RATE_LIMIT_PER_MINUTE,
       historyButtonCooldownSec: parsedEnv.HISTORY_BUTTON_COOLDOWN_SEC,
@@ -152,6 +156,14 @@ export class AppConfigService {
 
   public get etherscanApiKey(): string | null {
     return this.config.etherscanApiKey;
+  }
+
+  public get alertMinSendIntervalSec(): number {
+    return this.config.alertMinSendIntervalSec;
+  }
+
+  public get tokenMetaCacheTtlSec(): number {
+    return this.config.tokenMetaCacheTtlSec;
   }
 
   public get historyCacheTtlSec(): number {

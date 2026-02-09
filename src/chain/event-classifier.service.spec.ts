@@ -1,4 +1,9 @@
-import { ChainId, ClassifiedEventType, type ObservedTransaction } from './chain.types';
+import {
+  ChainId,
+  ClassifiedEventType,
+  EventDirection,
+  type ObservedTransaction,
+} from './chain.types';
 import { ERC20_TRANSFER_TOPIC, UNISWAP_V2_SWAP_TOPIC } from './constants/event-signatures';
 import { EventClassifierService } from './event-classifier.service';
 import { applyTestEnv } from '../../test/helpers/test-env';
@@ -39,6 +44,8 @@ describe('EventClassifierService', (): void => {
 
     expect(result.eventType).toBe(ClassifiedEventType.TRANSFER);
     expect(result.logIndex).toBe(12);
+    expect(result.direction).toBe(EventDirection.OUT);
+    expect(result.tokenAddress).toBe('0xcccccccccccccccccccccccccccccccccccccccc');
     expect(result.tokenAmountRaw).toBe('10');
   });
 
@@ -64,6 +71,7 @@ describe('EventClassifierService', (): void => {
     const result = service.classify(event);
 
     expect(result.eventType).toBe(ClassifiedEventType.SWAP);
+    expect(result.direction).toBe(EventDirection.OUT);
     expect(result.dex).toBe('Uniswap V2');
   });
 });
