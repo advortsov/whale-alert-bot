@@ -14,6 +14,7 @@ import type { AppConfigService } from '../config/app-config.service';
 import type { UserRow } from '../storage/database.types';
 import type { SubscriptionsRepository } from '../storage/repositories/subscriptions.repository';
 import type { TrackedWalletsRepository } from '../storage/repositories/tracked-wallets.repository';
+import type { UserAlertPreferencesRepository } from '../storage/repositories/user-alert-preferences.repository';
 import type { UsersRepository } from '../storage/repositories/users.repository';
 
 type SubscriptionsRepositoryStub = {
@@ -49,6 +50,13 @@ type HistoryRateLimiterServiceStub = {
   readonly evaluate: ReturnType<typeof vi.fn>;
 };
 
+type UserAlertPreferencesRepositoryStub = {
+  readonly findOrCreateByUserId: ReturnType<typeof vi.fn>;
+  readonly updateMinAmount: ReturnType<typeof vi.fn>;
+  readonly updateMute: ReturnType<typeof vi.fn>;
+  readonly updateEventType: ReturnType<typeof vi.fn>;
+};
+
 type TestContext = {
   readonly userRef: TelegramUserRef;
   readonly userRow: UserRow;
@@ -58,6 +66,7 @@ type TestContext = {
   readonly etherscanHistoryServiceStub: EtherscanHistoryServiceStub;
   readonly historyCacheServiceStub: HistoryCacheServiceStub;
   readonly historyRateLimiterServiceStub: HistoryRateLimiterServiceStub;
+  readonly userAlertPreferencesRepositoryStub: UserAlertPreferencesRepositoryStub;
   readonly appConfigServiceStub: AppConfigServiceStub;
   readonly service: TrackingService;
 };
@@ -92,6 +101,12 @@ const createTestContext = (): TestContext => {
   const historyRateLimiterServiceStub: HistoryRateLimiterServiceStub = {
     evaluate: vi.fn(),
   };
+  const userAlertPreferencesRepositoryStub: UserAlertPreferencesRepositoryStub = {
+    findOrCreateByUserId: vi.fn(),
+    updateMinAmount: vi.fn(),
+    updateMute: vi.fn(),
+    updateEventType: vi.fn(),
+  };
   const appConfigServiceStub: AppConfigServiceStub = {
     etherscanTxBaseUrl: 'https://etherscan.io/tx/',
   };
@@ -109,6 +124,36 @@ const createTestContext = (): TestContext => {
 
   usersRepositoryStub.findOrCreate.mockResolvedValue(userRow);
   historyRateLimiterServiceStub.evaluate.mockReturnValue(allowDecision);
+  userAlertPreferencesRepositoryStub.findOrCreateByUserId.mockResolvedValue({
+    id: 1,
+    user_id: 7,
+    min_amount: 0,
+    allow_transfer: true,
+    allow_swap: true,
+    muted_until: null,
+    created_at: new Date('2026-02-01T00:00:00.000Z'),
+    updated_at: new Date('2026-02-01T00:00:00.000Z'),
+  });
+  userAlertPreferencesRepositoryStub.updateMinAmount.mockResolvedValue({
+    id: 1,
+    user_id: 7,
+    min_amount: 1000.5,
+    allow_transfer: true,
+    allow_swap: true,
+    muted_until: null,
+    created_at: new Date('2026-02-01T00:00:00.000Z'),
+    updated_at: new Date('2026-02-01T00:00:00.000Z'),
+  });
+  userAlertPreferencesRepositoryStub.updateMute.mockResolvedValue({
+    id: 1,
+    user_id: 7,
+    min_amount: 0,
+    allow_transfer: true,
+    allow_swap: true,
+    muted_until: new Date('2026-02-01T01:00:00.000Z'),
+    created_at: new Date('2026-02-01T00:00:00.000Z'),
+    updated_at: new Date('2026-02-01T00:00:00.000Z'),
+  });
 
   const service: TrackingService = new TrackingService(
     usersRepositoryStub as unknown as UsersRepository,
@@ -117,6 +162,7 @@ const createTestContext = (): TestContext => {
     etherscanHistoryServiceStub as unknown as EtherscanHistoryService,
     historyCacheServiceStub as unknown as HistoryCacheService,
     historyRateLimiterServiceStub as unknown as HistoryRateLimiterService,
+    userAlertPreferencesRepositoryStub as unknown as UserAlertPreferencesRepository,
     appConfigServiceStub as unknown as AppConfigService,
   );
 
@@ -129,6 +175,7 @@ const createTestContext = (): TestContext => {
     etherscanHistoryServiceStub,
     historyCacheServiceStub,
     historyRateLimiterServiceStub,
+    userAlertPreferencesRepositoryStub,
     appConfigServiceStub,
     service,
   };
@@ -268,5 +315,29 @@ describe('TrackingService', (): void => {
         HistoryRequestSource.COMMAND,
       ),
     ).rejects.toThrow('Слишком много запросов к истории. Повтори через 4 сек.');
+  });
+
+  it('updates minimum alert amount for user preferences', async (): Promise<void> => {
+    const context: TestContext = createTestContext();
+
+    const message: string = await context.service.setMinimumAlertAmount(context.userRef, '1000.5');
+
+    expect(context.userAlertPreferencesRepositoryStub.updateMinAmount).toHaveBeenCalledWith(
+      context.userRow.id,
+      1000.5,
+    );
+    expect(message).toContain('1000.500000');
+  });
+
+  it('returns readable filters snapshot for user', async (): Promise<void> => {
+    const context: TestContext = createTestContext();
+
+    const message: string = await context.service.getUserAlertFilters(context.userRef);
+
+    expect(context.userAlertPreferencesRepositoryStub.findOrCreateByUserId).toHaveBeenCalledWith(
+      context.userRow.id,
+    );
+    expect(message).toContain('Текущие фильтры алертов');
+    expect(message).toContain('transfer: on');
   });
 });

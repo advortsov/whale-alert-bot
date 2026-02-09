@@ -1,6 +1,16 @@
 import type { ColumnType, Generated, Insertable, Selectable } from 'kysely';
 
 type TimestampColumn = ColumnType<Date, Date | string | undefined, never>;
+type UpdatableTimestampColumn = ColumnType<
+  Date,
+  Date | string | undefined,
+  Date | string | undefined
+>;
+type NullableUpdatableTimestampColumn = ColumnType<
+  Date | null,
+  Date | string | null | undefined,
+  Date | string | null | undefined
+>;
 
 export interface UsersTable {
   id: Generated<number>;
@@ -32,11 +42,23 @@ export interface ProcessedEventsTable {
   processed_at: TimestampColumn;
 }
 
+export interface UserAlertPreferencesTable {
+  id: Generated<number>;
+  user_id: number;
+  min_amount: number;
+  allow_transfer: boolean;
+  allow_swap: boolean;
+  muted_until: NullableUpdatableTimestampColumn;
+  created_at: TimestampColumn;
+  updated_at: UpdatableTimestampColumn;
+}
+
 export interface Database {
   users: UsersTable;
   tracked_wallets: TrackedWalletsTable;
   user_wallet_subscriptions: UserWalletSubscriptionsTable;
   processed_events: ProcessedEventsTable;
+  user_alert_preferences: UserAlertPreferencesTable;
 }
 
 export type UserRow = Selectable<UsersTable>;
@@ -50,3 +72,6 @@ export type NewUserWalletSubscriptionRow = Insertable<UserWalletSubscriptionsTab
 
 export type ProcessedEventRow = Selectable<ProcessedEventsTable>;
 export type NewProcessedEventRow = Insertable<ProcessedEventsTable>;
+
+export type UserAlertPreferenceRow = Selectable<UserAlertPreferencesTable>;
+export type NewUserAlertPreferenceRow = Insertable<UserAlertPreferencesTable>;

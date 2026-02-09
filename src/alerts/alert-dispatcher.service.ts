@@ -4,8 +4,11 @@ import { AlertEnrichmentService } from './alert-enrichment.service';
 import { AlertMessageFormatter } from './alert-message.formatter';
 import { AlertSuppressionService } from './alert-suppression.service';
 import { type AlertDeliveryResult } from './alert.interfaces';
-import type { ClassifiedEvent } from '../chain/chain.types';
+import { ClassifiedEventType, type ClassifiedEvent } from '../chain/chain.types';
+import type { UserAlertPreferenceRow } from '../storage/database.types';
 import { SubscriptionsRepository } from '../storage/repositories/subscriptions.repository';
+import { UserAlertPreferencesRepository } from '../storage/repositories/user-alert-preferences.repository';
+import { UsersRepository } from '../storage/repositories/users.repository';
 import { TelegramSenderService } from '../telegram/telegram-sender.service';
 
 @Injectable()
@@ -17,6 +20,8 @@ export class AlertDispatcherService {
     private readonly alertEnrichmentService: AlertEnrichmentService,
     private readonly alertSuppressionService: AlertSuppressionService,
     private readonly alertMessageFormatter: AlertMessageFormatter,
+    private readonly usersRepository: UsersRepository,
+    private readonly userAlertPreferencesRepository: UserAlertPreferencesRepository,
     private readonly telegramSenderService: TelegramSenderService,
   ) {}
 
@@ -51,6 +56,18 @@ export class AlertDispatcherService {
       `dispatch sending eventType=${event.eventType} recipients=${telegramIds.length} txHash=${event.txHash}`,
     );
     for (const telegramId of telegramIds) {
+      const shouldSkipByPreferences: boolean = await this.shouldSkipByUserPreferences(
+        telegramId,
+        enrichedEvent,
+      );
+
+      if (shouldSkipByPreferences) {
+        this.logger.debug(
+          `dispatch skipped by user preferences telegramId=${telegramId} txHash=${event.txHash}`,
+        );
+        continue;
+      }
+
       try {
         await this.telegramSenderService.sendText(telegramId, message);
         deliveryResults.push({
@@ -77,5 +94,47 @@ export class AlertDispatcherService {
     this.logger.debug(
       `dispatch complete txHash=${event.txHash} successful=${successfulDeliveries} failed=${deliveryResults.length - successfulDeliveries}`,
     );
+  }
+
+  private async shouldSkipByUserPreferences(
+    telegramId: string,
+    event: ClassifiedEvent,
+  ): Promise<boolean> {
+    const user = await this.usersRepository.findByTelegramId(telegramId);
+
+    if (!user) {
+      return false;
+    }
+
+    const preferences: UserAlertPreferenceRow =
+      await this.userAlertPreferencesRepository.findOrCreateByUserId(user.id);
+
+    if (preferences.muted_until !== null && preferences.muted_until.getTime() > Date.now()) {
+      return true;
+    }
+
+    if (event.eventType === ClassifiedEventType.TRANSFER && !preferences.allow_transfer) {
+      return true;
+    }
+
+    if (event.eventType === ClassifiedEventType.SWAP && !preferences.allow_swap) {
+      return true;
+    }
+
+    const minAmount: number = Number.parseFloat(String(preferences.min_amount));
+
+    if (Number.isNaN(minAmount) || minAmount <= 0) {
+      return false;
+    }
+
+    const value: number | null = event.valueFormatted
+      ? Number.parseFloat(event.valueFormatted)
+      : null;
+
+    if (value === null || Number.isNaN(value)) {
+      return true;
+    }
+
+    return value < minAmount;
   }
 }

@@ -4,6 +4,7 @@ import { DatabaseService } from './database.service';
 import { ProcessedEventsRepository } from './repositories/processed-events.repository';
 import { SubscriptionsRepository } from './repositories/subscriptions.repository';
 import { TrackedWalletsRepository } from './repositories/tracked-wallets.repository';
+import { UserAlertPreferencesRepository } from './repositories/user-alert-preferences.repository';
 import { UsersRepository } from './repositories/users.repository';
 
 @Module({
@@ -13,6 +14,7 @@ import { UsersRepository } from './repositories/users.repository';
     TrackedWalletsRepository,
     SubscriptionsRepository,
     ProcessedEventsRepository,
+    UserAlertPreferencesRepository,
   ],
   exports: [
     DatabaseService,
@@ -20,6 +22,7 @@ import { UsersRepository } from './repositories/users.repository';
     TrackedWalletsRepository,
     SubscriptionsRepository,
     ProcessedEventsRepository,
+    UserAlertPreferencesRepository,
   ],
 })
 export class StorageModule {}

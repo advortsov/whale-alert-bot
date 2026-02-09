@@ -86,6 +86,38 @@ describe('TelegramUpdate', (): void => {
     });
   });
 
+  it('parses /filters command with toggle args', (): void => {
+    const trackingServiceStub: TrackingService = {} as TrackingService;
+    const update: TelegramUpdate = new TelegramUpdate(trackingServiceStub);
+    const privateApi: TelegramUpdatePrivateApi = update as unknown as TelegramUpdatePrivateApi;
+
+    const parsed: readonly ParsedMessageCommandView[] =
+      privateApi.parseMessageCommands('/filters transfer off');
+
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0]).toMatchObject({
+      command: 'filters',
+      args: ['transfer', 'off'],
+      lineNumber: 1,
+    });
+  });
+
+  it('parses /setmin command with amount arg', (): void => {
+    const trackingServiceStub: TrackingService = {} as TrackingService;
+    const update: TelegramUpdate = new TelegramUpdate(trackingServiceStub);
+    const privateApi: TelegramUpdatePrivateApi = update as unknown as TelegramUpdatePrivateApi;
+
+    const parsed: readonly ParsedMessageCommandView[] =
+      privateApi.parseMessageCommands('/setmin 1000.5');
+
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0]).toMatchObject({
+      command: 'setmin',
+      args: ['1000.5'],
+      lineNumber: 1,
+    });
+  });
+
   it('parses menu button text into mapped command', (): void => {
     const trackingServiceStub: TrackingService = {} as TrackingService;
     const update: TelegramUpdate = new TelegramUpdate(trackingServiceStub);

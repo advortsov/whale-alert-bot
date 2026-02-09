@@ -8,3 +8,15 @@ export type TrackedWalletOption = {
   readonly walletAddress: string;
   readonly walletLabel: string | null;
 };
+
+export enum AlertFilterToggleTarget {
+  TRANSFER = 'transfer',
+  SWAP = 'swap',
+}
+
+export type UserAlertPreferences = {
+  readonly minAmount: number;
+  readonly allowTransfer: boolean;
+  readonly allowSwap: boolean;
+  readonly mutedUntil: Date | null;
+};

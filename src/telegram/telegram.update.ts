@@ -14,7 +14,11 @@ import {
   type WalletHistoryCallbackTarget,
 } from './telegram.interfaces';
 import { HistoryRequestSource } from '../tracking/history-rate-limiter.interfaces';
-import type { TelegramUserRef, TrackedWalletOption } from '../tracking/tracking.interfaces';
+import {
+  AlertFilterToggleTarget,
+  type TelegramUserRef,
+  type TrackedWalletOption,
+} from '../tracking/tracking.interfaces';
 import { TrackingService } from '../tracking/tracking.service';
 
 const SUPPORTED_COMMAND_MAP: Readonly<Record<string, SupportedTelegramCommand>> = {
@@ -24,6 +28,9 @@ const SUPPORTED_COMMAND_MAP: Readonly<Record<string, SupportedTelegramCommand>> 
   list: SupportedTelegramCommand.LIST,
   untrack: SupportedTelegramCommand.UNTRACK,
   history: SupportedTelegramCommand.HISTORY,
+  filters: SupportedTelegramCommand.FILTERS,
+  setmin: SupportedTelegramCommand.SETMIN,
+  mute: SupportedTelegramCommand.MUTE,
 };
 
 const MENU_BUTTON_COMMAND_MAP: Readonly<Record<string, SupportedTelegramCommand>> = {
@@ -31,8 +38,14 @@ const MENU_BUTTON_COMMAND_MAP: Readonly<Record<string, SupportedTelegramCommand>
   '➕ Добавить адрес': SupportedTelegramCommand.TRACK_HINT,
   '📋 Мой список': SupportedTelegramCommand.LIST,
   '📜 История': SupportedTelegramCommand.HISTORY_HINT,
+  '⚙️ Фильтры': SupportedTelegramCommand.FILTERS,
   '🗑 Удалить адрес': SupportedTelegramCommand.UNTRACK_HINT,
   '❓ Помощь': SupportedTelegramCommand.HELP,
+};
+
+const ALERT_FILTER_TARGET_MAP: Readonly<Record<string, AlertFilterToggleTarget>> = {
+  transfer: AlertFilterToggleTarget.TRANSFER,
+  swap: AlertFilterToggleTarget.SWAP,
 };
 
 const WALLET_HISTORY_CALLBACK_PREFIX: string = 'wallet_history:';
@@ -186,6 +199,15 @@ export class TelegramUpdate {
         case SupportedTelegramCommand.HISTORY:
           message = await this.executeHistoryCommand(userRef, commandEntry, updateMeta);
           replyOptions = this.buildHistoryReplyOptions();
+          break;
+        case SupportedTelegramCommand.FILTERS:
+          message = await this.executeFiltersCommand(userRef, commandEntry, updateMeta);
+          break;
+        case SupportedTelegramCommand.SETMIN:
+          message = await this.executeSetMinCommand(userRef, commandEntry, updateMeta);
+          break;
+        case SupportedTelegramCommand.MUTE:
+          message = await this.executeMuteCommand(userRef, commandEntry, updateMeta);
           break;
         case SupportedTelegramCommand.TRACK_HINT:
           message = this.buildTrackHintMessage();
@@ -358,6 +380,97 @@ export class TelegramUpdate {
     return responseMessage;
   }
 
+  private async executeFiltersCommand(
+    userRef: TelegramUserRef | null,
+    commandEntry: ParsedMessageCommand,
+    updateMeta: UpdateMeta,
+  ): Promise<string> {
+    if (!userRef) {
+      this.logger.warn(
+        `Filters command rejected: user context is missing line=${commandEntry.lineNumber} updateId=${updateMeta.updateId ?? 'n/a'}`,
+      );
+      return 'Не удалось определить пользователя.';
+    }
+
+    const targetArg: string | null = commandEntry.args[0] ?? null;
+    const stateArg: string | null = commandEntry.args[1] ?? null;
+
+    if (!targetArg && !stateArg) {
+      return this.trackingService.getUserAlertFilters(userRef);
+    }
+
+    if (!targetArg || !stateArg) {
+      return ['Формат: /filters <transfer|swap> <on|off>', 'Или: /filters'].join('\n');
+    }
+
+    const normalizedTarget: string = targetArg.trim().toLowerCase();
+    const normalizedState: string = stateArg.trim().toLowerCase();
+
+    if (normalizedState !== 'on' && normalizedState !== 'off') {
+      return 'Неверное значение. Используй on/off.';
+    }
+
+    const enabled: boolean = normalizedState === 'on';
+    const target: AlertFilterToggleTarget | null =
+      ALERT_FILTER_TARGET_MAP[normalizedTarget] ?? null;
+
+    if (!target) {
+      return 'Неизвестный фильтр. Используй transfer или swap.';
+    }
+
+    return this.trackingService.setEventTypeFilter(userRef, target, enabled);
+  }
+
+  private async executeSetMinCommand(
+    userRef: TelegramUserRef | null,
+    commandEntry: ParsedMessageCommand,
+    updateMeta: UpdateMeta,
+  ): Promise<string> {
+    if (!userRef) {
+      this.logger.warn(
+        `Setmin command rejected: user context is missing line=${commandEntry.lineNumber} updateId=${updateMeta.updateId ?? 'n/a'}`,
+      );
+      return 'Не удалось определить пользователя.';
+    }
+
+    const amountArg: string | null = commandEntry.args[0] ?? null;
+
+    if (!amountArg) {
+      return [
+        'Передай минимальную сумму.',
+        'Формат: /setmin <amount>',
+        'Пример: /setmin 1000',
+      ].join('\n');
+    }
+
+    return this.trackingService.setMinimumAlertAmount(userRef, amountArg);
+  }
+
+  private async executeMuteCommand(
+    userRef: TelegramUserRef | null,
+    commandEntry: ParsedMessageCommand,
+    updateMeta: UpdateMeta,
+  ): Promise<string> {
+    if (!userRef) {
+      this.logger.warn(
+        `Mute command rejected: user context is missing line=${commandEntry.lineNumber} updateId=${updateMeta.updateId ?? 'n/a'}`,
+      );
+      return 'Не удалось определить пользователя.';
+    }
+
+    const minutesArg: string | null = commandEntry.args[0] ?? null;
+
+    if (!minutesArg) {
+      return [
+        'Передай время в минутах или off.',
+        'Формат: /mute <minutes|off>',
+        'Пример: /mute 30',
+      ].join('\n');
+    }
+
+    return this.trackingService.setMuteAlerts(userRef, minutesArg);
+  }
+
   private buildStartMessage(): string {
     return [
       'Whale Alert Bot готов к работе.',
@@ -372,6 +485,9 @@ export class TelegramUpdate {
       '/track <address> [label]',
       '/list',
       '/history <address|#id> [limit]',
+      '/filters',
+      '/setmin <amount>',
+      '/mute <minutes|off>',
       '',
       'Можно отправлять несколько команд одним сообщением, по одной на строку.',
       'Подробности: /help',
@@ -385,10 +501,16 @@ export class TelegramUpdate {
       '/list - показать список адресов и их id',
       '/untrack <address|id> - удалить адрес',
       '/history <address|#id> [limit] - последние транзакции',
+      '/filters - показать/изменить фильтры',
+      '/setmin <amount> - минимальная сумма алерта',
+      '/mute <minutes|off> - пауза алертов',
       '',
       'Примеры:',
       '/track 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045 vitalik',
       '/history #1 10',
+      '/filters transfer off',
+      '/setmin 1000',
+      '/mute 30',
       '/untrack #1',
       '',
       'Подсказка по адресу:',
@@ -661,9 +783,9 @@ export class TelegramUpdate {
 
   private buildReplyOptions(): ReplyOptions {
     return Markup.keyboard([
-      ['🏠 Главное меню', '📋 Мой список'],
-      ['➕ Добавить адрес', '📜 История'],
-      ['🗑 Удалить адрес', '❓ Помощь'],
+      ['🏠 Главное меню', '📋 Мой список', '⚙️ Фильтры'],
+      ['➕ Добавить адрес', '📜 История', '🗑 Удалить адрес'],
+      ['❓ Помощь'],
     ])
       .resize()
       .persistent();

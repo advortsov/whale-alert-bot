@@ -12,10 +12,18 @@ import {
   type HistoryRateLimitDecision,
 } from './history-rate-limiter.interfaces';
 import { HistoryRateLimiterService } from './history-rate-limiter.service';
-import type { TelegramUserRef, TrackedWalletOption } from './tracking.interfaces';
+import {
+  AlertFilterToggleTarget,
+  type TelegramUserRef,
+  type TrackedWalletOption,
+  type UserAlertPreferences,
+} from './tracking.interfaces';
 import { AppConfigService } from '../config/app-config.service';
+import type { UserAlertPreferenceRow } from '../storage/database.types';
 import { SubscriptionsRepository } from '../storage/repositories/subscriptions.repository';
 import { TrackedWalletsRepository } from '../storage/repositories/tracked-wallets.repository';
+import { AlertEventFilterType } from '../storage/repositories/user-alert-preferences.interfaces';
+import { UserAlertPreferencesRepository } from '../storage/repositories/user-alert-preferences.repository';
 import { UsersRepository } from '../storage/repositories/users.repository';
 
 @Injectable()
@@ -31,6 +39,7 @@ export class TrackingService {
     private readonly etherscanHistoryService: EtherscanHistoryService,
     private readonly historyCacheService: HistoryCacheService,
     private readonly historyRateLimiterService: HistoryRateLimiterService,
+    private readonly userAlertPreferencesRepository: UserAlertPreferencesRepository,
     private readonly appConfigService: AppConfigService,
   ) {}
 
@@ -197,6 +206,71 @@ export class TrackingService {
     return removedByAddress
       ? `Удалил адрес ${normalizedAddress} из отслеживания.`
       : `Адрес ${normalizedAddress} не найден в списке. Проверь /list.`;
+  }
+
+  public async getUserAlertFilters(userRef: TelegramUserRef): Promise<string> {
+    const user = await this.usersRepository.findOrCreate(userRef.telegramId, userRef.username);
+    const preferencesRow: UserAlertPreferenceRow =
+      await this.userAlertPreferencesRepository.findOrCreateByUserId(user.id);
+    const preferences: UserAlertPreferences = this.mapPreferences(preferencesRow);
+    const mutedUntilText: string = preferences.mutedUntil
+      ? this.formatTimestamp(preferences.mutedUntil)
+      : 'выключен';
+
+    return [
+      'Текущие фильтры алертов:',
+      `- min amount: ${preferences.minAmount.toFixed(6)}`,
+      `- transfer: ${preferences.allowTransfer ? 'on' : 'off'}`,
+      `- swap: ${preferences.allowSwap ? 'on' : 'off'}`,
+      `- mute до: ${mutedUntilText}`,
+      '',
+      'Команды:',
+      '/setmin <amount>',
+      '/mute <minutes|off>',
+      '/filters transfer <on|off>',
+      '/filters swap <on|off>',
+    ].join('\n');
+  }
+
+  public async setMinimumAlertAmount(userRef: TelegramUserRef, rawAmount: string): Promise<string> {
+    const minAmount: number = this.parseMinAmount(rawAmount);
+    const user = await this.usersRepository.findOrCreate(userRef.telegramId, userRef.username);
+    const updatedRow: UserAlertPreferenceRow =
+      await this.userAlertPreferencesRepository.updateMinAmount(user.id, minAmount);
+    const preferences: UserAlertPreferences = this.mapPreferences(updatedRow);
+
+    return `Установил минимальную сумму алерта: ${preferences.minAmount.toFixed(6)}.`;
+  }
+
+  public async setMuteAlerts(userRef: TelegramUserRef, rawMinutes: string): Promise<string> {
+    const user = await this.usersRepository.findOrCreate(userRef.telegramId, userRef.username);
+    const mutedUntil: Date | null = this.parseMuteUntil(rawMinutes);
+    const updatedRow: UserAlertPreferenceRow = await this.userAlertPreferencesRepository.updateMute(
+      user.id,
+      mutedUntil,
+    );
+    const preferences: UserAlertPreferences = this.mapPreferences(updatedRow);
+
+    if (!preferences.mutedUntil) {
+      return 'Mute выключен. Алерты снова активны.';
+    }
+
+    return `Алерты отключены до ${this.formatTimestamp(preferences.mutedUntil)}.`;
+  }
+
+  public async setEventTypeFilter(
+    userRef: TelegramUserRef,
+    target: AlertFilterToggleTarget,
+    enabled: boolean,
+  ): Promise<string> {
+    const user = await this.usersRepository.findOrCreate(userRef.telegramId, userRef.username);
+    const targetType: AlertEventFilterType =
+      target === AlertFilterToggleTarget.TRANSFER
+        ? AlertEventFilterType.TRANSFER
+        : AlertEventFilterType.SWAP;
+    await this.userAlertPreferencesRepository.updateEventType(user.id, targetType, enabled);
+
+    return `Фильтр ${target} -> ${enabled ? 'on' : 'off'}.`;
   }
 
   public async getAddressHistory(
@@ -372,6 +446,58 @@ export class TrackingService {
     }
 
     return limit;
+  }
+
+  private mapPreferences(row: UserAlertPreferenceRow): UserAlertPreferences {
+    const minAmount: number = Number.parseFloat(String(row.min_amount));
+
+    return {
+      minAmount: Number.isNaN(minAmount) ? 0 : minAmount,
+      allowTransfer: row.allow_transfer,
+      allowSwap: row.allow_swap,
+      mutedUntil: row.muted_until,
+    };
+  }
+
+  private parseMinAmount(rawAmount: string): number {
+    const normalizedAmount: string = rawAmount.trim();
+
+    if (!/^\d+(\.\d+)?$/.test(normalizedAmount)) {
+      throw new Error('Неверный формат суммы. Пример: /setmin 1000 или /setmin 12.5');
+    }
+
+    const parsedAmount: number = Number.parseFloat(normalizedAmount);
+
+    if (Number.isNaN(parsedAmount) || parsedAmount < 0) {
+      throw new Error('Минимальная сумма должна быть неотрицательным числом.');
+    }
+
+    return parsedAmount;
+  }
+
+  private parseMuteUntil(rawMinutes: string): Date | null {
+    const normalizedMinutes: string = rawMinutes.trim().toLowerCase();
+
+    if (normalizedMinutes === 'off' || normalizedMinutes === '0') {
+      return null;
+    }
+
+    if (!/^\d+$/.test(normalizedMinutes)) {
+      throw new Error('Неверный формат mute. Используй /mute <minutes|off>.');
+    }
+
+    const minutes: number = Number.parseInt(normalizedMinutes, 10);
+
+    if (minutes < 0 || minutes > 10_080) {
+      throw new Error('mute должен быть от 0 до 10080 минут.');
+    }
+
+    if (minutes === 0) {
+      return null;
+    }
+
+    const now: Date = new Date();
+    return new Date(now.getTime() + minutes * 60_000);
   }
 
   private formatHistoryMessage(
