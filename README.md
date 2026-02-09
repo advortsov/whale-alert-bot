@@ -15,6 +15,7 @@ Telegram-бот на `NestJS + TypeScript` для отслеживания ак�
 
 - `/track <address> [label]`
 - `/list`
+- `/wallet <#id>`
 - `/untrack <address|id>`
 - `/history <address> [limit]`
 - `/filters`

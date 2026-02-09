@@ -159,6 +159,34 @@ export class TrackingService {
     );
   }
 
+  public async getWalletDetails(userRef: TelegramUserRef, rawWalletId: string): Promise<string> {
+    const user = await this.usersRepository.findOrCreate(userRef.telegramId, userRef.username);
+    const walletId: number | null = this.parseWalletId(rawWalletId);
+
+    if (walletId === null) {
+      throw new Error('Неверный id кошелька. Используй формат /wallet #3.');
+    }
+
+    const subscriptions = await this.subscriptionsRepository.listByUserId(user.id);
+    const matchedSubscription = subscriptions.find(
+      (subscription): boolean => subscription.walletId === walletId,
+    );
+
+    if (!matchedSubscription) {
+      throw new Error(`Не нашел адрес с id #${walletId}. Сначала проверь /list.`);
+    }
+
+    const labelText: string = matchedSubscription.walletLabel ?? 'без ярлыка';
+
+    return [
+      `Кошелек #${matchedSubscription.walletId}`,
+      `Label: ${labelText}`,
+      `Address: ${matchedSubscription.walletAddress}`,
+      `История: /history #${matchedSubscription.walletId} 10`,
+      `Удалить: /untrack #${matchedSubscription.walletId}`,
+    ].join('\n');
+  }
+
   public async untrackAddress(userRef: TelegramUserRef, rawIdentifier: string): Promise<string> {
     this.logger.debug(
       `untrackAddress start telegramId=${userRef.telegramId} identifier=${rawIdentifier}`,

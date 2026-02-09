@@ -340,4 +340,23 @@ describe('TrackingService', (): void => {
     expect(message).toContain('Текущие фильтры алертов');
     expect(message).toContain('transfer: on');
   });
+
+  it('returns wallet details by wallet id', async (): Promise<void> => {
+    const context: TestContext = createTestContext();
+    context.subscriptionsRepositoryStub.listByUserId.mockResolvedValue([
+      {
+        subscriptionId: 1,
+        walletId: 9,
+        walletAddress: '0x2F0b23f53734252Bda2277357e97e1517d6B042A',
+        walletLabel: 'Maker_ETH_Vault',
+        createdAt: new Date('2026-02-01T00:00:00.000Z'),
+      },
+    ]);
+
+    const message: string = await context.service.getWalletDetails(context.userRef, '#9');
+
+    expect(message).toContain('Кошелек #9');
+    expect(message).toContain('Maker_ETH_Vault');
+    expect(message).toContain('/history #9 10');
+  });
 });

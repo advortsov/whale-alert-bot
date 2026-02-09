@@ -7,11 +7,13 @@ import type { Message } from 'telegraf/typings/core/types/typegram';
 
 import {
   SupportedTelegramCommand,
+  WalletCallbackAction,
+  WalletCallbackTargetType,
   type CommandExecutionResult,
   type ParsedMessageCommand,
   type ReplyOptions,
   type UpdateMeta,
-  type WalletHistoryCallbackTarget,
+  type WalletCallbackTarget,
 } from './telegram.interfaces';
 import { HistoryRequestSource } from '../tracking/history-rate-limiter.interfaces';
 import {
@@ -28,6 +30,7 @@ const SUPPORTED_COMMAND_MAP: Readonly<Record<string, SupportedTelegramCommand>> 
   list: SupportedTelegramCommand.LIST,
   untrack: SupportedTelegramCommand.UNTRACK,
   history: SupportedTelegramCommand.HISTORY,
+  wallet: SupportedTelegramCommand.WALLET,
   filters: SupportedTelegramCommand.FILTERS,
   setmin: SupportedTelegramCommand.SETMIN,
   mute: SupportedTelegramCommand.MUTE,
@@ -50,6 +53,10 @@ const ALERT_FILTER_TARGET_MAP: Readonly<Record<string, AlertFilterToggleTarget>>
 
 const WALLET_HISTORY_CALLBACK_PREFIX: string = 'wallet_history:';
 const WALLET_HISTORY_ADDR_CALLBACK_PREFIX: string = 'wallet_history_addr:';
+const WALLET_MENU_CALLBACK_PREFIX: string = 'wallet_menu:';
+const WALLET_UNTRACK_CALLBACK_PREFIX: string = 'wallet_untrack:';
+const WALLET_MUTE_CALLBACK_PREFIX: string = 'wallet_mute:';
+const WALLET_FILTERS_CALLBACK_PREFIX: string = 'wallet_filters:';
 const CALLBACK_HISTORY_LIMIT: string = '10';
 
 @Update()
@@ -115,8 +122,7 @@ export class TelegramUpdate {
       return;
     }
 
-    const callbackTarget: WalletHistoryCallbackTarget | null =
-      this.parseWalletHistoryCallbackData(callbackData);
+    const callbackTarget: WalletCallbackTarget | null = this.parseWalletCallbackData(callbackData);
 
     if (callbackTarget === null) {
       await this.answerCallbackSafe(ctx, 'Неизвестное действие.');
@@ -128,28 +134,18 @@ export class TelegramUpdate {
       return;
     }
 
-    await this.answerCallbackSafe(ctx, 'Загружаю историю...');
+    await this.answerCallbackSafe(ctx, 'Выполняю действие...');
 
     try {
-      const historyMessage: string =
-        callbackTarget.targetType === 'address'
-          ? await this.trackingService.getAddressHistoryWithPolicy(
-              userRef,
-              callbackTarget.walletAddress,
-              CALLBACK_HISTORY_LIMIT,
-              HistoryRequestSource.CALLBACK,
-            )
-          : await this.trackingService.getAddressHistoryWithPolicy(
-              userRef,
-              `#${callbackTarget.walletId}`,
-              CALLBACK_HISTORY_LIMIT,
-              HistoryRequestSource.CALLBACK,
-            );
-      await this.replyWithLog(ctx, historyMessage, updateMeta, this.buildHistoryReplyOptions());
+      const response: CommandExecutionResult = await this.executeWalletCallbackAction(
+        userRef,
+        callbackTarget,
+      );
+      await this.replyWithLog(ctx, response.message, updateMeta, response.replyOptions);
     } catch (error: unknown) {
       const errorMessage: string = error instanceof Error ? error.message : String(error);
       this.logger.warn(
-        `Callback history failed: callbackData=${callbackData} reason=${errorMessage}`,
+        `Callback action failed: callbackData=${callbackData} reason=${errorMessage}`,
       );
       await this.replyWithLog(ctx, `Ошибка обработки команд: ${errorMessage}`, updateMeta);
     }
@@ -199,6 +195,17 @@ export class TelegramUpdate {
         case SupportedTelegramCommand.HISTORY:
           message = await this.executeHistoryCommand(userRef, commandEntry, updateMeta);
           replyOptions = this.buildHistoryReplyOptions();
+          break;
+        case SupportedTelegramCommand.WALLET:
+          {
+            const walletResult: CommandExecutionResult = await this.executeWalletCommand(
+              userRef,
+              commandEntry,
+              updateMeta,
+            );
+            message = walletResult.message;
+            replyOptions = walletResult.replyOptions;
+          }
           break;
         case SupportedTelegramCommand.FILTERS:
           message = await this.executeFiltersCommand(userRef, commandEntry, updateMeta);
@@ -299,7 +306,7 @@ export class TelegramUpdate {
       lineNumber: commandEntry.lineNumber,
       message: responseMessage,
       replyOptions:
-        walletOptions.length > 0 ? this.buildWalletHistoryInlineKeyboard(walletOptions) : null,
+        walletOptions.length > 0 ? this.buildWalletMenuInlineKeyboard(walletOptions) : null,
     };
   }
 
@@ -378,6 +385,130 @@ export class TelegramUpdate {
     );
 
     return responseMessage;
+  }
+
+  private async executeWalletCommand(
+    userRef: TelegramUserRef | null,
+    commandEntry: ParsedMessageCommand,
+    updateMeta: UpdateMeta,
+  ): Promise<CommandExecutionResult> {
+    if (!userRef) {
+      this.logger.warn(
+        `Wallet command rejected: user context is missing line=${commandEntry.lineNumber} updateId=${updateMeta.updateId ?? 'n/a'}`,
+      );
+      return {
+        lineNumber: commandEntry.lineNumber,
+        message: 'Не удалось определить пользователя.',
+        replyOptions: null,
+      };
+    }
+
+    const rawWalletId: string | null = commandEntry.args[0] ?? null;
+
+    if (!rawWalletId) {
+      return {
+        lineNumber: commandEntry.lineNumber,
+        message: ['Передай id кошелька.', 'Формат: /wallet #3', 'Посмотреть id: /list'].join('\n'),
+        replyOptions: null,
+      };
+    }
+
+    const message: string = await this.trackingService.getWalletDetails(userRef, rawWalletId);
+    const normalizedWalletId: number | null = this.parseWalletId(rawWalletId);
+
+    return {
+      lineNumber: commandEntry.lineNumber,
+      message,
+      replyOptions:
+        normalizedWalletId !== null
+          ? this.buildWalletActionInlineKeyboard(normalizedWalletId)
+          : null,
+    };
+  }
+
+  private async executeWalletCallbackAction(
+    userRef: TelegramUserRef,
+    callbackTarget: WalletCallbackTarget,
+  ): Promise<CommandExecutionResult> {
+    if (callbackTarget.action === WalletCallbackAction.MENU) {
+      if (callbackTarget.walletId === null) {
+        throw new Error('Callback не содержит id кошелька.');
+      }
+
+      const message: string = await this.trackingService.getWalletDetails(
+        userRef,
+        `#${callbackTarget.walletId}`,
+      );
+
+      return {
+        lineNumber: 1,
+        message,
+        replyOptions: this.buildWalletActionInlineKeyboard(callbackTarget.walletId),
+      };
+    }
+
+    if (callbackTarget.action === WalletCallbackAction.HISTORY) {
+      const historyMessage: string =
+        callbackTarget.targetType === WalletCallbackTargetType.ADDRESS &&
+        callbackTarget.walletAddress !== null
+          ? await this.trackingService.getAddressHistoryWithPolicy(
+              userRef,
+              callbackTarget.walletAddress,
+              CALLBACK_HISTORY_LIMIT,
+              HistoryRequestSource.CALLBACK,
+            )
+          : await this.trackingService.getAddressHistoryWithPolicy(
+              userRef,
+              `#${callbackTarget.walletId}`,
+              CALLBACK_HISTORY_LIMIT,
+              HistoryRequestSource.CALLBACK,
+            );
+
+      return {
+        lineNumber: 1,
+        message: historyMessage,
+        replyOptions: this.buildHistoryReplyOptions(),
+      };
+    }
+
+    if (callbackTarget.action === WalletCallbackAction.UNTRACK) {
+      if (callbackTarget.walletId === null) {
+        throw new Error('Callback не содержит id кошелька.');
+      }
+
+      const message: string = await this.trackingService.untrackAddress(
+        userRef,
+        `#${callbackTarget.walletId}`,
+      );
+
+      return {
+        lineNumber: 1,
+        message,
+        replyOptions: null,
+      };
+    }
+
+    if (callbackTarget.action === WalletCallbackAction.MUTE) {
+      const muteMinutes: number = callbackTarget.muteMinutes ?? 30;
+      const message: string = await this.trackingService.setMuteAlerts(
+        userRef,
+        String(muteMinutes),
+      );
+
+      return {
+        lineNumber: 1,
+        message,
+        replyOptions: null,
+      };
+    }
+
+    const message: string = await this.trackingService.getUserAlertFilters(userRef);
+
+    return {
+      lineNumber: 1,
+      message,
+      replyOptions: null,
+    };
   }
 
   private async executeFiltersCommand(
@@ -484,6 +615,7 @@ export class TelegramUpdate {
       'Быстрый старт:',
       '/track <address> [label]',
       '/list',
+      '/wallet #id',
       '/history <address|#id> [limit]',
       '/filters',
       '/setmin <amount>',
@@ -499,6 +631,7 @@ export class TelegramUpdate {
       'Команды:',
       '/track <address> [label] - добавить адрес',
       '/list - показать список адресов и их id',
+      '/wallet <#id> - карточка кошелька и действия кнопками',
       '/untrack <address|id> - удалить адрес',
       '/history <address|#id> [limit] - последние транзакции',
       '/filters - показать/изменить фильтры',
@@ -708,7 +841,69 @@ export class TelegramUpdate {
     return typeof callbackQuery.data === 'string' ? callbackQuery.data : null;
   }
 
-  private parseWalletHistoryCallbackData(callbackData: string): WalletHistoryCallbackTarget | null {
+  private parseWalletCallbackData(callbackData: string): WalletCallbackTarget | null {
+    if (callbackData.startsWith(WALLET_MENU_CALLBACK_PREFIX)) {
+      const walletId: number | null = this.parseWalletId(
+        callbackData.slice(WALLET_MENU_CALLBACK_PREFIX.length),
+      );
+
+      if (walletId === null) {
+        return null;
+      }
+
+      return {
+        action: WalletCallbackAction.MENU,
+        targetType: WalletCallbackTargetType.WALLET_ID,
+        walletId,
+        walletAddress: null,
+        muteMinutes: null,
+      };
+    }
+
+    if (callbackData.startsWith(WALLET_UNTRACK_CALLBACK_PREFIX)) {
+      const walletId: number | null = this.parseWalletId(
+        callbackData.slice(WALLET_UNTRACK_CALLBACK_PREFIX.length),
+      );
+
+      if (walletId === null) {
+        return null;
+      }
+
+      return {
+        action: WalletCallbackAction.UNTRACK,
+        targetType: WalletCallbackTargetType.WALLET_ID,
+        walletId,
+        walletAddress: null,
+        muteMinutes: null,
+      };
+    }
+
+    if (callbackData.startsWith(WALLET_MUTE_CALLBACK_PREFIX)) {
+      const rawMinutes: string = callbackData.slice(WALLET_MUTE_CALLBACK_PREFIX.length);
+
+      if (!/^\d+$/.test(rawMinutes)) {
+        return null;
+      }
+
+      return {
+        action: WalletCallbackAction.MUTE,
+        targetType: WalletCallbackTargetType.WALLET_ID,
+        walletId: null,
+        walletAddress: null,
+        muteMinutes: Number.parseInt(rawMinutes, 10),
+      };
+    }
+
+    if (callbackData.startsWith(WALLET_FILTERS_CALLBACK_PREFIX)) {
+      return {
+        action: WalletCallbackAction.FILTERS,
+        targetType: WalletCallbackTargetType.WALLET_ID,
+        walletId: null,
+        walletAddress: null,
+        muteMinutes: null,
+      };
+    }
+
     if (callbackData.startsWith(WALLET_HISTORY_ADDR_CALLBACK_PREFIX)) {
       const rawAddress: string = callbackData.slice(WALLET_HISTORY_ADDR_CALLBACK_PREFIX.length);
 
@@ -717,25 +912,43 @@ export class TelegramUpdate {
       }
 
       return {
-        targetType: 'address',
+        action: WalletCallbackAction.HISTORY,
+        targetType: WalletCallbackTargetType.ADDRESS,
+        walletId: null,
         walletAddress: rawAddress,
+        muteMinutes: null,
       };
     }
 
-    if (!callbackData.startsWith(WALLET_HISTORY_CALLBACK_PREFIX)) {
+    if (callbackData.startsWith(WALLET_HISTORY_CALLBACK_PREFIX)) {
+      const walletId: number | null = this.parseWalletId(
+        callbackData.slice(WALLET_HISTORY_CALLBACK_PREFIX.length),
+      );
+
+      if (walletId === null) {
+        return null;
+      }
+
+      return {
+        action: WalletCallbackAction.HISTORY,
+        targetType: WalletCallbackTargetType.WALLET_ID,
+        walletId,
+        walletAddress: null,
+        muteMinutes: null,
+      };
+    }
+
+    return null;
+  }
+
+  private parseWalletId(rawWalletId: string): number | null {
+    const normalizedWalletId: string = rawWalletId.trim().replace('#', '');
+
+    if (!/^\d+$/.test(normalizedWalletId)) {
       return null;
     }
 
-    const rawWalletId: string = callbackData.slice(WALLET_HISTORY_CALLBACK_PREFIX.length);
-
-    if (!/^\d+$/.test(rawWalletId)) {
-      return null;
-    }
-
-    return {
-      targetType: 'wallet_id',
-      walletId: Number.parseInt(rawWalletId, 10),
-    };
+    return Number.parseInt(normalizedWalletId, 10);
   }
 
   private getUpdateMeta(ctx: Context): UpdateMeta {
@@ -814,14 +1027,14 @@ export class TelegramUpdate {
     }
   }
 
-  private buildWalletHistoryInlineKeyboard(
+  private buildWalletMenuInlineKeyboard(
     walletOptions: readonly TrackedWalletOption[],
   ): ReplyOptions {
     const rows: InlineKeyboardButton.CallbackButton[][] = walletOptions.map(
       (wallet): InlineKeyboardButton.CallbackButton[] => [
         {
-          text: this.buildWalletHistoryButtonText(wallet),
-          callback_data: `${WALLET_HISTORY_ADDR_CALLBACK_PREFIX}${wallet.walletAddress}`,
+          text: this.buildWalletMenuButtonText(wallet),
+          callback_data: `${WALLET_MENU_CALLBACK_PREFIX}${String(wallet.walletId)}`,
         },
       ],
     );
@@ -829,13 +1042,40 @@ export class TelegramUpdate {
     return Markup.inlineKeyboard(rows);
   }
 
-  private buildWalletHistoryButtonText(wallet: TrackedWalletOption): string {
+  private buildWalletActionInlineKeyboard(walletId: number): ReplyOptions {
+    const rows: InlineKeyboardButton.CallbackButton[][] = [
+      [
+        {
+          text: '📜 История',
+          callback_data: `${WALLET_HISTORY_CALLBACK_PREFIX}${String(walletId)}`,
+        },
+        {
+          text: '🗑 Удалить',
+          callback_data: `${WALLET_UNTRACK_CALLBACK_PREFIX}${String(walletId)}`,
+        },
+      ],
+      [
+        {
+          text: '⏸ Mute 30m',
+          callback_data: `${WALLET_MUTE_CALLBACK_PREFIX}30`,
+        },
+        {
+          text: '⚙️ Фильтры',
+          callback_data: WALLET_FILTERS_CALLBACK_PREFIX,
+        },
+      ],
+    ];
+
+    return Markup.inlineKeyboard(rows);
+  }
+
+  private buildWalletMenuButtonText(wallet: TrackedWalletOption): string {
     const titleSource: string = wallet.walletLabel ?? this.shortAddress(wallet.walletAddress);
     const normalizedTitle: string = titleSource.trim();
     const title: string =
       normalizedTitle.length > 24 ? `${normalizedTitle.slice(0, 21)}...` : normalizedTitle;
 
-    return `📜 #${wallet.walletId} ${title}`;
+    return `📁 #${wallet.walletId} ${title}`;
   }
 
   private shortAddress(address: string): string {

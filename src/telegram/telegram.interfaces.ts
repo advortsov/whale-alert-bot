@@ -7,6 +7,7 @@ export enum SupportedTelegramCommand {
   LIST = 'list',
   UNTRACK = 'untrack',
   HISTORY = 'history',
+  WALLET = 'wallet',
   FILTERS = 'filters',
   SETMIN = 'setmin',
   MUTE = 'mute',
@@ -35,12 +36,23 @@ export type UpdateMeta = {
   readonly messageId: number | null;
 };
 
-export type WalletHistoryCallbackTarget =
-  | {
-      readonly targetType: 'wallet_id';
-      readonly walletId: number;
-    }
-  | {
-      readonly targetType: 'address';
-      readonly walletAddress: string;
-    };
+export enum WalletCallbackTargetType {
+  WALLET_ID = 'wallet_id',
+  ADDRESS = 'address',
+}
+
+export enum WalletCallbackAction {
+  MENU = 'menu',
+  HISTORY = 'history',
+  UNTRACK = 'untrack',
+  MUTE = 'mute',
+  FILTERS = 'filters',
+}
+
+export type WalletCallbackTarget = {
+  readonly action: WalletCallbackAction;
+  readonly targetType: WalletCallbackTargetType;
+  readonly walletId: number | null;
+  readonly walletAddress: string | null;
+  readonly muteMinutes: number | null;
+};

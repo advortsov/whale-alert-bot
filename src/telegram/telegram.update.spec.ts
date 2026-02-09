@@ -1,6 +1,11 @@
 import type { Context } from 'telegraf';
 import { describe, expect, it, vi } from 'vitest';
 
+import {
+  WalletCallbackAction,
+  WalletCallbackTargetType,
+  type WalletCallbackTarget,
+} from './telegram.interfaces';
 import { TelegramUpdate } from './telegram.update';
 import { HistoryRequestSource } from '../tracking/history-rate-limiter.interfaces';
 import type { TrackingService } from '../tracking/tracking.service';
@@ -13,16 +18,7 @@ type ParsedMessageCommandView = {
 
 type TelegramUpdatePrivateApi = {
   parseMessageCommands: (rawText: string) => readonly ParsedMessageCommandView[];
-  parseWalletHistoryCallbackData: (callbackData: string) =>
-    | {
-        readonly targetType: 'wallet_id';
-        readonly walletId: number;
-      }
-    | {
-        readonly targetType: 'address';
-        readonly walletAddress: string;
-      }
-    | null;
+  parseWalletCallbackData: (callbackData: string) => WalletCallbackTarget | null;
 };
 
 describe('TelegramUpdate', (): void => {
@@ -118,6 +114,22 @@ describe('TelegramUpdate', (): void => {
     });
   });
 
+  it('parses /wallet command with wallet id', (): void => {
+    const trackingServiceStub: TrackingService = {} as TrackingService;
+    const update: TelegramUpdate = new TelegramUpdate(trackingServiceStub);
+    const privateApi: TelegramUpdatePrivateApi = update as unknown as TelegramUpdatePrivateApi;
+
+    const parsed: readonly ParsedMessageCommandView[] =
+      privateApi.parseMessageCommands('/wallet #12');
+
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0]).toMatchObject({
+      command: 'wallet',
+      args: ['#12'],
+      lineNumber: 1,
+    });
+  });
+
   it('parses menu button text into mapped command', (): void => {
     const trackingServiceStub: TrackingService = {} as TrackingService;
     const update: TelegramUpdate = new TelegramUpdate(trackingServiceStub);
@@ -139,10 +151,11 @@ describe('TelegramUpdate', (): void => {
     const update: TelegramUpdate = new TelegramUpdate(trackingServiceStub);
     const privateApi: TelegramUpdatePrivateApi = update as unknown as TelegramUpdatePrivateApi;
 
-    const callbackTarget = privateApi.parseWalletHistoryCallbackData('wallet_history:15');
+    const callbackTarget = privateApi.parseWalletCallbackData('wallet_history:15');
 
     expect(callbackTarget).toMatchObject({
-      targetType: 'wallet_id',
+      action: WalletCallbackAction.HISTORY,
+      targetType: WalletCallbackTargetType.WALLET_ID,
       walletId: 15,
     });
   });
@@ -152,13 +165,28 @@ describe('TelegramUpdate', (): void => {
     const update: TelegramUpdate = new TelegramUpdate(trackingServiceStub);
     const privateApi: TelegramUpdatePrivateApi = update as unknown as TelegramUpdatePrivateApi;
 
-    const callbackTarget = privateApi.parseWalletHistoryCallbackData(
+    const callbackTarget = privateApi.parseWalletCallbackData(
       'wallet_history_addr:0x96b0Dc619A86572524c15C1fC9c42DA9A94BCAa0',
     );
 
     expect(callbackTarget).toMatchObject({
-      targetType: 'address',
+      action: WalletCallbackAction.HISTORY,
+      targetType: WalletCallbackTargetType.ADDRESS,
       walletAddress: '0x96b0Dc619A86572524c15C1fC9c42DA9A94BCAa0',
+    });
+  });
+
+  it('parses wallet menu callback by wallet id', (): void => {
+    const trackingServiceStub: TrackingService = {} as TrackingService;
+    const update: TelegramUpdate = new TelegramUpdate(trackingServiceStub);
+    const privateApi: TelegramUpdatePrivateApi = update as unknown as TelegramUpdatePrivateApi;
+
+    const callbackTarget = privateApi.parseWalletCallbackData('wallet_menu:7');
+
+    expect(callbackTarget).toMatchObject({
+      action: WalletCallbackAction.MENU,
+      targetType: WalletCallbackTargetType.WALLET_ID,
+      walletId: 7,
     });
   });
 
@@ -167,7 +195,7 @@ describe('TelegramUpdate', (): void => {
     const update: TelegramUpdate = new TelegramUpdate(trackingServiceStub);
     const privateApi: TelegramUpdatePrivateApi = update as unknown as TelegramUpdatePrivateApi;
 
-    const callbackTarget = privateApi.parseWalletHistoryCallbackData('wallet_history:abc');
+    const callbackTarget = privateApi.parseWalletCallbackData('wallet_history:abc');
 
     expect(callbackTarget).toBeNull();
   });
@@ -210,7 +238,7 @@ describe('TelegramUpdate', (): void => {
       '10',
       HistoryRequestSource.CALLBACK,
     );
-    expect(answerCbQueryMock).toHaveBeenCalledWith('Загружаю историю...');
+    expect(answerCbQueryMock).toHaveBeenCalledWith('Выполняю действие...');
     expect(replyMock).toHaveBeenCalledWith(
       'Ошибка обработки команд: Слишком часто нажимаешь кнопку истории. Повтори через 2 сек.',
       expect.anything(),
