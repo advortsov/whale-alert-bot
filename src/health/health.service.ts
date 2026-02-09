@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 
 import type { AppHealthStatus, ComponentHealth } from './health.types';
-import { ChainId } from '../chain/chain.types';
 import { ProviderFactory } from '../chain/providers/provider.factory';
 import { AppConfigService } from '../config/app-config.service';
+import { ChainKey } from '../core/chains/chain-key.interfaces';
 import { DatabaseService } from '../storage/database.service';
 
 @Injectable()
@@ -20,14 +20,14 @@ export class HealthService {
     const rpcChecksEnabled: boolean = this.appConfigService.chainWatcherEnabled;
 
     const primaryProviderHealth = rpcChecksEnabled
-      ? await this.providerFactory.createPrimary(ChainId.ETHEREUM_MAINNET).healthCheck()
+      ? await this.providerFactory.createPrimary(ChainKey.ETHEREUM_MAINNET).healthCheck()
       : {
           provider: 'alchemy-primary',
           ok: true,
           details: 'disabled by CHAIN_WATCHER_ENABLED=false',
         };
     const fallbackProviderHealth = rpcChecksEnabled
-      ? await this.providerFactory.createFallback(ChainId.ETHEREUM_MAINNET).healthCheck()
+      ? await this.providerFactory.createFallback(ChainKey.ETHEREUM_MAINNET).healthCheck()
       : {
           provider: 'infura-fallback',
           ok: true,

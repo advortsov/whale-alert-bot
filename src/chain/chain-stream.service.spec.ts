@@ -1,4 +1,3 @@
-import type { TransactionReceipt, TransactionResponse } from 'ethers';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ChainStreamService } from './chain-stream.service';
@@ -10,16 +9,20 @@ import {
   type ObservedTransaction,
 } from './chain.types';
 import type { EventClassifierService } from './event-classifier.service';
-import type {
-  BlockWithTransactions,
-  ISubscriptionHandle,
-  ProviderOperation,
-} from './interfaces/rpc-provider.interface';
-import type { ProviderHealth } from './interfaces/rpc-provider.interface';
 import type { ProviderFailoverService } from './providers/provider-failover.service';
 import type { ProviderFactory } from './providers/provider.factory';
 import type { AlertDispatcherService } from '../alerts/alert-dispatcher.service';
 import type { AppConfigService } from '../config/app-config.service';
+import type {
+  BlockEnvelope,
+  ReceiptEnvelope,
+  TransactionEnvelope,
+} from '../core/ports/rpc/block-stream.interfaces';
+import type {
+  ISubscriptionHandle,
+  ProviderOperation,
+  ProviderHealth,
+} from '../core/ports/rpc/rpc-adapter.interfaces';
 import type { RuntimeStatusService } from '../runtime/runtime-status.service';
 import type { ChainCheckpointsRepository } from '../storage/repositories/chain-checkpoints.repository';
 import type { ProcessedEventsRepository } from '../storage/repositories/processed-events.repository';
@@ -28,16 +31,12 @@ import type { WalletEventsRepository } from '../storage/repositories/wallet-even
 
 class ProviderStub {
   public blockHandler: ((blockNumber: number) => Promise<void>) | null = null;
-  public getTransactionCalls: number = 0;
   public receiptCalls: string[] = [];
   public blockRequestCalls: number[] = [];
   public latestBlockNumber: number = 200;
-  private readonly blocks: Map<number, BlockWithTransactions> = new Map<
-    number,
-    BlockWithTransactions
-  >();
+  private readonly blocks: Map<number, BlockEnvelope> = new Map<number, BlockEnvelope>();
 
-  public setBlock(blockNumber: number, block: BlockWithTransactions): void {
+  public setBlock(blockNumber: number, block: BlockEnvelope): void {
     this.blocks.set(blockNumber, block);
   }
 
@@ -57,9 +56,7 @@ class ProviderStub {
     };
   }
 
-  public async getBlockWithTransactions(
-    blockNumber: number,
-  ): Promise<BlockWithTransactions | null> {
+  public async getBlockEnvelope(blockNumber: number): Promise<BlockEnvelope | null> {
     this.blockRequestCalls.push(blockNumber);
     return this.blocks.get(blockNumber) ?? null;
   }
@@ -68,21 +65,13 @@ class ProviderStub {
     return this.latestBlockNumber;
   }
 
-  public async getBlock(): Promise<null> {
-    return null;
-  }
-
-  public async getTransaction(): Promise<null> {
-    this.getTransactionCalls += 1;
-    return null;
-  }
-
-  public async getTransactionReceipt(txHash: string): Promise<TransactionReceipt | null> {
+  public async getReceiptEnvelope(txHash: string): Promise<ReceiptEnvelope | null> {
     this.receiptCalls.push(txHash);
 
     return {
+      txHash,
       logs: [],
-    } as unknown as TransactionReceipt;
+    };
   }
 
   public async healthCheck(): Promise<ProviderHealth> {
@@ -110,26 +99,30 @@ describe('ChainStreamService', (): void => {
   it('uses prefetched block transactions and requests receipts only for matched addresses', async (): Promise<void> => {
     const trackedAddress: string = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
     const providerStub: ProviderStub = new ProviderStub();
-    const txMatchedByFrom: TransactionResponse = {
+    const txMatchedByFrom: TransactionEnvelope = {
       hash: '0x1',
       from: trackedAddress,
       to: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-    } as TransactionResponse;
-    const txMatchedByTo: TransactionResponse = {
+      blockTimestampSec: 1_739_400_000,
+    };
+    const txMatchedByTo: TransactionEnvelope = {
       hash: '0x2',
       from: '0xcccccccccccccccccccccccccccccccccccccccc',
       to: trackedAddress,
-    } as TransactionResponse;
-    const txUnmatched: TransactionResponse = {
+      blockTimestampSec: 1_739_400_000,
+    };
+    const txUnmatched: TransactionEnvelope = {
       hash: '0x3',
       from: '0xdddddddddddddddddddddddddddddddddddddddd',
       to: '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
-    } as TransactionResponse;
+      blockTimestampSec: 1_739_400_000,
+    };
 
     providerStub.setBlock(123, {
-      timestamp: 1_739_400_000,
-      prefetchedTransactions: [txMatchedByFrom, txMatchedByTo, txUnmatched],
-    } as BlockWithTransactions);
+      number: 123,
+      timestampSec: 1_739_400_000,
+      transactions: [txMatchedByFrom, txMatchedByTo, txUnmatched],
+    });
 
     const providerFailoverService: ProviderFailoverService = {
       execute: async <T>(operation: ProviderOperation<T>): Promise<T> => operation(providerStub),
@@ -227,7 +220,6 @@ describe('ChainStreamService', (): void => {
       await sleep(10);
     }
 
-    expect(providerStub.getTransactionCalls).toBe(0);
     expect(providerStub.receiptCalls).toEqual(['0x1', '0x2']);
     expect(dispatched).toHaveLength(2);
     expect(saveEvent).toHaveBeenCalledTimes(2);
@@ -239,14 +231,17 @@ describe('ChainStreamService', (): void => {
     const trackedAddress: string = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
     const providerStub: ProviderStub = new ProviderStub();
     providerStub.setBlock(121, {
-      prefetchedTransactions: [
+      number: 121,
+      timestampSec: 1_739_400_000,
+      transactions: [
         {
           hash: '0xfinalized',
           from: trackedAddress,
           to: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-        } as TransactionResponse,
+          blockTimestampSec: 1_739_400_000,
+        },
       ],
-    } as BlockWithTransactions);
+    });
 
     const providerFailoverService: ProviderFailoverService = {
       execute: async <T>(operation: ProviderOperation<T>): Promise<T> => operation(providerStub),
@@ -350,32 +345,41 @@ describe('ChainStreamService', (): void => {
     const providerStub: ProviderStub = new ProviderStub();
     providerStub.latestBlockNumber = 125;
     providerStub.setBlock(121, {
-      prefetchedTransactions: [
+      number: 121,
+      timestampSec: 1_739_400_000,
+      transactions: [
         {
           hash: '0x121',
           from: trackedAddress,
           to: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-        } as TransactionResponse,
+          blockTimestampSec: 1_739_400_000,
+        },
       ],
-    } as BlockWithTransactions);
+    });
     providerStub.setBlock(122, {
-      prefetchedTransactions: [
+      number: 122,
+      timestampSec: 1_739_400_000,
+      transactions: [
         {
           hash: '0x122',
           from: trackedAddress,
           to: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-        } as TransactionResponse,
+          blockTimestampSec: 1_739_400_000,
+        },
       ],
-    } as BlockWithTransactions);
+    });
     providerStub.setBlock(123, {
-      prefetchedTransactions: [
+      number: 123,
+      timestampSec: 1_739_400_000,
+      transactions: [
         {
           hash: '0x123',
           from: trackedAddress,
           to: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-        } as TransactionResponse,
+          blockTimestampSec: 1_739_400_000,
+        },
       ],
-    } as BlockWithTransactions);
+    });
 
     const saveLastProcessedBlock: ReturnType<typeof vi.fn> = vi.fn().mockResolvedValue(undefined);
     const chainCheckpointsRepository: ChainCheckpointsRepository = {

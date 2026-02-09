@@ -1,9 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { formatUnits } from 'ethers';
 
 import { isEthereumAddressCandidate, tryNormalizeEthereumAddress } from './address.util';
-import type { HistoryTransactionItem } from './etherscan-history.interfaces';
-import { EtherscanHistoryService } from './etherscan-history.service';
 import type { HistoryCacheEntry } from './history-cache.interfaces';
 import { HistoryCacheService } from './history-cache.service';
 import type { HistoryPageResult } from './history-page.interfaces';
@@ -22,6 +20,11 @@ import {
   type WalletAlertFilterState,
 } from './tracking.interfaces';
 import { AppConfigService } from '../config/app-config.service';
+import { ChainKey } from '../core/chains/chain-key.interfaces';
+import { HISTORY_EXPLORER_ADAPTER } from '../core/ports/explorers/explorer-port.tokens';
+import type { IHistoryExplorerAdapter } from '../core/ports/explorers/history-explorer.interfaces';
+import type { HistoryItemDto, HistoryPageDto } from '../features/tracking/dto/history-item.dto';
+import { HistoryDirectionFilter, HistoryKind } from '../features/tracking/dto/history-request.dto';
 import type {
   UserAlertPreferenceRow,
   UserWalletAlertPreferenceRow,
@@ -45,7 +48,8 @@ export class TrackingService {
     private readonly usersRepository: UsersRepository,
     private readonly trackedWalletsRepository: TrackedWalletsRepository,
     private readonly subscriptionsRepository: SubscriptionsRepository,
-    private readonly etherscanHistoryService: EtherscanHistoryService,
+    @Inject(HISTORY_EXPLORER_ADAPTER)
+    private readonly historyExplorerAdapter: IHistoryExplorerAdapter,
     private readonly historyCacheService: HistoryCacheService,
     private readonly historyRateLimiterService: HistoryRateLimiterService,
     private readonly userAlertPreferencesRepository: UserAlertPreferencesRepository,
@@ -550,11 +554,18 @@ export class TrackingService {
       this.logger.debug(
         `history_local_miss telegramId=${userRef.telegramId} source=${source} address=${normalizedAddress} limit=${String(limit)}`,
       );
-      const transactions = await this.etherscanHistoryService.loadRecentTransactions(
-        normalizedAddress,
+      const historyPage: HistoryPageDto = await this.historyExplorerAdapter.loadRecentTransactions({
+        chainKey: ChainKey.ETHEREUM_MAINNET,
+        address: normalizedAddress,
         limit,
+        offset: 0,
+        kind: HistoryKind.ALL,
+        direction: HistoryDirectionFilter.ALL,
+      });
+      const historyMessage: string = this.formatHistoryMessage(
+        normalizedAddress,
+        historyPage.items,
       );
-      const historyMessage: string = this.formatHistoryMessage(normalizedAddress, transactions);
       this.historyCacheService.set(normalizedAddress, limit, historyMessage);
       return historyMessage;
     } catch (error: unknown) {
@@ -765,7 +776,7 @@ export class TrackingService {
 
   private formatHistoryMessage(
     normalizedAddress: string,
-    transactions: readonly HistoryTransactionItem[],
+    transactions: readonly HistoryItemDto[],
   ): string {
     if (transactions.length === 0) {
       return `История для ${normalizedAddress} пуста.`;
@@ -779,12 +790,12 @@ export class TrackingService {
       const statusIcon: string = tx.isError ? '🔴' : '🟢';
       const directionIcon: string = direction === 'OUT' ? '↗️ OUT' : '↘️ IN';
       const escapedAssetSymbol: string = this.escapeHtml(tx.assetSymbol);
-      const txUrl: string = this.buildTxUrl(tx.hash);
+      const txUrl: string = this.buildTxUrl(tx.txHash);
 
       return [
         `<a href="${txUrl}">Tx #${index + 1}</a> ${statusIcon} ${directionIcon} <b>${formattedValue} ${escapedAssetSymbol}</b>`,
         `🕒 <code>${this.formatTimestamp(date)}</code>`,
-        `🔹 <code>${this.shortHash(tx.hash)}</code>`,
+        `🔹 <code>${this.shortHash(tx.txHash)}</code>`,
       ].join('\n');
     });
 

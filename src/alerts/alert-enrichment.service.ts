@@ -1,12 +1,16 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { formatUnits } from 'ethers';
 
-import { TokenMetadataService } from './token-metadata.service';
 import { EventDirection, type ClassifiedEvent } from '../chain/chain.types';
+import { TOKEN_METADATA_ADAPTER } from '../core/ports/token-metadata/token-metadata-port.tokens';
+import type { ITokenMetadataAdapter } from '../core/ports/token-metadata/token-metadata.interfaces';
 
 @Injectable()
 export class AlertEnrichmentService {
-  public constructor(private readonly tokenMetadataService: TokenMetadataService) {}
+  public constructor(
+    @Inject(TOKEN_METADATA_ADAPTER)
+    private readonly tokenMetadataService: ITokenMetadataAdapter,
+  ) {}
 
   public enrich(event: ClassifiedEvent): ClassifiedEvent {
     const tokenMetadata = this.tokenMetadataService.getMetadata(event.contractAddress);

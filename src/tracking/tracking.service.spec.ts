@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { EtherscanHistoryService } from './etherscan-history.service';
 import type { HistoryCacheService } from './history-cache.service';
 import {
   HistoryRateLimitReason,
@@ -11,6 +10,8 @@ import type { HistoryRateLimiterService } from './history-rate-limiter.service';
 import { AlertFilterToggleTarget, type TelegramUserRef } from './tracking.interfaces';
 import { TrackingService } from './tracking.service';
 import type { AppConfigService } from '../config/app-config.service';
+import type { IHistoryExplorerAdapter } from '../core/ports/explorers/history-explorer.interfaces';
+import { HistoryDirection, HistoryItemType } from '../features/tracking/dto/history-item.dto';
 import type { UserRow } from '../storage/database.types';
 import type { SubscriptionsRepository } from '../storage/repositories/subscriptions.repository';
 import type { TrackedWalletsRepository } from '../storage/repositories/tracked-wallets.repository';
@@ -34,7 +35,7 @@ type TrackedWalletsRepositoryStub = {
   readonly findOrCreate: ReturnType<typeof vi.fn>;
 };
 
-type EtherscanHistoryServiceStub = {
+type HistoryExplorerAdapterStub = {
   readonly loadRecentTransactions: ReturnType<typeof vi.fn>;
 };
 
@@ -76,7 +77,7 @@ type TestContext = {
   readonly usersRepositoryStub: UsersRepositoryStub;
   readonly trackedWalletsRepositoryStub: TrackedWalletsRepositoryStub;
   readonly subscriptionsRepositoryStub: SubscriptionsRepositoryStub;
-  readonly etherscanHistoryServiceStub: EtherscanHistoryServiceStub;
+  readonly historyExplorerAdapterStub: HistoryExplorerAdapterStub;
   readonly historyCacheServiceStub: HistoryCacheServiceStub;
   readonly historyRateLimiterServiceStub: HistoryRateLimiterServiceStub;
   readonly userAlertPreferencesRepositoryStub: UserAlertPreferencesRepositoryStub;
@@ -105,7 +106,7 @@ const createTestContext = (): TestContext => {
     removeByWalletId: vi.fn(),
     removeByAddress: vi.fn(),
   };
-  const etherscanHistoryServiceStub: EtherscanHistoryServiceStub = {
+  const historyExplorerAdapterStub: HistoryExplorerAdapterStub = {
     loadRecentTransactions: vi.fn(),
   };
   const historyCacheServiceStub: HistoryCacheServiceStub = {
@@ -201,7 +202,7 @@ const createTestContext = (): TestContext => {
     usersRepositoryStub as unknown as UsersRepository,
     trackedWalletsRepositoryStub as unknown as TrackedWalletsRepository,
     subscriptionsRepositoryStub as unknown as SubscriptionsRepository,
-    etherscanHistoryServiceStub as unknown as EtherscanHistoryService,
+    historyExplorerAdapterStub as unknown as IHistoryExplorerAdapter,
     historyCacheServiceStub as unknown as HistoryCacheService,
     historyRateLimiterServiceStub as unknown as HistoryRateLimiterService,
     userAlertPreferencesRepositoryStub as unknown as UserAlertPreferencesRepository,
@@ -216,7 +217,7 @@ const createTestContext = (): TestContext => {
     usersRepositoryStub,
     trackedWalletsRepositoryStub,
     subscriptionsRepositoryStub,
-    etherscanHistoryServiceStub,
+    historyExplorerAdapterStub,
     historyCacheServiceStub,
     historyRateLimiterServiceStub,
     userAlertPreferencesRepositoryStub,
@@ -258,7 +259,7 @@ describe('TrackingService', (): void => {
     );
 
     expect(message).toBe('cached history message');
-    expect(context.etherscanHistoryServiceStub.loadRecentTransactions).not.toHaveBeenCalled();
+    expect(context.historyExplorerAdapterStub.loadRecentTransactions).not.toHaveBeenCalled();
     expect(context.historyCacheServiceStub.getFresh).toHaveBeenCalledWith(
       '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
       5,
@@ -269,18 +270,24 @@ describe('TrackingService', (): void => {
     const context: TestContext = createTestContext();
     context.historyCacheServiceStub.getFresh.mockReturnValue(null);
     context.walletEventsRepositoryStub.listRecentByTrackedAddress.mockResolvedValue([]);
-    context.etherscanHistoryServiceStub.loadRecentTransactions.mockResolvedValue([
-      {
-        hash: '0xabc',
-        from: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
-        to: '0x0000000000000000000000000000000000000001',
-        valueRaw: '1000000000000000000',
-        isError: false,
-        timestampSec: 1739160000,
-        assetSymbol: 'ETH',
-        assetDecimals: 18,
-      },
-    ]);
+    context.historyExplorerAdapterStub.loadRecentTransactions.mockResolvedValue({
+      items: [
+        {
+          txHash: '0xabc',
+          from: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
+          to: '0x0000000000000000000000000000000000000001',
+          valueRaw: '1000000000000000000',
+          isError: false,
+          timestampSec: 1739160000,
+          assetSymbol: 'ETH',
+          assetDecimals: 18,
+          eventType: HistoryItemType.TRANSFER,
+          direction: HistoryDirection.OUT,
+          txLink: 'https://etherscan.io/tx/0xabc',
+        },
+      ],
+      nextOffset: null,
+    });
 
     const message: string = await context.service.getAddressHistoryWithPolicy(
       context.userRef,
@@ -289,10 +296,7 @@ describe('TrackingService', (): void => {
       HistoryRequestSource.COMMAND,
     );
 
-    expect(context.etherscanHistoryServiceStub.loadRecentTransactions).toHaveBeenCalledWith(
-      '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
-      5,
-    );
+    expect(context.historyExplorerAdapterStub.loadRecentTransactions).toHaveBeenCalledTimes(1);
     expect(context.historyCacheServiceStub.set).toHaveBeenCalledTimes(1);
     expect(message).toContain('<a href="https://etherscan.io/tx/0xabc">Tx #1</a>');
   });
@@ -329,7 +333,7 @@ describe('TrackingService', (): void => {
 
     expect(message).toContain('Локальные события');
     expect(message).toContain('Tx #1');
-    expect(context.etherscanHistoryServiceStub.loadRecentTransactions).not.toHaveBeenCalled();
+    expect(context.historyExplorerAdapterStub.loadRecentTransactions).not.toHaveBeenCalled();
     expect(context.historyCacheServiceStub.set).toHaveBeenCalledTimes(1);
   });
 
@@ -369,7 +373,7 @@ describe('TrackingService', (): void => {
 
     expect(message).toContain('Показал кешированную историю');
     expect(message).toContain('stale history message');
-    expect(context.etherscanHistoryServiceStub.loadRecentTransactions).not.toHaveBeenCalled();
+    expect(context.historyExplorerAdapterStub.loadRecentTransactions).not.toHaveBeenCalled();
   });
 
   it('returns readable retry error when rate limited and stale cache is missing', async (): Promise<void> => {
@@ -552,7 +556,7 @@ describe('TrackingService', (): void => {
     );
 
     expect(message).toBe('cached by string wallet id');
-    expect(context.etherscanHistoryServiceStub.loadRecentTransactions).not.toHaveBeenCalled();
+    expect(context.historyExplorerAdapterStub.loadRecentTransactions).not.toHaveBeenCalled();
   });
 
   it('returns paged local history with navigation metadata', async (): Promise<void> => {

@@ -1,0 +1,22 @@
+import type { ChainKey } from '../../../core/chains/chain-key.interfaces';
+
+export enum HistoryKind {
+  ALL = 'all',
+  ETH = 'eth',
+  ERC20 = 'erc20',
+}
+
+export enum HistoryDirectionFilter {
+  ALL = 'all',
+  IN = 'in',
+  OUT = 'out',
+}
+
+export interface HistoryRequestDto {
+  readonly chainKey: ChainKey;
+  readonly address: string;
+  readonly limit: number;
+  readonly offset: number;
+  readonly kind: HistoryKind;
+  readonly direction: HistoryDirectionFilter;
+}

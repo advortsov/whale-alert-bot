@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { EtherscanHistoryService } from './etherscan-history.service';
 import type { AppConfigService } from '../config/app-config.service';
+import { EtherscanHistoryAdapter } from '../integrations/explorers/etherscan/etherscan-history.adapter';
 
 class HistoryConfigStub {
   public readonly etherscanApiBaseUrl: string = 'https://api.etherscan.io/v2/api';
@@ -32,9 +33,10 @@ describe('EtherscanHistoryService', (): void => {
       }),
     } as Response);
 
-    const service: EtherscanHistoryService = new EtherscanHistoryService(
+    const adapter: EtherscanHistoryAdapter = new EtherscanHistoryAdapter(
       new HistoryConfigStub() as unknown as AppConfigService,
     );
+    const service: EtherscanHistoryService = new EtherscanHistoryService(adapter);
     const result = await service.loadRecentTransactions(
       '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
       5,
@@ -85,9 +87,10 @@ describe('EtherscanHistoryService', (): void => {
         }),
       } as Response);
 
-    const service: EtherscanHistoryService = new EtherscanHistoryService(
+    const adapter: EtherscanHistoryAdapter = new EtherscanHistoryAdapter(
       new HistoryConfigStub() as unknown as AppConfigService,
     );
+    const service: EtherscanHistoryService = new EtherscanHistoryService(adapter);
     const result = await service.loadRecentTransactions(
       '0x96b0Dc619A86572524c15C1fC9c42DA9A94BCAa0',
       5,
@@ -118,9 +121,10 @@ describe('EtherscanHistoryService', (): void => {
       }),
     } as Response);
 
-    const service: EtherscanHistoryService = new EtherscanHistoryService(
+    const adapter: EtherscanHistoryAdapter = new EtherscanHistoryAdapter(
       new HistoryConfigStub() as unknown as AppConfigService,
     );
+    const service: EtherscanHistoryService = new EtherscanHistoryService(adapter);
 
     await expect(
       service.loadRecentTransactions('0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045', 5),

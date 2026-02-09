@@ -3,11 +3,11 @@ import { Module } from '@nestjs/common';
 import { ChainStreamService } from './chain-stream.service';
 import { EventClassifierService } from './event-classifier.service';
 import { AlertsModule } from '../alerts/alerts.module';
+import { FALLBACK_RPC_ADAPTER, PRIMARY_RPC_ADAPTER } from '../core/ports/rpc/rpc-port.tokens';
+import { AlchemyPrimaryAdapter } from '../integrations/rpc/ethereum/alchemy-primary.adapter';
+import { InfuraFallbackAdapter } from '../integrations/rpc/ethereum/infura-fallback.adapter';
 import { RuntimeModule } from '../runtime/runtime.module';
 import { StorageModule } from '../storage/storage.module';
-import { FALLBACK_RPC_PROVIDER, PRIMARY_RPC_PROVIDER } from './constants/chain.tokens';
-import { AlchemyPrimaryProvider } from './providers/alchemy-primary.provider';
-import { InfuraFallbackProvider } from './providers/infura-fallback.provider';
 import { ProviderFailoverService } from './providers/provider-failover.service';
 import { ProviderFactory } from './providers/provider.factory';
 import { RpcThrottlerService } from './providers/rpc-throttler.service';
@@ -15,15 +15,15 @@ import { RpcThrottlerService } from './providers/rpc-throttler.service';
 @Module({
   imports: [StorageModule, AlertsModule, RuntimeModule],
   providers: [
-    AlchemyPrimaryProvider,
-    InfuraFallbackProvider,
+    AlchemyPrimaryAdapter,
+    InfuraFallbackAdapter,
     {
-      provide: PRIMARY_RPC_PROVIDER,
-      useExisting: AlchemyPrimaryProvider,
+      provide: PRIMARY_RPC_ADAPTER,
+      useExisting: AlchemyPrimaryAdapter,
     },
     {
-      provide: FALLBACK_RPC_PROVIDER,
-      useExisting: InfuraFallbackProvider,
+      provide: FALLBACK_RPC_ADAPTER,
+      useExisting: InfuraFallbackAdapter,
     },
     ProviderFactory,
     RpcThrottlerService,

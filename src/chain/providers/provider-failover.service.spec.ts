@@ -2,13 +2,13 @@ import { ProviderFailoverService } from './provider-failover.service';
 import { ProviderFactory } from './provider.factory';
 import { RpcThrottlerService } from './rpc-throttler.service';
 import type { AppConfigService } from '../../config/app-config.service';
+import type { BlockEnvelope, ReceiptEnvelope } from '../../core/ports/rpc/block-stream.interfaces';
 import type {
-  BlockWithTransactions,
-  IFallbackRpcProvider,
-  IPrimaryRpcProvider,
+  IFallbackRpcAdapter,
+  IPrimaryRpcAdapter,
   ISubscriptionHandle,
   ProviderHealth,
-} from '../interfaces/rpc-provider.interface';
+} from '../../core/ports/rpc/rpc-adapter.interfaces';
 
 class RpcConfigStub {
   public readonly chainRpcMinIntervalMs: number = 0;
@@ -16,7 +16,7 @@ class RpcConfigStub {
   public readonly chainBackoffMaxMs: number = 10;
 }
 
-class PrimaryProviderStub implements IPrimaryRpcProvider {
+class PrimaryProviderStub implements IPrimaryRpcAdapter {
   public getName(): string {
     return 'primary';
   }
@@ -29,7 +29,7 @@ class PrimaryProviderStub implements IPrimaryRpcProvider {
     };
   }
 
-  public async getBlock(): Promise<null> {
+  public async getBlockEnvelope(): Promise<BlockEnvelope | null> {
     return null;
   }
 
@@ -37,15 +37,7 @@ class PrimaryProviderStub implements IPrimaryRpcProvider {
     return 1;
   }
 
-  public async getBlockWithTransactions(): Promise<BlockWithTransactions | null> {
-    return null;
-  }
-
-  public async getTransaction(): Promise<null> {
-    return null;
-  }
-
-  public async getTransactionReceipt(): Promise<null> {
+  public async getReceiptEnvelope(): Promise<ReceiptEnvelope | null> {
     return null;
   }
 
@@ -58,7 +50,7 @@ class PrimaryProviderStub implements IPrimaryRpcProvider {
   }
 }
 
-class FallbackProviderStub implements IFallbackRpcProvider {
+class FallbackProviderStub implements IFallbackRpcAdapter {
   public getName(): string {
     return 'fallback';
   }
@@ -71,7 +63,7 @@ class FallbackProviderStub implements IFallbackRpcProvider {
     };
   }
 
-  public async getBlock(): Promise<null> {
+  public async getBlockEnvelope(): Promise<BlockEnvelope | null> {
     return null;
   }
 
@@ -79,15 +71,7 @@ class FallbackProviderStub implements IFallbackRpcProvider {
     return 1;
   }
 
-  public async getBlockWithTransactions(): Promise<BlockWithTransactions | null> {
-    return null;
-  }
-
-  public async getTransaction(): Promise<null> {
-    return null;
-  }
-
-  public async getTransactionReceipt(): Promise<null> {
+  public async getReceiptEnvelope(): Promise<ReceiptEnvelope | null> {
     return null;
   }
 
@@ -102,8 +86,8 @@ class FallbackProviderStub implements IFallbackRpcProvider {
 
 describe('ProviderFailoverService', (): void => {
   it('uses fallback when primary operation throws', async (): Promise<void> => {
-    const primary: IPrimaryRpcProvider = new PrimaryProviderStub();
-    const fallback: IFallbackRpcProvider = new FallbackProviderStub();
+    const primary: IPrimaryRpcAdapter = new PrimaryProviderStub();
+    const fallback: IFallbackRpcAdapter = new FallbackProviderStub();
 
     const factory: ProviderFactory = new ProviderFactory(primary, fallback);
     const throttler: RpcThrottlerService = new RpcThrottlerService(

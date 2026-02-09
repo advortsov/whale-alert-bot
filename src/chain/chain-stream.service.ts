@@ -1,16 +1,18 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import type { Log, TransactionReceipt, TransactionResponse } from 'ethers';
 
 import { ChainId, ClassifiedEventType, type ObservedTransaction } from './chain.types';
 import { EventClassifierService } from './event-classifier.service';
 import { AlertDispatcherService } from '../alerts/alert-dispatcher.service';
 import { AppConfigService } from '../config/app-config.service';
-import type {
-  BlockWithTransactions,
-  ISubscriptionHandle,
-} from './interfaces/rpc-provider.interface';
 import { ProviderFailoverService } from './providers/provider-failover.service';
 import { ProviderFactory } from './providers/provider.factory';
+import { ChainKey } from '../core/chains/chain-key.interfaces';
+import type {
+  BlockEnvelope,
+  ReceiptEnvelope,
+  TransactionEnvelope,
+} from '../core/ports/rpc/block-stream.interfaces';
+import type { ISubscriptionHandle } from '../core/ports/rpc/rpc-adapter.interfaces';
 import { RuntimeStatusService } from '../runtime/runtime-status.service';
 import { ChainCheckpointsRepository } from '../storage/repositories/chain-checkpoints.repository';
 import { ProcessedEventsRepository } from '../storage/repositories/processed-events.repository';
@@ -230,8 +232,8 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
       trackedAddresses.map((address: string): string => address.toLowerCase()),
     );
 
-    const block: BlockWithTransactions | null = await this.providerFailoverService.execute(
-      (provider) => provider.getBlockWithTransactions(blockNumber),
+    const block: BlockEnvelope | null = await this.providerFailoverService.execute((provider) =>
+      provider.getBlockEnvelope(blockNumber),
     );
 
     if (!block) {
@@ -240,13 +242,13 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
     }
 
     const matchedTransactions: readonly MatchedTransaction[] = this.collectMatchedTransactions(
-      block.prefetchedTransactions,
+      block.transactions,
       trackedAddressSet,
-      typeof block.timestamp === 'number' ? block.timestamp : null,
+      block.timestampSec,
     );
 
     this.logger.debug(
-      `processBlock loaded blockNumber=${blockNumber} txCount=${block.prefetchedTransactions.length} matchedCount=${matchedTransactions.length}`,
+      `processBlock loaded blockNumber=${blockNumber} txCount=${block.transactions.length} matchedCount=${matchedTransactions.length}`,
     );
 
     if (matchedTransactions.length === 0) {
@@ -257,7 +259,7 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
   }
 
   private collectMatchedTransactions(
-    transactions: readonly TransactionResponse[],
+    transactions: readonly TransactionEnvelope[],
     trackedAddressSet: ReadonlySet<string>,
     blockTimestampSec: number | null,
   ): readonly MatchedTransaction[] {
@@ -318,8 +320,8 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
       `processMatchedTransaction start txHash=${matchedTransaction.txHash} address=${matchedTransaction.trackedAddress}`,
     );
 
-    const receipt: TransactionReceipt | null = await this.providerFailoverService.execute(
-      (provider) => provider.getTransactionReceipt(matchedTransaction.txHash),
+    const receipt: ReceiptEnvelope | null = await this.providerFailoverService.execute((provider) =>
+      provider.getReceiptEnvelope(matchedTransaction.txHash),
     );
 
     const observedTransaction: ObservedTransaction = {
@@ -395,17 +397,17 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
   }
 
   private extractLogs(
-    receipt: TransactionReceipt | null,
+    receipt: ReceiptEnvelope | null,
   ): readonly ObservedTransaction['logs'][number][] {
     if (!receipt) {
       return [];
     }
 
-    return receipt.logs.map((log: Log): ObservedTransaction['logs'][number] => ({
+    return receipt.logs.map((log): ObservedTransaction['logs'][number] => ({
       address: log.address.toLowerCase(),
       topics: log.topics,
       data: log.data,
-      logIndex: log.index,
+      logIndex: log.logIndex,
     }));
   }
 
@@ -437,8 +439,8 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async logStartupProviderChecks(): Promise<void> {
-    const primaryProvider = this.providerFactory.createPrimary(ChainId.ETHEREUM_MAINNET);
-    const fallbackProvider = this.providerFactory.createFallback(ChainId.ETHEREUM_MAINNET);
+    const primaryProvider = this.providerFactory.createPrimary(ChainKey.ETHEREUM_MAINNET);
+    const fallbackProvider = this.providerFactory.createFallback(ChainKey.ETHEREUM_MAINNET);
 
     const primaryHealth = await primaryProvider.healthCheck();
     const fallbackHealth = await fallbackProvider.healthCheck();

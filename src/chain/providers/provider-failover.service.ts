@@ -1,14 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 
-import { ChainId } from '../chain.types';
 import { ProviderFactory } from './provider.factory';
 import { RpcThrottlerService } from './rpc-throttler.service';
+import { ChainKey } from '../../core/chains/chain-key.interfaces';
 import type {
-  IFallbackRpcProvider,
-  IPrimaryRpcProvider,
+  IFallbackRpcAdapter,
+  IPrimaryRpcAdapter,
   IProviderFailoverService,
   ProviderOperation,
-} from '../interfaces/rpc-provider.interface';
+} from '../../core/ports/rpc/rpc-adapter.interfaces';
 
 @Injectable()
 export class ProviderFailoverService implements IProviderFailoverService {
@@ -20,8 +20,8 @@ export class ProviderFailoverService implements IProviderFailoverService {
   ) {}
 
   public async execute<T>(operation: ProviderOperation<T>): Promise<T> {
-    const primaryProvider: IPrimaryRpcProvider = this.providerFactory.createPrimary(
-      ChainId.ETHEREUM_MAINNET,
+    const primaryProvider: IPrimaryRpcAdapter = this.providerFactory.createPrimary(
+      ChainKey.ETHEREUM_MAINNET,
     );
 
     try {
@@ -36,8 +36,8 @@ export class ProviderFailoverService implements IProviderFailoverService {
       this.applyBackoffIfNeeded(primaryError, `primary:${primaryProvider.getName()}`);
       this.logger.warn(`Primary provider failed: ${primaryErrorMessage}. Switching to fallback.`);
 
-      const fallbackProvider: IFallbackRpcProvider = this.providerFactory.createFallback(
-        ChainId.ETHEREUM_MAINNET,
+      const fallbackProvider: IFallbackRpcAdapter = this.providerFactory.createFallback(
+        ChainKey.ETHEREUM_MAINNET,
       );
 
       try {

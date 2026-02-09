@@ -1,0 +1,2 @@
+export const PRIMARY_RPC_ADAPTER = Symbol('PRIMARY_RPC_ADAPTER');
+export const FALLBACK_RPC_ADAPTER = Symbol('FALLBACK_RPC_ADAPTER');

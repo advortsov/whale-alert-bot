@@ -1,5 +1,1 @@
-export type TokenMetadata = {
-  readonly address: string;
-  readonly symbol: string;
-  readonly decimals: number;
-};
+export type { TokenMetadataDto as TokenMetadata } from '../core/ports/token-metadata/token-metadata.interfaces';
