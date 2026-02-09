@@ -24,6 +24,7 @@ import type { RuntimeStatusService } from '../runtime/runtime-status.service';
 import type { ChainCheckpointsRepository } from '../storage/repositories/chain-checkpoints.repository';
 import type { ProcessedEventsRepository } from '../storage/repositories/processed-events.repository';
 import type { SubscriptionsRepository } from '../storage/repositories/subscriptions.repository';
+import type { WalletEventsRepository } from '../storage/repositories/wallet-events.repository';
 
 class ProviderStub {
   public blockHandler: ((blockNumber: number) => Promise<void>) | null = null;
@@ -126,6 +127,7 @@ describe('ChainStreamService', (): void => {
     } as TransactionResponse;
 
     providerStub.setBlock(123, {
+      timestamp: 1_739_400_000,
       prefetchedTransactions: [txMatchedByFrom, txMatchedByTo, txUnmatched],
     } as BlockWithTransactions);
 
@@ -148,6 +150,11 @@ describe('ChainStreamService', (): void => {
       hasProcessed: async (): Promise<boolean> => false,
       markProcessed: async (): Promise<void> => undefined,
     } as unknown as ProcessedEventsRepository;
+    const saveEvent: ReturnType<typeof vi.fn> = vi.fn().mockResolvedValue(undefined);
+    const walletEventsRepository: WalletEventsRepository = {
+      saveEvent,
+      listRecentByTrackedAddress: async (): Promise<readonly []> => [],
+    } as unknown as WalletEventsRepository;
     const eventClassifierService: EventClassifierService = {
       classify: (event: ObservedTransaction): ClassifiedEvent => ({
         chainId: ChainId.ETHEREUM_MAINNET,
@@ -200,6 +207,7 @@ describe('ChainStreamService', (): void => {
       chainCheckpointsRepository,
       subscriptionsRepository,
       processedEventsRepository,
+      walletEventsRepository,
       eventClassifierService,
       alertDispatcherService,
     );
@@ -222,6 +230,7 @@ describe('ChainStreamService', (): void => {
     expect(providerStub.getTransactionCalls).toBe(0);
     expect(providerStub.receiptCalls).toEqual(['0x1', '0x2']);
     expect(dispatched).toHaveLength(2);
+    expect(saveEvent).toHaveBeenCalledTimes(2);
 
     await service.onModuleDestroy();
   });
@@ -258,6 +267,10 @@ describe('ChainStreamService', (): void => {
       hasProcessed: async (): Promise<boolean> => false,
       markProcessed: async (): Promise<void> => undefined,
     } as unknown as ProcessedEventsRepository;
+    const walletEventsRepository: WalletEventsRepository = {
+      saveEvent: async (): Promise<void> => undefined,
+      listRecentByTrackedAddress: async (): Promise<readonly []> => [],
+    } as unknown as WalletEventsRepository;
     const eventClassifierService: EventClassifierService = {
       classify: (event: ObservedTransaction): ClassifiedEvent => ({
         chainId: ChainId.ETHEREUM_MAINNET,
@@ -307,6 +320,7 @@ describe('ChainStreamService', (): void => {
       chainCheckpointsRepository,
       subscriptionsRepository,
       processedEventsRepository,
+      walletEventsRepository,
       eventClassifierService,
       alertDispatcherService,
     );
@@ -383,6 +397,10 @@ describe('ChainStreamService', (): void => {
       hasProcessed: async (): Promise<boolean> => false,
       markProcessed: async (): Promise<void> => undefined,
     } as unknown as ProcessedEventsRepository;
+    const walletEventsRepository: WalletEventsRepository = {
+      saveEvent: async (): Promise<void> => undefined,
+      listRecentByTrackedAddress: async (): Promise<readonly []> => [],
+    } as unknown as WalletEventsRepository;
     const eventClassifierService: EventClassifierService = {
       classify: (event: ObservedTransaction): ClassifiedEvent => ({
         chainId: ChainId.ETHEREUM_MAINNET,
@@ -432,6 +450,7 @@ describe('ChainStreamService', (): void => {
       chainCheckpointsRepository,
       subscriptionsRepository,
       processedEventsRepository,
+      walletEventsRepository,
       eventClassifierService,
       alertDispatcherService,
     );

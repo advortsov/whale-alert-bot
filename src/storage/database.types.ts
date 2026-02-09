@@ -59,6 +59,26 @@ export interface ChainCheckpointsTable {
   updated_at: UpdatableTimestampColumn;
 }
 
+export interface WalletEventsTable {
+  id: Generated<number>;
+  chain_id: number;
+  tx_hash: string;
+  log_index: number;
+  tracked_address: string;
+  event_type: string;
+  direction: string;
+  contract_address: string | null;
+  token_address: string | null;
+  token_symbol: string | null;
+  token_decimals: number | null;
+  token_amount_raw: string | null;
+  value_formatted: string | null;
+  dex: string | null;
+  pair: string | null;
+  occurred_at: TimestampColumn;
+  created_at: TimestampColumn;
+}
+
 export interface Database {
   users: UsersTable;
   tracked_wallets: TrackedWalletsTable;
@@ -66,6 +86,7 @@ export interface Database {
   processed_events: ProcessedEventsTable;
   user_alert_preferences: UserAlertPreferencesTable;
   chain_checkpoints: ChainCheckpointsTable;
+  wallet_events: WalletEventsTable;
 }
 
 export type UserRow = Selectable<UsersTable>;
@@ -85,3 +106,6 @@ export type NewUserAlertPreferenceRow = Insertable<UserAlertPreferencesTable>;
 
 export type ChainCheckpointRow = Selectable<ChainCheckpointsTable>;
 export type NewChainCheckpointRow = Insertable<ChainCheckpointsTable>;
+
+export type WalletEventRow = Selectable<WalletEventsTable>;
+export type NewWalletEventRow = Insertable<WalletEventsTable>;

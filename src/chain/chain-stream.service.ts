@@ -15,12 +15,14 @@ import { RuntimeStatusService } from '../runtime/runtime-status.service';
 import { ChainCheckpointsRepository } from '../storage/repositories/chain-checkpoints.repository';
 import { ProcessedEventsRepository } from '../storage/repositories/processed-events.repository';
 import { SubscriptionsRepository } from '../storage/repositories/subscriptions.repository';
+import { WalletEventsRepository } from '../storage/repositories/wallet-events.repository';
 
 type MatchedTransaction = {
   readonly txHash: string;
   readonly txFrom: string;
   readonly txTo: string | null;
   readonly trackedAddress: string;
+  readonly blockTimestampSec: number | null;
 };
 
 @Injectable()
@@ -41,6 +43,7 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
     private readonly chainCheckpointsRepository: ChainCheckpointsRepository,
     private readonly subscriptionsRepository: SubscriptionsRepository,
     private readonly processedEventsRepository: ProcessedEventsRepository,
+    private readonly walletEventsRepository: WalletEventsRepository,
     private readonly eventClassifierService: EventClassifierService,
     private readonly alertDispatcherService: AlertDispatcherService,
   ) {}
@@ -239,6 +242,7 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
     const matchedTransactions: readonly MatchedTransaction[] = this.collectMatchedTransactions(
       block.prefetchedTransactions,
       trackedAddressSet,
+      typeof block.timestamp === 'number' ? block.timestamp : null,
     );
 
     this.logger.debug(
@@ -255,6 +259,7 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
   private collectMatchedTransactions(
     transactions: readonly TransactionResponse[],
     trackedAddressSet: ReadonlySet<string>,
+    blockTimestampSec: number | null,
   ): readonly MatchedTransaction[] {
     const matchedTransactions: MatchedTransaction[] = [];
 
@@ -276,6 +281,7 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
         txFrom,
         txTo,
         trackedAddress: matchedAddress,
+        blockTimestampSec,
       });
     }
 
@@ -357,6 +363,15 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
       logIndex: classifiedEvent.logIndex,
       chainId: classifiedEvent.chainId,
       trackedAddress: classifiedEvent.trackedAddress,
+    });
+
+    const occurredAt: Date =
+      matchedTransaction.blockTimestampSec !== null
+        ? new Date(matchedTransaction.blockTimestampSec * 1000)
+        : new Date();
+    await this.walletEventsRepository.saveEvent({
+      event: classifiedEvent,
+      occurredAt,
     });
 
     await this.alertDispatcherService.dispatch(classifiedEvent);

@@ -26,6 +26,8 @@ import { TrackedWalletsRepository } from '../storage/repositories/tracked-wallet
 import { AlertEventFilterType } from '../storage/repositories/user-alert-preferences.interfaces';
 import { UserAlertPreferencesRepository } from '../storage/repositories/user-alert-preferences.repository';
 import { UsersRepository } from '../storage/repositories/users.repository';
+import { WalletEventsRepository } from '../storage/repositories/wallet-events.repository';
+import type { WalletEventHistoryView } from '../storage/repositories/wallet-events.repository.interfaces';
 
 @Injectable()
 export class TrackingService {
@@ -41,6 +43,7 @@ export class TrackingService {
     private readonly historyCacheService: HistoryCacheService,
     private readonly historyRateLimiterService: HistoryRateLimiterService,
     private readonly userAlertPreferencesRepository: UserAlertPreferencesRepository,
+    private readonly walletEventsRepository: WalletEventsRepository,
     private readonly appConfigService: AppConfigService,
   ) {}
 
@@ -404,6 +407,24 @@ export class TrackingService {
     );
 
     try {
+      const localEvents: readonly WalletEventHistoryView[] =
+        await this.walletEventsRepository.listRecentByTrackedAddress(normalizedAddress, limit);
+
+      if (localEvents.length > 0) {
+        this.logger.debug(
+          `history_local_hit telegramId=${userRef.telegramId} source=${source} address=${normalizedAddress} limit=${String(limit)} count=${localEvents.length}`,
+        );
+        const localHistoryMessage: string = this.formatWalletEventsHistoryMessage(
+          normalizedAddress,
+          localEvents,
+        );
+        this.historyCacheService.set(normalizedAddress, limit, localHistoryMessage);
+        return localHistoryMessage;
+      }
+
+      this.logger.debug(
+        `history_local_miss telegramId=${userRef.telegramId} source=${source} address=${normalizedAddress} limit=${String(limit)}`,
+      );
       const transactions = await this.etherscanHistoryService.loadRecentTransactions(
         normalizedAddress,
         limit,
@@ -593,6 +614,32 @@ export class TrackingService {
     ].join('\n\n');
   }
 
+  private formatWalletEventsHistoryMessage(
+    normalizedAddress: string,
+    events: readonly WalletEventHistoryView[],
+  ): string {
+    const rows: string[] = events.map((event, index: number): string => {
+      const txUrl: string = this.buildTxUrl(event.txHash);
+      const formattedValue: string = this.resolveEventValue(event);
+      const directionLabel: string = this.resolveDirectionLabel(event.direction);
+      const eventTypeLabel: string = this.escapeHtml(event.eventType);
+      const contractShort: string =
+        event.contractAddress !== null ? this.shortHash(event.contractAddress) : 'n/a';
+
+      return [
+        `<a href="${txUrl}">Tx #${index + 1}</a> ${directionLabel} <b>${this.escapeHtml(formattedValue)}</b>`,
+        `📌 <code>${eventTypeLabel}</code> • <code>${contractShort}</code>`,
+        `🕒 <code>${this.formatTimestamp(event.occurredAt)}</code>`,
+      ].join('\n');
+    });
+
+    return [
+      `📜 <b>История</b> <code>${normalizedAddress}</code>`,
+      `Последние ${events.length} событий (локальная БД):`,
+      ...rows,
+    ].join('\n\n');
+  }
+
   private buildStaleMessage(cachedHistoryMessage: string): string {
     return [
       '⚠️ Показал кешированную историю (данные могут быть неактуальны).',
@@ -629,6 +676,40 @@ export class TrackingService {
     } catch {
       return '0.000000';
     }
+  }
+
+  private resolveDirectionLabel(direction: string): string {
+    if (direction === 'OUT') {
+      return '↗️ OUT';
+    }
+
+    if (direction === 'IN') {
+      return '↘️ IN';
+    }
+
+    return '↔️ UNKNOWN';
+  }
+
+  private resolveEventValue(event: WalletEventHistoryView): string {
+    if (event.valueFormatted !== null && event.valueFormatted.trim().length > 0) {
+      const symbolFromValue: string = event.tokenSymbol ?? 'TOKEN';
+      return `${event.valueFormatted} ${symbolFromValue}`;
+    }
+
+    if (event.tokenAmountRaw !== null && event.tokenDecimals !== null && event.tokenDecimals >= 0) {
+      const normalizedAmount: string = this.formatAssetValue(
+        event.tokenAmountRaw,
+        event.tokenDecimals,
+      );
+      const symbolFromAmount: string = event.tokenSymbol ?? 'TOKEN';
+      return `${normalizedAmount} ${symbolFromAmount}`;
+    }
+
+    if (event.tokenSymbol !== null && event.tokenSymbol.trim().length > 0) {
+      return event.tokenSymbol;
+    }
+
+    return event.eventType;
   }
 
   private formatTimestamp(date: Date): string {

@@ -16,6 +16,7 @@ import type { SubscriptionsRepository } from '../storage/repositories/subscripti
 import type { TrackedWalletsRepository } from '../storage/repositories/tracked-wallets.repository';
 import type { UserAlertPreferencesRepository } from '../storage/repositories/user-alert-preferences.repository';
 import type { UsersRepository } from '../storage/repositories/users.repository';
+import type { WalletEventsRepository } from '../storage/repositories/wallet-events.repository';
 
 type SubscriptionsRepositoryStub = {
   readonly addSubscription: ReturnType<typeof vi.fn>;
@@ -58,6 +59,11 @@ type UserAlertPreferencesRepositoryStub = {
   readonly updateEventType: ReturnType<typeof vi.fn>;
 };
 
+type WalletEventsRepositoryStub = {
+  readonly listRecentByTrackedAddress: ReturnType<typeof vi.fn>;
+  readonly saveEvent: ReturnType<typeof vi.fn>;
+};
+
 type TestContext = {
   readonly userRef: TelegramUserRef;
   readonly userRow: UserRow;
@@ -68,6 +74,7 @@ type TestContext = {
   readonly historyCacheServiceStub: HistoryCacheServiceStub;
   readonly historyRateLimiterServiceStub: HistoryRateLimiterServiceStub;
   readonly userAlertPreferencesRepositoryStub: UserAlertPreferencesRepositoryStub;
+  readonly walletEventsRepositoryStub: WalletEventsRepositoryStub;
   readonly appConfigServiceStub: AppConfigServiceStub;
   readonly service: TrackingService;
 };
@@ -108,6 +115,10 @@ const createTestContext = (): TestContext => {
     updateMinAmount: vi.fn(),
     updateMute: vi.fn(),
     updateEventType: vi.fn(),
+  };
+  const walletEventsRepositoryStub: WalletEventsRepositoryStub = {
+    listRecentByTrackedAddress: vi.fn(),
+    saveEvent: vi.fn(),
   };
   const appConfigServiceStub: AppConfigServiceStub = {
     etherscanTxBaseUrl: 'https://etherscan.io/tx/',
@@ -163,6 +174,7 @@ const createTestContext = (): TestContext => {
     created_at: new Date('2026-02-01T00:00:00.000Z'),
     updated_at: new Date('2026-02-01T00:00:00.000Z'),
   });
+  walletEventsRepositoryStub.listRecentByTrackedAddress.mockResolvedValue([]);
 
   const service: TrackingService = new TrackingService(
     usersRepositoryStub as unknown as UsersRepository,
@@ -172,6 +184,7 @@ const createTestContext = (): TestContext => {
     historyCacheServiceStub as unknown as HistoryCacheService,
     historyRateLimiterServiceStub as unknown as HistoryRateLimiterService,
     userAlertPreferencesRepositoryStub as unknown as UserAlertPreferencesRepository,
+    walletEventsRepositoryStub as unknown as WalletEventsRepository,
     appConfigServiceStub as unknown as AppConfigService,
   );
 
@@ -185,6 +198,7 @@ const createTestContext = (): TestContext => {
     historyCacheServiceStub,
     historyRateLimiterServiceStub,
     userAlertPreferencesRepositoryStub,
+    walletEventsRepositoryStub,
     appConfigServiceStub,
     service,
   };
@@ -231,6 +245,7 @@ describe('TrackingService', (): void => {
   it('fetches history and stores cache on miss', async (): Promise<void> => {
     const context: TestContext = createTestContext();
     context.historyCacheServiceStub.getFresh.mockReturnValue(null);
+    context.walletEventsRepositoryStub.listRecentByTrackedAddress.mockResolvedValue([]);
     context.etherscanHistoryServiceStub.loadRecentTransactions.mockResolvedValue([
       {
         hash: '0xabc',
@@ -257,6 +272,42 @@ describe('TrackingService', (): void => {
     );
     expect(context.historyCacheServiceStub.set).toHaveBeenCalledTimes(1);
     expect(message).toContain('<a href="https://etherscan.io/tx/0xabc">Tx #1</a>');
+  });
+
+  it('returns local database history before etherscan fallback', async (): Promise<void> => {
+    const context: TestContext = createTestContext();
+    context.historyCacheServiceStub.getFresh.mockReturnValue(null);
+    context.walletEventsRepositoryStub.listRecentByTrackedAddress.mockResolvedValue([
+      {
+        chainId: 1,
+        txHash: '0xlocal',
+        logIndex: 1,
+        trackedAddress: '0xd8da6bf26964af9d7eed9e03e53415d37aa96045',
+        eventType: 'TRANSFER',
+        direction: 'OUT',
+        contractAddress: '0x1111111111111111111111111111111111111111',
+        tokenAddress: '0x1111111111111111111111111111111111111111',
+        tokenSymbol: 'USDT',
+        tokenDecimals: 6,
+        tokenAmountRaw: '5000000',
+        valueFormatted: '5.0',
+        dex: null,
+        pair: null,
+        occurredAt: new Date('2026-02-09T12:00:00.000Z'),
+      },
+    ]);
+
+    const message: string = await context.service.getAddressHistoryWithPolicy(
+      context.userRef,
+      '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
+      '5',
+      HistoryRequestSource.COMMAND,
+    );
+
+    expect(message).toContain('локальная БД');
+    expect(message).toContain('Tx #1');
+    expect(context.etherscanHistoryServiceStub.loadRecentTransactions).not.toHaveBeenCalled();
+    expect(context.historyCacheServiceStub.set).toHaveBeenCalledTimes(1);
   });
 
   it('serves stale cache entry when request is rate limited', async (): Promise<void> => {
