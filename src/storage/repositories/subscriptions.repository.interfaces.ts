@@ -1,6 +1,7 @@
 export type UserWalletSubscriptionView = {
   readonly subscriptionId: number;
   readonly walletId: number;
+  readonly chainKey: string;
   readonly walletAddress: string;
   readonly walletLabel: string | null;
   readonly createdAt: Date;

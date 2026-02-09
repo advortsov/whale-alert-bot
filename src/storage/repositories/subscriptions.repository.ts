@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
+import type { ChainKey } from '../../core/chains/chain-key.interfaces';
 import { DatabaseService } from '../database.service';
 import type {
   NewUserWalletSubscriptionRow,
@@ -39,6 +40,7 @@ export class SubscriptionsRepository {
     const rows: readonly {
       id: number;
       wallet_id: number;
+      chain_key: string;
       address: string;
       label: string | null;
       created_at: Date;
@@ -49,6 +51,7 @@ export class SubscriptionsRepository {
       .select([
         'user_wallet_subscriptions.id',
         'tracked_wallets.id as wallet_id',
+        'tracked_wallets.chain_key as chain_key',
         'tracked_wallets.address',
         'tracked_wallets.label',
         'user_wallet_subscriptions.created_at',
@@ -61,6 +64,7 @@ export class SubscriptionsRepository {
       (row): UserWalletSubscriptionView => ({
         subscriptionId: row.id,
         walletId: row.wallet_id,
+        chainKey: row.chain_key,
         walletAddress: row.address,
         walletLabel: row.label,
         createdAt: row.created_at,
@@ -79,11 +83,16 @@ export class SubscriptionsRepository {
     return Number(result.numDeletedRows) > 0;
   }
 
-  public async removeByAddress(userId: number, address: string): Promise<boolean> {
+  public async removeByAddress(
+    userId: number,
+    chainKey: ChainKey,
+    address: string,
+  ): Promise<boolean> {
     const wallet: TrackedWalletRow | undefined = await this.databaseService
       .getDb()
       .selectFrom('tracked_wallets')
       .selectAll()
+      .where('chain_key', '=', chainKey)
       .where('address', '=', address)
       .executeTakeFirst();
 
@@ -94,7 +103,7 @@ export class SubscriptionsRepository {
     return this.removeByWalletId(userId, wallet.id);
   }
 
-  public async listTrackedAddresses(): Promise<readonly string[]> {
+  public async listTrackedAddresses(chainKey: ChainKey): Promise<readonly string[]> {
     const rows: readonly { address: string }[] = await this.databaseService
       .getDb()
       .selectFrom('tracked_wallets')
@@ -104,13 +113,17 @@ export class SubscriptionsRepository {
         'tracked_wallets.id',
       )
       .select('tracked_wallets.address')
+      .where('tracked_wallets.chain_key', '=', chainKey)
       .distinct()
       .execute();
 
     return rows.map((row: { address: string }): string => row.address);
   }
 
-  public async getSubscriberTelegramIdsByAddress(address: string): Promise<readonly string[]> {
+  public async getSubscriberTelegramIdsByAddress(
+    chainKey: ChainKey,
+    address: string,
+  ): Promise<readonly string[]> {
     const rows: readonly { telegram_id: string }[] = await this.databaseService
       .getDb()
       .selectFrom('tracked_wallets')
@@ -121,6 +134,7 @@ export class SubscriptionsRepository {
       )
       .innerJoin('users', 'users.id', 'user_wallet_subscriptions.user_id')
       .select('users.telegram_id')
+      .where('tracked_wallets.chain_key', '=', chainKey)
       .where('tracked_wallets.address', '=', address)
       .execute();
 
@@ -128,6 +142,7 @@ export class SubscriptionsRepository {
   }
 
   public async listSubscriberWalletRecipientsByAddress(
+    chainKey: ChainKey,
     address: string,
   ): Promise<readonly SubscriberWalletRecipient[]> {
     const rows: readonly {
@@ -148,6 +163,7 @@ export class SubscriptionsRepository {
         'user_wallet_subscriptions.user_id',
         'user_wallet_subscriptions.wallet_id',
       ])
+      .where('tracked_wallets.chain_key', '=', chainKey)
       .where('tracked_wallets.address', '=', address)
       .execute();
 

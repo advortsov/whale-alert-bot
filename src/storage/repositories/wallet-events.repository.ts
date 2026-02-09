@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
+import { ChainKey } from '../../core/chains/chain-key.interfaces';
 import { DatabaseService } from '../database.service';
 import type { NewWalletEventRow } from '../database.types';
 import type {
@@ -15,6 +16,7 @@ export class WalletEventsRepository {
     const { event, occurredAt } = input;
     const insertRow: NewWalletEventRow = {
       chain_id: event.chainId,
+      chain_key: this.mapChainIdToChainKey(event.chainId),
       tx_hash: event.txHash,
       log_index: event.logIndex,
       tracked_address: event.trackedAddress.toLowerCase(),
@@ -36,18 +38,20 @@ export class WalletEventsRepository {
       .insertInto('wallet_events')
       .values(insertRow)
       .onConflict((oc) =>
-        oc.columns(['tx_hash', 'log_index', 'chain_id', 'tracked_address']).doNothing(),
+        oc.columns(['tx_hash', 'log_index', 'chain_key', 'tracked_address']).doNothing(),
       )
       .executeTakeFirst();
   }
 
   public async listRecentByTrackedAddress(
+    chainKey: ChainKey,
     trackedAddress: string,
     limit: number,
     offset: number = 0,
   ): Promise<readonly WalletEventHistoryView[]> {
     const rows: readonly {
       chain_id: number;
+      chain_key: string;
       tx_hash: string;
       log_index: number;
       tracked_address: string;
@@ -67,6 +71,7 @@ export class WalletEventsRepository {
       .selectFrom('wallet_events')
       .select([
         'chain_id',
+        'chain_key',
         'tx_hash',
         'log_index',
         'tracked_address',
@@ -82,6 +87,7 @@ export class WalletEventsRepository {
         'pair',
         'occurred_at',
       ])
+      .where('chain_key', '=', chainKey)
       .where('tracked_address', '=', trackedAddress.toLowerCase())
       .orderBy('occurred_at', 'desc')
       .limit(limit)
@@ -91,6 +97,7 @@ export class WalletEventsRepository {
     return rows.map(
       (row): WalletEventHistoryView => ({
         chainId: row.chain_id,
+        chainKey: row.chain_key,
         txHash: row.tx_hash,
         logIndex: row.log_index,
         trackedAddress: row.tracked_address,
@@ -107,5 +114,13 @@ export class WalletEventsRepository {
         occurredAt: row.occurred_at,
       }),
     );
+  }
+
+  private mapChainIdToChainKey(chainId: number): ChainKey {
+    if (chainId === 1) {
+      return ChainKey.ETHEREUM_MAINNET;
+    }
+
+    return ChainKey.ETHEREUM_MAINNET;
   }
 }

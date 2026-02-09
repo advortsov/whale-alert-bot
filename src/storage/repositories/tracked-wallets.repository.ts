@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
+import type { ChainKey } from '../../core/chains/chain-key.interfaces';
 import { DatabaseService } from '../database.service';
 import type { NewTrackedWalletRow, TrackedWalletRow } from '../database.types';
 
@@ -7,11 +8,15 @@ import type { NewTrackedWalletRow, TrackedWalletRow } from '../database.types';
 export class TrackedWalletsRepository {
   public constructor(private readonly databaseService: DatabaseService) {}
 
-  public async findByAddress(address: string): Promise<TrackedWalletRow | null> {
+  public async findByAddress(
+    chainKey: ChainKey,
+    address: string,
+  ): Promise<TrackedWalletRow | null> {
     const trackedWallet: TrackedWalletRow | undefined = await this.databaseService
       .getDb()
       .selectFrom('tracked_wallets')
       .selectAll()
+      .where('chain_key', '=', chainKey)
       .where('address', '=', address)
       .executeTakeFirst();
 
@@ -27,15 +32,20 @@ export class TrackedWalletsRepository {
       .executeTakeFirstOrThrow();
   }
 
-  public async findOrCreate(address: string, label: string | null): Promise<TrackedWalletRow> {
+  public async findOrCreate(
+    chainKey: ChainKey,
+    address: string,
+    label: string | null,
+  ): Promise<TrackedWalletRow> {
     const insertedWallet: TrackedWalletRow | undefined = await this.databaseService
       .getDb()
       .insertInto('tracked_wallets')
       .values({
+        chain_key: chainKey,
         address,
         label,
       })
-      .onConflict((oc) => oc.column('address').doNothing())
+      .onConflict((oc) => oc.columns(['chain_key', 'address']).doNothing())
       .returningAll()
       .executeTakeFirst();
 
@@ -43,7 +53,7 @@ export class TrackedWalletsRepository {
       return insertedWallet;
     }
 
-    const existingWallet: TrackedWalletRow | null = await this.findByAddress(address);
+    const existingWallet: TrackedWalletRow | null = await this.findByAddress(chainKey, address);
 
     if (!existingWallet) {
       throw new Error(`Wallet ${address} was not found after upsert attempt.`);

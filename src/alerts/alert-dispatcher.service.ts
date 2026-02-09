@@ -5,6 +5,7 @@ import { AlertMessageFormatter } from './alert-message.formatter';
 import { AlertSuppressionService } from './alert-suppression.service';
 import { type AlertDeliveryResult } from './alert.interfaces';
 import { ClassifiedEventType, type ClassifiedEvent } from '../chain/chain.types';
+import { ChainKey } from '../core/chains/chain-key.interfaces';
 import type { UserAlertPreferenceRow } from '../storage/database.types';
 import { SubscriptionsRepository } from '../storage/repositories/subscriptions.repository';
 import type { SubscriberWalletRecipient } from '../storage/repositories/subscriptions.repository.interfaces';
@@ -32,6 +33,7 @@ export class AlertDispatcherService {
     );
     const subscribers: readonly SubscriberWalletRecipient[] =
       await this.subscriptionsRepository.listSubscriberWalletRecipientsByAddress(
+        this.resolveChainKey(event.chainId),
         event.trackedAddress,
       );
 
@@ -143,5 +145,13 @@ export class AlertDispatcherService {
     }
 
     return value < minAmount;
+  }
+
+  private resolveChainKey(chainId: number): ChainKey {
+    if (chainId === 1) {
+      return ChainKey.ETHEREUM_MAINNET;
+    }
+
+    return ChainKey.ETHEREUM_MAINNET;
   }
 }

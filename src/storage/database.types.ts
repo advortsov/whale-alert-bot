@@ -21,6 +21,7 @@ export interface UsersTable {
 
 export interface TrackedWalletsTable {
   id: Generated<number>;
+  chain_key: string;
   address: string;
   label: string | null;
   created_at: TimestampColumn;
@@ -38,6 +39,7 @@ export interface ProcessedEventsTable {
   tx_hash: string;
   log_index: number;
   chain_id: number;
+  chain_key: string;
   tracked_address: string;
   processed_at: TimestampColumn;
 }
@@ -65,6 +67,7 @@ export interface UserWalletAlertPreferencesTable {
 
 export interface ChainCheckpointsTable {
   chain_id: number;
+  chain_key: string;
   last_processed_block: string;
   updated_at: UpdatableTimestampColumn;
 }
@@ -72,6 +75,7 @@ export interface ChainCheckpointsTable {
 export interface WalletEventsTable {
   id: Generated<number>;
   chain_id: number;
+  chain_key: string;
   tx_hash: string;
   log_index: number;
   tracked_address: string;

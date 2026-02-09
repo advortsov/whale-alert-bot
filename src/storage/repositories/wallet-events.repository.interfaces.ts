@@ -2,6 +2,7 @@ import type { ClassifiedEvent } from '../../chain/chain.types';
 
 export type WalletEventHistoryView = {
   readonly chainId: number;
+  readonly chainKey: string;
   readonly txHash: string;
   readonly logIndex: number;
   readonly trackedAddress: string;

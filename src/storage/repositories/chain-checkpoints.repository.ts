@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
+import type { ChainKey } from '../../core/chains/chain-key.interfaces';
 import { DatabaseService } from '../database.service';
 import type { ChainCheckpointRow, NewChainCheckpointRow } from '../database.types';
 
@@ -7,12 +8,12 @@ import type { ChainCheckpointRow, NewChainCheckpointRow } from '../database.type
 export class ChainCheckpointsRepository {
   public constructor(private readonly databaseService: DatabaseService) {}
 
-  public async getLastProcessedBlock(chainId: number): Promise<number | null> {
+  public async getLastProcessedBlock(chainKey: ChainKey): Promise<number | null> {
     const row: ChainCheckpointRow | undefined = await this.databaseService
       .getDb()
       .selectFrom('chain_checkpoints')
       .selectAll()
-      .where('chain_id', '=', chainId)
+      .where('chain_key', '=', chainKey)
       .executeTakeFirst();
 
     if (!row) {
@@ -22,9 +23,14 @@ export class ChainCheckpointsRepository {
     return Number.parseInt(row.last_processed_block, 10);
   }
 
-  public async saveLastProcessedBlock(chainId: number, blockNumber: number): Promise<void> {
+  public async saveLastProcessedBlock(
+    chainKey: ChainKey,
+    chainId: number,
+    blockNumber: number,
+  ): Promise<void> {
     const payload: NewChainCheckpointRow = {
       chain_id: chainId,
+      chain_key: chainKey,
       last_processed_block: String(blockNumber),
       updated_at: new Date(),
     };
@@ -34,7 +40,8 @@ export class ChainCheckpointsRepository {
       .insertInto('chain_checkpoints')
       .values(payload)
       .onConflict((oc) =>
-        oc.column('chain_id').doUpdateSet({
+        oc.column('chain_key').doUpdateSet({
+          chain_id: chainId,
           last_processed_block: String(blockNumber),
           updated_at: new Date(),
         }),

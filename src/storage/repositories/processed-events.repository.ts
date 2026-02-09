@@ -7,6 +7,7 @@ export type ProcessedEventKey = {
   readonly txHash: string;
   readonly logIndex: number;
   readonly chainId: number;
+  readonly chainKey: string;
   readonly trackedAddress: string;
 };
 
@@ -21,7 +22,7 @@ export class ProcessedEventsRepository {
       .select('id')
       .where('tx_hash', '=', key.txHash)
       .where('log_index', '=', key.logIndex)
-      .where('chain_id', '=', key.chainId)
+      .where('chain_key', '=', key.chainKey)
       .where('tracked_address', '=', key.trackedAddress)
       .executeTakeFirst();
 
@@ -33,6 +34,7 @@ export class ProcessedEventsRepository {
       tx_hash: key.txHash,
       log_index: key.logIndex,
       chain_id: key.chainId,
+      chain_key: key.chainKey,
       tracked_address: key.trackedAddress,
     };
 
@@ -41,7 +43,7 @@ export class ProcessedEventsRepository {
       .insertInto('processed_events')
       .values(payload)
       .onConflict((oc) =>
-        oc.columns(['tx_hash', 'log_index', 'chain_id', 'tracked_address']).doNothing(),
+        oc.columns(['tx_hash', 'log_index', 'chain_key', 'tracked_address']).doNothing(),
       )
       .execute();
   }

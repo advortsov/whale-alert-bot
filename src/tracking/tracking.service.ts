@@ -96,7 +96,11 @@ export class TrackingService {
     this.logger.debug(`trackAddress normalizedAddress=${normalizedAddress}`);
 
     const user = await this.usersRepository.findOrCreate(userRef.telegramId, userRef.username);
-    const wallet = await this.trackedWalletsRepository.findOrCreate(normalizedAddress, label);
+    const wallet = await this.trackedWalletsRepository.findOrCreate(
+      ChainKey.ETHEREUM_MAINNET,
+      normalizedAddress,
+      label,
+    );
     const insertedSubscription = await this.subscriptionsRepository.addSubscription(
       user.id,
       wallet.id,
@@ -255,6 +259,7 @@ export class TrackingService {
 
     const removedByAddress: boolean = await this.subscriptionsRepository.removeByAddress(
       user.id,
+      ChainKey.ETHEREUM_MAINNET,
       normalizedAddress,
     );
     this.logger.log(
@@ -428,6 +433,7 @@ export class TrackingService {
       );
       const nextPageProbe: readonly WalletEventHistoryView[] =
         await this.walletEventsRepository.listRecentByTrackedAddress(
+          ChainKey.ETHEREUM_MAINNET,
           historyTarget.address,
           limit + 1,
           0,
@@ -454,6 +460,7 @@ export class TrackingService {
 
     const localEventsWithProbe: readonly WalletEventHistoryView[] =
       await this.walletEventsRepository.listRecentByTrackedAddress(
+        ChainKey.ETHEREUM_MAINNET,
         historyTarget.address,
         limit + 1,
         offset,
@@ -537,7 +544,11 @@ export class TrackingService {
 
     try {
       const localEvents: readonly WalletEventHistoryView[] =
-        await this.walletEventsRepository.listRecentByTrackedAddress(normalizedAddress, limit);
+        await this.walletEventsRepository.listRecentByTrackedAddress(
+          ChainKey.ETHEREUM_MAINNET,
+          normalizedAddress,
+          limit,
+        );
 
       if (localEvents.length > 0) {
         this.logger.debug(

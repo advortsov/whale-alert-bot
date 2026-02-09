@@ -91,7 +91,7 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
       provider.getLatestBlockNumber(),
     );
     const checkpointBlockNumber: number | null =
-      await this.chainCheckpointsRepository.getLastProcessedBlock(ChainId.ETHEREUM_MAINNET);
+      await this.chainCheckpointsRepository.getLastProcessedBlock(ChainKey.ETHEREUM_MAINNET);
 
     if (checkpointBlockNumber === null) {
       this.logger.log(
@@ -195,6 +195,7 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
           await this.processBlock(nextBlockNumber);
           this.lastProcessedBlockNumber = nextBlockNumber;
           await this.chainCheckpointsRepository.saveLastProcessedBlock(
+            ChainKey.ETHEREUM_MAINNET,
             ChainId.ETHEREUM_MAINNET,
             nextBlockNumber,
           );
@@ -218,7 +219,7 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
   private async processBlock(blockNumber: number): Promise<void> {
     this.logger.debug(`processBlock start blockNumber=${blockNumber}`);
     const trackedAddresses: readonly string[] =
-      await this.subscriptionsRepository.listTrackedAddresses();
+      await this.subscriptionsRepository.listTrackedAddresses(ChainKey.ETHEREUM_MAINNET);
 
     if (trackedAddresses.length === 0) {
       this.logger.debug(`processBlock skip no tracked addresses blockNumber=${blockNumber}`);
@@ -350,6 +351,7 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
       txHash: classifiedEvent.txHash,
       logIndex: classifiedEvent.logIndex,
       chainId: classifiedEvent.chainId,
+      chainKey: ChainKey.ETHEREUM_MAINNET,
       trackedAddress: classifiedEvent.trackedAddress,
     });
 
@@ -364,6 +366,7 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
       txHash: classifiedEvent.txHash,
       logIndex: classifiedEvent.logIndex,
       chainId: classifiedEvent.chainId,
+      chainKey: ChainKey.ETHEREUM_MAINNET,
       trackedAddress: classifiedEvent.trackedAddress,
     });
 
