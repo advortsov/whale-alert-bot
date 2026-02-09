@@ -132,12 +132,15 @@ export class TrackingService {
     }
 
     const rows: string[] = subscriptions.map((subscription, index: number): string => {
+      const walletId: number | null = this.normalizeDbId(subscription.walletId);
+      const walletIdText: string =
+        walletId !== null ? String(walletId) : String(subscription.walletId);
       const labelPart: string = subscription.walletLabel ? ` (${subscription.walletLabel})` : '';
       return [
-        `${index + 1}. #${subscription.walletId}${labelPart}`,
+        `${index + 1}. #${walletIdText}${labelPart}`,
         `   ${subscription.walletAddress}`,
-        `   История: /history #${subscription.walletId} ${TrackingService.DEFAULT_HISTORY_LIMIT}`,
-        `   Удалить: /untrack #${subscription.walletId}`,
+        `   История: /history #${walletIdText} ${TrackingService.DEFAULT_HISTORY_LIMIT}`,
+        `   Удалить: /untrack #${walletIdText}`,
       ].join('\n');
     });
 
@@ -151,13 +154,26 @@ export class TrackingService {
     const user = await this.usersRepository.findOrCreate(userRef.telegramId, userRef.username);
     const subscriptions = await this.subscriptionsRepository.listByUserId(user.id);
 
-    return subscriptions.map(
-      (subscription): TrackedWalletOption => ({
-        walletId: subscription.walletId,
+    const options: TrackedWalletOption[] = [];
+
+    for (const subscription of subscriptions) {
+      const walletId: number | null = this.normalizeDbId(subscription.walletId);
+
+      if (walletId === null) {
+        this.logger.warn(
+          `Skip wallet option with invalid walletId value=${String(subscription.walletId)} telegramId=${userRef.telegramId}`,
+        );
+        continue;
+      }
+
+      options.push({
+        walletId,
         walletAddress: subscription.walletAddress,
         walletLabel: subscription.walletLabel,
-      }),
-    );
+      });
+    }
+
+    return options;
   }
 
   public async getWalletDetails(userRef: TelegramUserRef, rawWalletId: string): Promise<string> {
@@ -169,9 +185,7 @@ export class TrackingService {
     }
 
     const subscriptions = await this.subscriptionsRepository.listByUserId(user.id);
-    const matchedSubscription = subscriptions.find(
-      (subscription): boolean => subscription.walletId === walletId,
-    );
+    const matchedSubscription = this.findSubscriptionByWalletId(subscriptions, walletId);
 
     if (!matchedSubscription) {
       throw new Error(`Не нашел адрес с id #${walletId}. Сначала проверь /list.`);
@@ -180,11 +194,11 @@ export class TrackingService {
     const labelText: string = matchedSubscription.walletLabel ?? 'без ярлыка';
 
     return [
-      `Кошелек #${matchedSubscription.walletId}`,
+      `Кошелек #${walletId}`,
       `Label: ${labelText}`,
       `Address: ${matchedSubscription.walletAddress}`,
-      `История: /history #${matchedSubscription.walletId} 10`,
-      `Удалить: /untrack #${matchedSubscription.walletId}`,
+      `История: /history #${walletId} 10`,
+      `Удалить: /untrack #${walletId}`,
     ].join('\n');
   }
 
@@ -438,9 +452,7 @@ export class TrackingService {
 
     if (walletId !== null) {
       const subscriptions = await this.subscriptionsRepository.listByUserId(userId);
-      const matchedSubscription = subscriptions.find(
-        (subscription): boolean => subscription.walletId === walletId,
-      );
+      const matchedSubscription = this.findSubscriptionByWalletId(subscriptions, walletId);
 
       if (!matchedSubscription) {
         throw new Error(`Не нашел адрес с id #${walletId}. Сначала проверь /list.`);
@@ -641,5 +653,52 @@ export class TrackingService {
       .replaceAll('>', '&gt;')
       .replaceAll('"', '&quot;')
       .replaceAll("'", '&#39;');
+  }
+
+  private findSubscriptionByWalletId(
+    subscriptions: readonly {
+      readonly walletId: number;
+      readonly walletAddress: string;
+      readonly walletLabel: string | null;
+    }[],
+    targetWalletId: number,
+  ): {
+    readonly walletId: number;
+    readonly walletAddress: string;
+    readonly walletLabel: string | null;
+  } | null {
+    for (const subscription of subscriptions) {
+      const subscriptionWalletId: number | null = this.normalizeDbId(subscription.walletId);
+
+      if (subscriptionWalletId === targetWalletId) {
+        return subscription;
+      }
+    }
+
+    return null;
+  }
+
+  private normalizeDbId(rawValue: unknown): number | null {
+    if (typeof rawValue === 'number' && Number.isSafeInteger(rawValue) && rawValue > 0) {
+      return rawValue;
+    }
+
+    if (typeof rawValue !== 'string') {
+      return null;
+    }
+
+    const trimmed: string = rawValue.trim();
+
+    if (!/^\d+$/.test(trimmed)) {
+      return null;
+    }
+
+    const parsed: number = Number.parseInt(trimmed, 10);
+
+    if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+      return null;
+    }
+
+    return parsed;
   }
 }

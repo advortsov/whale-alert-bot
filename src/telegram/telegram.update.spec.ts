@@ -277,4 +277,49 @@ describe('TelegramUpdate', (): void => {
       expect.anything(),
     );
   });
+
+  it('handles wallet menu callback and loads wallet details by id', async (): Promise<void> => {
+    const getWalletDetailsMock: ReturnType<typeof vi.fn> = vi
+      .fn()
+      .mockResolvedValue('Кошелек #16\nAddress: 0x96b0...');
+    const trackingServiceStub = {
+      getWalletDetails: getWalletDetailsMock,
+    } as unknown as TrackingService;
+    const update: TelegramUpdate = createUpdate(trackingServiceStub);
+    const answerCbQueryMock: ReturnType<typeof vi.fn> = vi.fn().mockResolvedValue(undefined);
+    const replyMock: ReturnType<typeof vi.fn> = vi
+      .fn()
+      .mockResolvedValue({ message_id: 1000, text: 'ok' });
+    const callbackContext = {
+      callbackQuery: {
+        data: 'wallet_menu:16',
+      },
+      from: {
+        id: 42,
+        username: 'tester',
+      },
+      update: {
+        update_id: 200,
+      },
+      answerCbQuery: answerCbQueryMock,
+      reply: replyMock,
+    };
+
+    await update.onCallbackQuery(callbackContext as unknown as Context);
+
+    expect(getWalletDetailsMock).toHaveBeenCalledWith(
+      {
+        telegramId: '42',
+        username: 'tester',
+      },
+      '#16',
+    );
+    expect(answerCbQueryMock).toHaveBeenCalledWith('Выполняю действие...');
+    expect(replyMock).toHaveBeenCalledWith('Кошелек #16\nAddress: 0x96b0...', expect.anything());
+
+    const firstReplyCall: unknown[] | undefined = replyMock.mock.calls[0];
+    const replyOptions: unknown = firstReplyCall?.[1];
+    expect(typeof replyOptions).toBe('object');
+    expect(replyOptions).not.toBeNull();
+  });
 });

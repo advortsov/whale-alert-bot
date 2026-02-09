@@ -50,6 +50,7 @@ npm run start:dev
 - `npm run test`
 - `npm run build`
 - `npm run check` (полный gate)
+- `npm run test:telegram:harness` (локальный harness Telegram без внешнего API)
 
 Перед любым деплоем обязательно выполняется минимум `npm run lint`.
 
@@ -115,6 +116,20 @@ docker compose up --build
 ```
 
 В `docker-compose.yml` зафиксирована точная версия Postgres: `postgres:16.4-alpine`.
+
+## Локальный Telegram harness
+
+Для локальной проверки сценариев бота без реального Telegram API:
+
+```bash
+npm run test:telegram:harness
+```
+
+Покрытые сценарии:
+
+1. Многострочные команды в одном сообщении.
+2. Команда `/status` (runtime + пользовательский статус).
+3. Callback-история (`wallet_history_addr:*`) с policy `source=callback`.
 
 ## Rate-limit recovery runbook
 

@@ -26,6 +26,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",
+    "test:telegram:harness": "vitest run src/telegram/testing/local-bot-harness.spec.ts",
     "test:e2e": "npm run build:test && vitest run --config vitest.e2e.config.ts",
     "prepare": "husky",
     "lint-staged": "lint-staged --concurrent false"

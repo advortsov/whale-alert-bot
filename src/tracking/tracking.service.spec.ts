@@ -369,6 +369,58 @@ describe('TrackingService', (): void => {
     expect(message).toContain('/history #9 10');
   });
 
+  it('returns wallet details when repository returns wallet id as string', async (): Promise<void> => {
+    const context: TestContext = createTestContext();
+    context.subscriptionsRepositoryStub.listByUserId.mockResolvedValue([
+      {
+        subscriptionId: 1,
+        walletId: '16' as unknown as number,
+        walletAddress: '0x96b0Dc619A86572524c15C1fC9c42DA9A94BCAa0',
+        walletLabel: 'my_wallet',
+        createdAt: new Date('2026-02-01T00:00:00.000Z'),
+      },
+    ]);
+
+    const message: string = await context.service.getWalletDetails(context.userRef, '#16');
+
+    expect(message).toContain('Кошелек #16');
+    expect(message).toContain('my_wallet');
+    expect(message).toContain('/history #16 10');
+  });
+
+  it('resolves /history #id when repository returns wallet id as string', async (): Promise<void> => {
+    const context: TestContext = createTestContext();
+    context.historyCacheServiceStub.getFresh.mockReturnValue({
+      key: {
+        address: '0x96b0dc619a86572524c15c1fc9c42da9a94bcaa0',
+        limit: 5,
+      },
+      message: 'cached by string wallet id',
+      createdAtEpochMs: 1000,
+      freshUntilEpochMs: 2000,
+      staleUntilEpochMs: 3000,
+    });
+    context.subscriptionsRepositoryStub.listByUserId.mockResolvedValue([
+      {
+        subscriptionId: 1,
+        walletId: '16' as unknown as number,
+        walletAddress: '0x96b0Dc619A86572524c15C1fC9c42DA9A94BCAa0',
+        walletLabel: 'my_wallet',
+        createdAt: new Date('2026-02-01T00:00:00.000Z'),
+      },
+    ]);
+
+    const message: string = await context.service.getAddressHistoryWithPolicy(
+      context.userRef,
+      '#16',
+      '5',
+      HistoryRequestSource.COMMAND,
+    );
+
+    expect(message).toBe('cached by string wallet id');
+    expect(context.etherscanHistoryServiceStub.loadRecentTransactions).not.toHaveBeenCalled();
+  });
+
   it('returns user status with quota snapshot', async (): Promise<void> => {
     const context: TestContext = createTestContext();
 
