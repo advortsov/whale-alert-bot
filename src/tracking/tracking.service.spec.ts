@@ -12,6 +12,7 @@ import { TrackingService } from './tracking.service';
 import type { AppConfigService } from '../config/app-config.service';
 import type { IHistoryExplorerAdapter } from '../core/ports/explorers/history-explorer.interfaces';
 import { HistoryDirection, HistoryItemType } from '../features/tracking/dto/history-item.dto';
+import { HistoryDirectionFilter, HistoryKind } from '../features/tracking/dto/history-request.dto';
 import type { UserRow } from '../storage/database.types';
 import type { SubscriptionsRepository } from '../storage/repositories/subscriptions.repository';
 import type { TrackedWalletsRepository } from '../storage/repositories/tracked-wallets.repository';
@@ -244,6 +245,8 @@ describe('TrackingService', (): void => {
       key: {
         address: '0xd8da6bf26964af9d7eed9e03e53415d37aa96045',
         limit: 5,
+        kind: HistoryKind.ALL,
+        direction: HistoryDirectionFilter.ALL,
       },
       message: 'cached history message',
       createdAtEpochMs: 1000,
@@ -263,6 +266,8 @@ describe('TrackingService', (): void => {
     expect(context.historyCacheServiceStub.getFresh).toHaveBeenCalledWith(
       '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
       5,
+      HistoryKind.ALL,
+      HistoryDirectionFilter.ALL,
     );
   });
 
@@ -357,6 +362,8 @@ describe('TrackingService', (): void => {
       key: {
         address: '0xd8da6bf26964af9d7eed9e03e53415d37aa96045',
         limit: 5,
+        kind: HistoryKind.ALL,
+        direction: HistoryDirectionFilter.ALL,
       },
       message: 'stale history message',
       createdAtEpochMs: 1000,
@@ -532,6 +539,8 @@ describe('TrackingService', (): void => {
       key: {
         address: '0x96b0dc619a86572524c15c1fc9c42da9a94bcaa0',
         limit: 5,
+        kind: HistoryKind.ALL,
+        direction: HistoryDirectionFilter.ALL,
       },
       message: 'cached by string wallet id',
       createdAtEpochMs: 1000,

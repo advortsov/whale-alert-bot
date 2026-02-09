@@ -1,5 +1,10 @@
 import type { Context } from 'telegraf';
 
+import type {
+  HistoryDirectionFilter,
+  HistoryKind,
+} from '../features/tracking/dto/history-request.dto';
+
 export enum SupportedTelegramCommand {
   START = 'start',
   HELP = 'help',
@@ -65,6 +70,8 @@ export type WalletCallbackTarget = {
   readonly muteMinutes: number | null;
   readonly historyOffset: number | null;
   readonly historyLimit: number | null;
+  readonly historyKind: HistoryKind | null;
+  readonly historyDirection: HistoryDirectionFilter | null;
   readonly filterTarget: WalletCallbackFilterTarget | null;
   readonly filterEnabled: boolean | null;
 };

@@ -403,12 +403,16 @@ export class TrackingService {
     userRef: TelegramUserRef,
     rawAddress: string,
     rawLimit: string | null,
+    rawKind: string | null = null,
+    rawDirection: string | null = null,
   ): Promise<string> {
     return this.getAddressHistoryWithPolicy(
       userRef,
       rawAddress,
       rawLimit,
       HistoryRequestSource.COMMAND,
+      rawKind,
+      rawDirection,
     );
   }
 
@@ -418,11 +422,15 @@ export class TrackingService {
     rawLimit: string | null,
     rawOffset: string | null,
     source: HistoryRequestSource,
+    rawKind: string | null = null,
+    rawDirection: string | null = null,
   ): Promise<HistoryPageResult> {
     const user = await this.usersRepository.findOrCreate(userRef.telegramId, userRef.username);
     const historyTarget = await this.resolveHistoryTarget(user.id, rawAddress);
     const limit: number = this.parseHistoryLimit(rawLimit);
     const offset: number = this.parseHistoryOffset(rawOffset);
+    const historyKind: HistoryKind = this.parseHistoryKind(rawKind);
+    const historyDirection: HistoryDirectionFilter = this.parseHistoryDirection(rawDirection);
 
     if (offset === 0) {
       const message: string = await this.getAddressHistoryWithPolicy(
@@ -430,13 +438,16 @@ export class TrackingService {
         rawAddress,
         String(limit),
         source,
+        rawKind,
+        rawDirection,
       );
-      const nextPageProbe: readonly WalletEventHistoryView[] =
-        await this.walletEventsRepository.listRecentByTrackedAddress(
-          ChainKey.ETHEREUM_MAINNET,
+      const localEventsWithFilters: readonly WalletEventHistoryView[] =
+        await this.loadLocalEventsForHistory(
           historyTarget.address,
           limit + 1,
           0,
+          historyKind,
+          historyDirection,
         );
 
       return {
@@ -445,7 +456,9 @@ export class TrackingService {
         walletId: historyTarget.walletId,
         limit,
         offset: 0,
-        hasNextPage: nextPageProbe.length > limit,
+        kind: historyKind,
+        direction: historyDirection,
+        hasNextPage: localEventsWithFilters.length > limit,
       };
     }
 
@@ -459,11 +472,12 @@ export class TrackingService {
     }
 
     const localEventsWithProbe: readonly WalletEventHistoryView[] =
-      await this.walletEventsRepository.listRecentByTrackedAddress(
-        ChainKey.ETHEREUM_MAINNET,
+      await this.loadLocalEventsForHistory(
         historyTarget.address,
         limit + 1,
         offset,
+        historyKind,
+        historyDirection,
       );
 
     if (localEventsWithProbe.length === 0) {
@@ -475,6 +489,8 @@ export class TrackingService {
       historyTarget.address,
       pageEvents,
       offset,
+      historyKind,
+      historyDirection,
     );
 
     return {
@@ -483,6 +499,8 @@ export class TrackingService {
       walletId: historyTarget.walletId,
       limit,
       offset,
+      kind: historyKind,
+      direction: historyDirection,
       hasNextPage: localEventsWithProbe.length > limit,
     };
   }
@@ -492,6 +510,8 @@ export class TrackingService {
     rawAddress: string,
     rawLimit: string | null,
     source: HistoryRequestSource,
+    rawKind: string | null = null,
+    rawDirection: string | null = null,
   ): Promise<string> {
     this.logger.debug(
       `getAddressHistoryWithPolicy start telegramId=${userRef.telegramId} source=${source} rawAddress=${rawAddress} rawLimit=${rawLimit ?? 'n/a'}`,
@@ -501,6 +521,8 @@ export class TrackingService {
     const historyTarget = await this.resolveHistoryTarget(user.id, rawAddress);
     const normalizedAddress: string = historyTarget.address;
     const limit: number = this.parseHistoryLimit(rawLimit);
+    const historyKind: HistoryKind = this.parseHistoryKind(rawKind);
+    const historyDirection: HistoryDirectionFilter = this.parseHistoryDirection(rawDirection);
     const rateLimitDecision: HistoryRateLimitDecision = this.historyRateLimiterService.evaluate(
       userRef.telegramId,
       source,
@@ -514,6 +536,8 @@ export class TrackingService {
       const staleEntry: HistoryCacheEntry | null = this.historyCacheService.getStale(
         normalizedAddress,
         limit,
+        historyKind,
+        historyDirection,
       );
 
       if (staleEntry) {
@@ -529,6 +553,8 @@ export class TrackingService {
     const freshEntry: HistoryCacheEntry | null = this.historyCacheService.getFresh(
       normalizedAddress,
       limit,
+      historyKind,
+      historyDirection,
     );
 
     if (freshEntry) {
@@ -543,12 +569,13 @@ export class TrackingService {
     );
 
     try {
-      const localEvents: readonly WalletEventHistoryView[] =
-        await this.walletEventsRepository.listRecentByTrackedAddress(
-          ChainKey.ETHEREUM_MAINNET,
-          normalizedAddress,
-          limit,
-        );
+      const localEvents: readonly WalletEventHistoryView[] = await this.loadLocalEventsForHistory(
+        normalizedAddress,
+        limit,
+        0,
+        historyKind,
+        historyDirection,
+      );
 
       if (localEvents.length > 0) {
         this.logger.debug(
@@ -557,8 +584,17 @@ export class TrackingService {
         const localHistoryMessage: string = this.formatWalletEventsHistoryMessage(
           normalizedAddress,
           localEvents,
+          0,
+          historyKind,
+          historyDirection,
         );
-        this.historyCacheService.set(normalizedAddress, limit, localHistoryMessage);
+        this.historyCacheService.set(
+          normalizedAddress,
+          limit,
+          localHistoryMessage,
+          historyKind,
+          historyDirection,
+        );
         return localHistoryMessage;
       }
 
@@ -570,14 +606,20 @@ export class TrackingService {
         address: normalizedAddress,
         limit,
         offset: 0,
-        kind: HistoryKind.ALL,
-        direction: HistoryDirectionFilter.ALL,
+        kind: historyKind,
+        direction: historyDirection,
       });
       const historyMessage: string = this.formatHistoryMessage(
         normalizedAddress,
         historyPage.items,
       );
-      this.historyCacheService.set(normalizedAddress, limit, historyMessage);
+      this.historyCacheService.set(
+        normalizedAddress,
+        limit,
+        historyMessage,
+        historyKind,
+        historyDirection,
+      );
       return historyMessage;
     } catch (error: unknown) {
       const errorMessage: string = error instanceof Error ? error.message : String(error);
@@ -592,6 +634,8 @@ export class TrackingService {
       const staleEntry: HistoryCacheEntry | null = this.historyCacheService.getStale(
         normalizedAddress,
         limit,
+        historyKind,
+        historyDirection,
       );
 
       if (staleEntry) {
@@ -733,6 +777,105 @@ export class TrackingService {
     return offset;
   }
 
+  private parseHistoryKind(rawKind: string | null): HistoryKind {
+    if (!rawKind) {
+      return HistoryKind.ALL;
+    }
+
+    const normalizedKind: string = rawKind.trim().toLowerCase();
+
+    if (normalizedKind === 'all') {
+      return HistoryKind.ALL;
+    }
+
+    if (normalizedKind === 'eth') {
+      return HistoryKind.ETH;
+    }
+
+    if (normalizedKind === 'erc20') {
+      return HistoryKind.ERC20;
+    }
+
+    throw new Error('Неверный kind. Используй all|eth|erc20.');
+  }
+
+  private parseHistoryDirection(rawDirection: string | null): HistoryDirectionFilter {
+    if (!rawDirection) {
+      return HistoryDirectionFilter.ALL;
+    }
+
+    const normalizedDirection: string = rawDirection.trim().toLowerCase();
+
+    if (normalizedDirection === 'all') {
+      return HistoryDirectionFilter.ALL;
+    }
+
+    if (normalizedDirection === 'in') {
+      return HistoryDirectionFilter.IN;
+    }
+
+    if (normalizedDirection === 'out') {
+      return HistoryDirectionFilter.OUT;
+    }
+
+    throw new Error('Неверный direction. Используй all|in|out.');
+  }
+
+  private async loadLocalEventsForHistory(
+    normalizedAddress: string,
+    limit: number,
+    offset: number,
+    historyKind: HistoryKind,
+    historyDirection: HistoryDirectionFilter,
+  ): Promise<readonly WalletEventHistoryView[]> {
+    const rawFetchLimit: number = Math.min(Math.max(offset + limit + 50, limit), 200);
+    const rawEvents: readonly WalletEventHistoryView[] =
+      await this.walletEventsRepository.listRecentByTrackedAddress(
+        ChainKey.ETHEREUM_MAINNET,
+        normalizedAddress,
+        rawFetchLimit,
+        0,
+      );
+
+    const filteredEvents: readonly WalletEventHistoryView[] = this.filterWalletEventsForHistory(
+      rawEvents,
+      historyKind,
+      historyDirection,
+    );
+
+    if (offset <= 0) {
+      return filteredEvents.slice(0, limit);
+    }
+
+    return filteredEvents.slice(offset, offset + limit + 1);
+  }
+
+  private filterWalletEventsForHistory(
+    events: readonly WalletEventHistoryView[],
+    historyKind: HistoryKind,
+    historyDirection: HistoryDirectionFilter,
+  ): readonly WalletEventHistoryView[] {
+    return events.filter((event: WalletEventHistoryView): boolean => {
+      if (historyDirection === HistoryDirectionFilter.IN && event.direction !== 'IN') {
+        return false;
+      }
+
+      if (historyDirection === HistoryDirectionFilter.OUT && event.direction !== 'OUT') {
+        return false;
+      }
+
+      if (historyKind === HistoryKind.ETH) {
+        return event.tokenAddress === null || event.tokenSymbol === 'ETH';
+      }
+
+      if (historyKind === HistoryKind.ERC20) {
+        return event.tokenAddress !== null && event.tokenSymbol !== 'ETH';
+      }
+
+      return true;
+    });
+  }
+
   private mapPreferences(row: UserAlertPreferenceRow): UserAlertPreferences {
     const minAmount: number = Number.parseFloat(String(row.min_amount));
 
@@ -794,17 +937,18 @@ export class TrackingService {
     }
 
     const rows: string[] = transactions.map((tx, index: number): string => {
-      const direction: string =
-        tx.from.toLowerCase() === normalizedAddress.toLowerCase() ? 'OUT' : 'IN';
+      const direction: string = tx.direction;
       const date: Date = new Date(tx.timestampSec * 1000);
       const formattedValue: string = this.formatAssetValue(tx.valueRaw, tx.assetDecimals);
       const statusIcon: string = tx.isError ? '🔴' : '🟢';
       const directionIcon: string = direction === 'OUT' ? '↗️ OUT' : '↘️ IN';
       const escapedAssetSymbol: string = this.escapeHtml(tx.assetSymbol);
       const txUrl: string = this.buildTxUrl(tx.txHash);
+      const eventType: string = this.escapeHtml(tx.eventType);
 
       return [
         `<a href="${txUrl}">Tx #${index + 1}</a> ${statusIcon} ${directionIcon} <b>${formattedValue} ${escapedAssetSymbol}</b>`,
+        `📌 <code>${eventType}</code>`,
         `🕒 <code>${this.formatTimestamp(date)}</code>`,
         `🔹 <code>${this.shortHash(tx.txHash)}</code>`,
       ].join('\n');
@@ -821,6 +965,8 @@ export class TrackingService {
     normalizedAddress: string,
     events: readonly WalletEventHistoryView[],
     offset: number = 0,
+    historyKind: HistoryKind = HistoryKind.ALL,
+    historyDirection: HistoryDirectionFilter = HistoryDirectionFilter.ALL,
   ): string {
     const rows: string[] = events.map((event, index: number): string => {
       const txUrl: string = this.buildTxUrl(event.txHash);
@@ -842,6 +988,7 @@ export class TrackingService {
 
     return [
       `📜 <b>История</b> <code>${normalizedAddress}</code>`,
+      `Фильтр: kind=<code>${historyKind}</code>, direction=<code>${historyDirection}</code>`,
       `Локальные события ${startIndex}-${endIndex}:`,
       ...rows,
     ].join('\n\n');

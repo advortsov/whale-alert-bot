@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import type { HistoryCacheEntry, HistoryCacheKey } from './history-cache.interfaces';
 import { AppConfigService } from '../config/app-config.service';
+import { HistoryDirectionFilter, HistoryKind } from '../features/tracking/dto/history-request.dto';
 
 @Injectable()
 export class HistoryCacheService {
@@ -12,9 +13,11 @@ export class HistoryCacheService {
   public getFresh(
     address: string,
     limit: number,
+    kind: HistoryKind = HistoryKind.ALL,
+    direction: HistoryDirectionFilter = HistoryDirectionFilter.ALL,
     nowEpochMs: number = Date.now(),
   ): HistoryCacheEntry | null {
-    const key: string = this.buildMapKey(address, limit);
+    const key: string = this.buildMapKey(address, limit, kind, direction);
     const entry: HistoryCacheEntry | undefined = this.cache.get(key);
 
     if (!entry) {
@@ -31,9 +34,11 @@ export class HistoryCacheService {
   public getStale(
     address: string,
     limit: number,
+    kind: HistoryKind = HistoryKind.ALL,
+    direction: HistoryDirectionFilter = HistoryDirectionFilter.ALL,
     nowEpochMs: number = Date.now(),
   ): HistoryCacheEntry | null {
-    const key: string = this.buildMapKey(address, limit);
+    const key: string = this.buildMapKey(address, limit, kind, direction);
     const entry: HistoryCacheEntry | undefined = this.cache.get(key);
 
     if (!entry) {
@@ -52,11 +57,15 @@ export class HistoryCacheService {
     address: string,
     limit: number,
     message: string,
+    kind: HistoryKind = HistoryKind.ALL,
+    direction: HistoryDirectionFilter = HistoryDirectionFilter.ALL,
     nowEpochMs: number = Date.now(),
   ): HistoryCacheEntry {
     const key: HistoryCacheKey = {
       address: address.toLowerCase(),
       limit,
+      kind,
+      direction,
     };
     const freshUntilEpochMs: number = nowEpochMs + this.appConfigService.historyCacheTtlSec * 1000;
     const staleUntilEpochMs: number =
@@ -75,11 +84,18 @@ export class HistoryCacheService {
       staleUntilEpochMs,
     };
 
-    this.cache.set(this.buildMapKey(address, limit), entry);
+    this.cache.set(this.buildMapKey(address, limit, kind, direction), entry);
     return entry;
   }
 
-  private buildMapKey(address: string, limit: number): string {
-    return `${address.toLowerCase()}:${String(limit)}`;
+  private buildMapKey(
+    address: string,
+    limit: number,
+    kind: HistoryKind,
+    direction: HistoryDirectionFilter,
+  ): string {
+    return [address.toLowerCase(), String(limit), kind.toLowerCase(), direction.toLowerCase()].join(
+      ':',
+    );
   }
 }

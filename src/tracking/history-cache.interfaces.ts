@@ -1,6 +1,13 @@
+import type {
+  HistoryDirectionFilter,
+  HistoryKind,
+} from '../features/tracking/dto/history-request.dto';
+
 export type HistoryCacheKey = {
   readonly address: string;
   readonly limit: number;
+  readonly kind: HistoryKind;
+  readonly direction: HistoryDirectionFilter;
 };
 
 export type HistoryCacheEntry = {

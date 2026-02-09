@@ -2,6 +2,10 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { LocalBotHarness } from './local-bot-harness';
 import type { HarnessRunResult, HarnessUser } from './local-bot-harness.interfaces';
+import {
+  HistoryDirectionFilter,
+  HistoryKind,
+} from '../../features/tracking/dto/history-request.dto';
 import type { RuntimeStatusService } from '../../runtime/runtime-status.service';
 import { HistoryRequestSource } from '../../tracking/history-rate-limiter.interfaces';
 import type { TrackingService } from '../../tracking/tracking.service';
@@ -142,6 +146,8 @@ describe('LocalBotHarness', (): void => {
       trackedAddress,
       '10',
       HistoryRequestSource.CALLBACK,
+      HistoryKind.ALL,
+      HistoryDirectionFilter.ALL,
     );
     expect(result.replies[0]?.options).toMatchObject({
       parse_mode: 'HTML',

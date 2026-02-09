@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { HistoryCacheService } from './history-cache.service';
 import type { AppConfigService } from '../config/app-config.service';
+import { HistoryDirectionFilter, HistoryKind } from '../features/tracking/dto/history-request.dto';
 
 type AppConfigServiceStub = {
   readonly historyCacheTtlSec: number;
@@ -18,8 +19,14 @@ describe('HistoryCacheService', (): void => {
       appConfigServiceStub as unknown as AppConfigService,
     );
 
-    service.set('0xabc', 5, 'cached message', 1000);
-    const freshEntry = service.getFresh('0xabc', 5, 1000 + 119_000);
+    service.set('0xabc', 5, 'cached message', HistoryKind.ALL, HistoryDirectionFilter.ALL, 1000);
+    const freshEntry = service.getFresh(
+      '0xabc',
+      5,
+      HistoryKind.ALL,
+      HistoryDirectionFilter.ALL,
+      1000 + 119_000,
+    );
 
     expect(freshEntry?.message).toBe('cached message');
   });
@@ -33,10 +40,22 @@ describe('HistoryCacheService', (): void => {
       appConfigServiceStub as unknown as AppConfigService,
     );
 
-    service.set('0xabc', 5, 'cached message', 2000);
+    service.set('0xabc', 5, 'cached message', HistoryKind.ALL, HistoryDirectionFilter.ALL, 2000);
 
-    const freshEntry = service.getFresh('0xabc', 5, 2000 + 121_000);
-    const staleEntry = service.getStale('0xabc', 5, 2000 + 121_000);
+    const freshEntry = service.getFresh(
+      '0xabc',
+      5,
+      HistoryKind.ALL,
+      HistoryDirectionFilter.ALL,
+      2000 + 121_000,
+    );
+    const staleEntry = service.getStale(
+      '0xabc',
+      5,
+      HistoryKind.ALL,
+      HistoryDirectionFilter.ALL,
+      2000 + 121_000,
+    );
 
     expect(freshEntry).toBeNull();
     expect(staleEntry?.message).toBe('cached message');
@@ -51,10 +70,22 @@ describe('HistoryCacheService', (): void => {
       appConfigServiceStub as unknown as AppConfigService,
     );
 
-    service.set('0xabc', 5, 'cached message', 3000);
+    service.set('0xabc', 5, 'cached message', HistoryKind.ALL, HistoryDirectionFilter.ALL, 3000);
 
-    const staleEntry = service.getStale('0xabc', 5, 3000 + 601_000);
-    const staleEntryAfterDelete = service.getStale('0xabc', 5, 3000 + 602_000);
+    const staleEntry = service.getStale(
+      '0xabc',
+      5,
+      HistoryKind.ALL,
+      HistoryDirectionFilter.ALL,
+      3000 + 601_000,
+    );
+    const staleEntryAfterDelete = service.getStale(
+      '0xabc',
+      5,
+      HistoryKind.ALL,
+      HistoryDirectionFilter.ALL,
+      3000 + 602_000,
+    );
 
     expect(staleEntry).toBeNull();
     expect(staleEntryAfterDelete).toBeNull();

@@ -7,6 +7,7 @@ import {
   type WalletCallbackTarget,
 } from './telegram.interfaces';
 import { TelegramUpdate } from './telegram.update';
+import { HistoryDirectionFilter, HistoryKind } from '../features/tracking/dto/history-request.dto';
 import type { RuntimeStatusService } from '../runtime/runtime-status.service';
 import { HistoryRequestSource } from '../tracking/history-rate-limiter.interfaces';
 import { AlertFilterToggleTarget } from '../tracking/tracking.interfaces';
@@ -368,6 +369,8 @@ describe('TelegramUpdate', (): void => {
       '0x96b0Dc619A86572524c15C1fC9c42DA9A94BCAa0',
       '10',
       HistoryRequestSource.CALLBACK,
+      HistoryKind.ALL,
+      HistoryDirectionFilter.ALL,
     );
     expect(answerCbQueryMock).toHaveBeenCalledWith('Выполняю действие...');
     expect(replyMock).toHaveBeenCalledWith(
@@ -430,6 +433,8 @@ describe('TelegramUpdate', (): void => {
         walletId: 16,
         limit: 10,
         offset: 0,
+        kind: HistoryKind.ALL,
+        direction: HistoryDirectionFilter.ALL,
         hasNextPage: true,
       });
     const trackingServiceStub = {
@@ -466,6 +471,8 @@ describe('TelegramUpdate', (): void => {
       '10',
       '0',
       HistoryRequestSource.CALLBACK,
+      HistoryKind.ALL,
+      HistoryDirectionFilter.ALL,
     );
     expect(answerCbQueryMock).toHaveBeenCalledWith('Выполняю действие...');
     expect(replyMock).toHaveBeenCalledWith('<b>История</b> page', expect.anything());
@@ -476,7 +483,7 @@ describe('TelegramUpdate', (): void => {
       | undefined;
     const firstButton = replyOptions?.reply_markup?.inline_keyboard?.[0]?.[0];
 
-    expect(firstButton?.callback_data).toBe('wallet_history_page:16:10:10');
+    expect(firstButton?.callback_data).toBe('wallet_history_page:16:10:10:all:all');
   });
 
   it('handles wallet filters callback and returns inline toggle keyboard', async (): Promise<void> => {
