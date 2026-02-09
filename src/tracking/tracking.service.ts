@@ -19,13 +19,18 @@ import {
   type TelegramUserRef,
   type TrackedWalletOption,
   type UserAlertPreferences,
+  type WalletAlertFilterState,
 } from './tracking.interfaces';
 import { AppConfigService } from '../config/app-config.service';
-import type { UserAlertPreferenceRow } from '../storage/database.types';
+import type {
+  UserAlertPreferenceRow,
+  UserWalletAlertPreferenceRow,
+} from '../storage/database.types';
 import { SubscriptionsRepository } from '../storage/repositories/subscriptions.repository';
 import { TrackedWalletsRepository } from '../storage/repositories/tracked-wallets.repository';
 import { AlertEventFilterType } from '../storage/repositories/user-alert-preferences.interfaces';
 import { UserAlertPreferencesRepository } from '../storage/repositories/user-alert-preferences.repository';
+import { UserWalletAlertPreferencesRepository } from '../storage/repositories/user-wallet-alert-preferences.repository';
 import { UsersRepository } from '../storage/repositories/users.repository';
 import { WalletEventsRepository } from '../storage/repositories/wallet-events.repository';
 import type { WalletEventHistoryView } from '../storage/repositories/wallet-events.repository.interfaces';
@@ -44,6 +49,7 @@ export class TrackingService {
     private readonly historyCacheService: HistoryCacheService,
     private readonly historyRateLimiterService: HistoryRateLimiterService,
     private readonly userAlertPreferencesRepository: UserAlertPreferencesRepository,
+    private readonly userWalletAlertPreferencesRepository: UserWalletAlertPreferencesRepository,
     private readonly walletEventsRepository: WalletEventsRepository,
     private readonly appConfigService: AppConfigService,
   ) {}
@@ -202,6 +208,7 @@ export class TrackingService {
       `Label: ${labelText}`,
       `Address: ${matchedSubscription.walletAddress}`,
       `История: /history #${walletId} 10`,
+      `Фильтры: /walletfilters #${walletId}`,
       `Удалить: /untrack #${walletId}`,
     ].join('\n');
   }
@@ -311,13 +318,56 @@ export class TrackingService {
     enabled: boolean,
   ): Promise<string> {
     const user = await this.usersRepository.findOrCreate(userRef.telegramId, userRef.username);
-    const targetType: AlertEventFilterType =
-      target === AlertFilterToggleTarget.TRANSFER
-        ? AlertEventFilterType.TRANSFER
-        : AlertEventFilterType.SWAP;
+    const targetType: AlertEventFilterType = this.mapAlertFilterTarget(target);
     await this.userAlertPreferencesRepository.updateEventType(user.id, targetType, enabled);
 
     return `Фильтр ${target} -> ${enabled ? 'on' : 'off'}.`;
+  }
+
+  public async getWalletAlertFilterState(
+    userRef: TelegramUserRef,
+    rawWalletId: string,
+  ): Promise<WalletAlertFilterState> {
+    const user = await this.usersRepository.findOrCreate(userRef.telegramId, userRef.username);
+    const walletSubscription = await this.resolveWalletSubscription(user.id, rawWalletId);
+    const globalPreferences: UserAlertPreferenceRow =
+      await this.userAlertPreferencesRepository.findOrCreateByUserId(user.id);
+    const walletPreferences: UserWalletAlertPreferenceRow | null =
+      await this.userWalletAlertPreferencesRepository.findByUserAndWalletId(
+        user.id,
+        walletSubscription.walletId,
+      );
+
+    return {
+      walletId: walletSubscription.walletId,
+      walletAddress: walletSubscription.walletAddress,
+      walletLabel: walletSubscription.walletLabel,
+      allowTransfer: walletPreferences
+        ? walletPreferences.allow_transfer
+        : globalPreferences.allow_transfer,
+      allowSwap: walletPreferences ? walletPreferences.allow_swap : globalPreferences.allow_swap,
+      hasWalletOverride: walletPreferences !== null,
+    };
+  }
+
+  public async setWalletEventTypeFilter(
+    userRef: TelegramUserRef,
+    rawWalletId: string,
+    target: AlertFilterToggleTarget,
+    enabled: boolean,
+  ): Promise<WalletAlertFilterState> {
+    const user = await this.usersRepository.findOrCreate(userRef.telegramId, userRef.username);
+    const walletSubscription = await this.resolveWalletSubscription(user.id, rawWalletId);
+    const targetType: AlertEventFilterType = this.mapAlertFilterTarget(target);
+
+    await this.userWalletAlertPreferencesRepository.updateEventType(
+      user.id,
+      walletSubscription.walletId,
+      targetType,
+      enabled,
+    );
+
+    return this.getWalletAlertFilterState(userRef, `#${String(walletSubscription.walletId)}`);
   }
 
   public async getUserStatus(userRef: TelegramUserRef): Promise<string> {
@@ -541,6 +591,30 @@ export class TrackingService {
     }
 
     return Number.parseInt(normalizedIdentifier, 10);
+  }
+
+  private async resolveWalletSubscription(
+    userId: number,
+    rawWalletId: string,
+  ): Promise<{
+    readonly walletId: number;
+    readonly walletAddress: string;
+    readonly walletLabel: string | null;
+  }> {
+    const walletId: number | null = this.parseWalletId(rawWalletId);
+
+    if (walletId === null) {
+      throw new Error('Неверный id кошелька. Используй формат #3.');
+    }
+
+    const subscriptions = await this.subscriptionsRepository.listByUserId(userId);
+    const matchedSubscription = this.findSubscriptionByWalletId(subscriptions, walletId);
+
+    if (!matchedSubscription) {
+      throw new Error(`Не нашел адрес с id #${walletId}. Сначала проверь /list.`);
+    }
+
+    return matchedSubscription;
   }
 
   private async resolveHistoryTarget(
@@ -892,5 +966,11 @@ export class TrackingService {
     }
 
     return parsed;
+  }
+
+  private mapAlertFilterTarget(target: AlertFilterToggleTarget): AlertEventFilterType {
+    return target === AlertFilterToggleTarget.TRANSFER
+      ? AlertEventFilterType.TRANSFER
+      : AlertEventFilterType.SWAP;
   }
 }

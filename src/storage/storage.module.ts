@@ -6,6 +6,7 @@ import { ProcessedEventsRepository } from './repositories/processed-events.repos
 import { SubscriptionsRepository } from './repositories/subscriptions.repository';
 import { TrackedWalletsRepository } from './repositories/tracked-wallets.repository';
 import { UserAlertPreferencesRepository } from './repositories/user-alert-preferences.repository';
+import { UserWalletAlertPreferencesRepository } from './repositories/user-wallet-alert-preferences.repository';
 import { UsersRepository } from './repositories/users.repository';
 import { WalletEventsRepository } from './repositories/wallet-events.repository';
 
@@ -18,6 +19,7 @@ import { WalletEventsRepository } from './repositories/wallet-events.repository'
     SubscriptionsRepository,
     ProcessedEventsRepository,
     UserAlertPreferencesRepository,
+    UserWalletAlertPreferencesRepository,
     WalletEventsRepository,
   ],
   exports: [
@@ -28,6 +30,7 @@ import { WalletEventsRepository } from './repositories/wallet-events.repository'
     SubscriptionsRepository,
     ProcessedEventsRepository,
     UserAlertPreferencesRepository,
+    UserWalletAlertPreferencesRepository,
     WalletEventsRepository,
   ],
 })

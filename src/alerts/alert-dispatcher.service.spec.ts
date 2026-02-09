@@ -10,14 +10,13 @@ import {
   EventDirection,
   type ClassifiedEvent,
 } from '../chain/chain.types';
-import type { UserRow } from '../storage/database.types';
 import type { SubscriptionsRepository } from '../storage/repositories/subscriptions.repository';
 import type { UserAlertPreferencesRepository } from '../storage/repositories/user-alert-preferences.repository';
-import type { UsersRepository } from '../storage/repositories/users.repository';
+import type { UserWalletAlertPreferencesRepository } from '../storage/repositories/user-wallet-alert-preferences.repository';
 import type { TelegramSenderService } from '../telegram/telegram-sender.service';
 
 type SubscriptionsRepositoryStub = {
-  readonly getSubscriberTelegramIdsByAddress: ReturnType<typeof vi.fn>;
+  readonly listSubscriberWalletRecipientsByAddress: ReturnType<typeof vi.fn>;
 };
 
 type AlertEnrichmentServiceStub = {
@@ -32,12 +31,12 @@ type AlertMessageFormatterStub = {
   readonly format: ReturnType<typeof vi.fn>;
 };
 
-type UsersRepositoryStub = {
-  readonly findByTelegramId: ReturnType<typeof vi.fn>;
-};
-
 type UserAlertPreferencesRepositoryStub = {
   readonly findOrCreateByUserId: ReturnType<typeof vi.fn>;
+};
+
+type UserWalletAlertPreferencesRepositoryStub = {
+  readonly findByUserAndWalletId: ReturnType<typeof vi.fn>;
 };
 
 type TelegramSenderServiceStub = {
@@ -69,12 +68,12 @@ const createService = (): {
   readonly alertEnrichmentServiceStub: AlertEnrichmentServiceStub;
   readonly alertSuppressionServiceStub: AlertSuppressionServiceStub;
   readonly alertMessageFormatterStub: AlertMessageFormatterStub;
-  readonly usersRepositoryStub: UsersRepositoryStub;
   readonly userAlertPreferencesRepositoryStub: UserAlertPreferencesRepositoryStub;
+  readonly userWalletAlertPreferencesRepositoryStub: UserWalletAlertPreferencesRepositoryStub;
   readonly telegramSenderServiceStub: TelegramSenderServiceStub;
 } => {
   const subscriptionsRepositoryStub: SubscriptionsRepositoryStub = {
-    getSubscriberTelegramIdsByAddress: vi.fn(),
+    listSubscriberWalletRecipientsByAddress: vi.fn(),
   };
   const alertEnrichmentServiceStub: AlertEnrichmentServiceStub = {
     enrich: vi.fn(),
@@ -85,17 +84,23 @@ const createService = (): {
   const alertMessageFormatterStub: AlertMessageFormatterStub = {
     format: vi.fn(),
   };
-  const usersRepositoryStub: UsersRepositoryStub = {
-    findByTelegramId: vi.fn(),
-  };
   const userAlertPreferencesRepositoryStub: UserAlertPreferencesRepositoryStub = {
     findOrCreateByUserId: vi.fn(),
+  };
+  const userWalletAlertPreferencesRepositoryStub: UserWalletAlertPreferencesRepositoryStub = {
+    findByUserAndWalletId: vi.fn(),
   };
   const telegramSenderServiceStub: TelegramSenderServiceStub = {
     sendText: vi.fn(),
   };
 
-  subscriptionsRepositoryStub.getSubscriberTelegramIdsByAddress.mockResolvedValue(['42']);
+  subscriptionsRepositoryStub.listSubscriberWalletRecipientsByAddress.mockResolvedValue([
+    {
+      telegramId: '42',
+      userId: 7,
+      walletId: 3,
+    },
+  ]);
   alertSuppressionServiceStub.shouldSuppress.mockReturnValue({
     suppressed: false,
     reason: null,
@@ -104,13 +109,6 @@ const createService = (): {
     (event: ClassifiedEvent): ClassifiedEvent => event,
   );
   alertMessageFormatterStub.format.mockReturnValue('alert');
-  const userRow: UserRow = {
-    id: 7,
-    telegram_id: '42',
-    username: 'tester',
-    created_at: new Date('2026-02-09T00:00:00.000Z'),
-  };
-  usersRepositoryStub.findByTelegramId.mockResolvedValue(userRow);
   userAlertPreferencesRepositoryStub.findOrCreateByUserId.mockResolvedValue({
     id: 1,
     user_id: 7,
@@ -121,14 +119,15 @@ const createService = (): {
     created_at: new Date('2026-02-09T00:00:00.000Z'),
     updated_at: new Date('2026-02-09T00:00:00.000Z'),
   });
+  userWalletAlertPreferencesRepositoryStub.findByUserAndWalletId.mockResolvedValue(null);
 
   const service: AlertDispatcherService = new AlertDispatcherService(
     subscriptionsRepositoryStub as unknown as SubscriptionsRepository,
     alertEnrichmentServiceStub as unknown as AlertEnrichmentService,
     alertSuppressionServiceStub as unknown as AlertSuppressionService,
     alertMessageFormatterStub as unknown as AlertMessageFormatter,
-    usersRepositoryStub as unknown as UsersRepository,
     userAlertPreferencesRepositoryStub as unknown as UserAlertPreferencesRepository,
+    userWalletAlertPreferencesRepositoryStub as unknown as UserWalletAlertPreferencesRepository,
     telegramSenderServiceStub as unknown as TelegramSenderService,
   );
 
@@ -138,8 +137,8 @@ const createService = (): {
     alertEnrichmentServiceStub,
     alertSuppressionServiceStub,
     alertMessageFormatterStub,
-    usersRepositoryStub,
     userAlertPreferencesRepositoryStub,
+    userWalletAlertPreferencesRepositoryStub,
     telegramSenderServiceStub,
   };
 };
@@ -182,6 +181,24 @@ describe('AlertDispatcherService', (): void => {
       allow_transfer: true,
       allow_swap: true,
       muted_until: null,
+      created_at: new Date('2026-02-09T00:00:00.000Z'),
+      updated_at: new Date('2026-02-09T00:00:00.000Z'),
+    });
+
+    await context.service.dispatch(buildEvent('12.000000'));
+
+    expect(context.telegramSenderServiceStub.sendText).not.toHaveBeenCalled();
+  });
+
+  it('skips alert when wallet override disables transfer for tracked wallet', async (): Promise<void> => {
+    const context = createService();
+
+    context.userWalletAlertPreferencesRepositoryStub.findByUserAndWalletId.mockResolvedValue({
+      id: 3,
+      user_id: 7,
+      wallet_id: 3,
+      allow_transfer: false,
+      allow_swap: true,
       created_at: new Date('2026-02-09T00:00:00.000Z'),
       updated_at: new Date('2026-02-09T00:00:00.000Z'),
     });

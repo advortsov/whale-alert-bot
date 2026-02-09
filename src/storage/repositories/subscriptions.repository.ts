@@ -6,14 +6,10 @@ import type {
   TrackedWalletRow,
   UserWalletSubscriptionRow,
 } from '../database.types';
-
-export type UserWalletSubscriptionView = {
-  readonly subscriptionId: number;
-  readonly walletId: number;
-  readonly walletAddress: string;
-  readonly walletLabel: string | null;
-  readonly createdAt: Date;
-};
+import type {
+  SubscriberWalletRecipient,
+  UserWalletSubscriptionView,
+} from './subscriptions.repository.interfaces';
 
 @Injectable()
 export class SubscriptionsRepository {
@@ -129,5 +125,38 @@ export class SubscriptionsRepository {
       .execute();
 
     return rows.map((row: { telegram_id: string }): string => row.telegram_id);
+  }
+
+  public async listSubscriberWalletRecipientsByAddress(
+    address: string,
+  ): Promise<readonly SubscriberWalletRecipient[]> {
+    const rows: readonly {
+      telegram_id: string;
+      user_id: number;
+      wallet_id: number;
+    }[] = await this.databaseService
+      .getDb()
+      .selectFrom('tracked_wallets')
+      .innerJoin(
+        'user_wallet_subscriptions',
+        'user_wallet_subscriptions.wallet_id',
+        'tracked_wallets.id',
+      )
+      .innerJoin('users', 'users.id', 'user_wallet_subscriptions.user_id')
+      .select([
+        'users.telegram_id',
+        'user_wallet_subscriptions.user_id',
+        'user_wallet_subscriptions.wallet_id',
+      ])
+      .where('tracked_wallets.address', '=', address)
+      .execute();
+
+    return rows.map(
+      (row): SubscriberWalletRecipient => ({
+        telegramId: row.telegram_id,
+        userId: row.user_id,
+        walletId: row.wallet_id,
+      }),
+    );
   }
 }

@@ -20,6 +20,8 @@ Telegram-бот на `NestJS + TypeScript` для отслеживания ак�
 - `/history <address> [limit]`
 - `/status`
 - `/filters`
+- `/walletfilters <#id>`
+- `/wfilter <#id> <transfer|swap> <on|off>`
 - `/setmin <amount>`
 - `/mute <minutes|off>`
 - `/help`

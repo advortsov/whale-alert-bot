@@ -8,13 +8,14 @@ import {
   type HistoryRateLimitDecision,
 } from './history-rate-limiter.interfaces';
 import type { HistoryRateLimiterService } from './history-rate-limiter.service';
-import type { TelegramUserRef } from './tracking.interfaces';
+import { AlertFilterToggleTarget, type TelegramUserRef } from './tracking.interfaces';
 import { TrackingService } from './tracking.service';
 import type { AppConfigService } from '../config/app-config.service';
 import type { UserRow } from '../storage/database.types';
 import type { SubscriptionsRepository } from '../storage/repositories/subscriptions.repository';
 import type { TrackedWalletsRepository } from '../storage/repositories/tracked-wallets.repository';
 import type { UserAlertPreferencesRepository } from '../storage/repositories/user-alert-preferences.repository';
+import type { UserWalletAlertPreferencesRepository } from '../storage/repositories/user-wallet-alert-preferences.repository';
 import type { UsersRepository } from '../storage/repositories/users.repository';
 import type { WalletEventsRepository } from '../storage/repositories/wallet-events.repository';
 
@@ -59,6 +60,11 @@ type UserAlertPreferencesRepositoryStub = {
   readonly updateEventType: ReturnType<typeof vi.fn>;
 };
 
+type UserWalletAlertPreferencesRepositoryStub = {
+  readonly findByUserAndWalletId: ReturnType<typeof vi.fn>;
+  readonly updateEventType: ReturnType<typeof vi.fn>;
+};
+
 type WalletEventsRepositoryStub = {
   readonly listRecentByTrackedAddress: ReturnType<typeof vi.fn>;
   readonly saveEvent: ReturnType<typeof vi.fn>;
@@ -74,6 +80,7 @@ type TestContext = {
   readonly historyCacheServiceStub: HistoryCacheServiceStub;
   readonly historyRateLimiterServiceStub: HistoryRateLimiterServiceStub;
   readonly userAlertPreferencesRepositoryStub: UserAlertPreferencesRepositoryStub;
+  readonly userWalletAlertPreferencesRepositoryStub: UserWalletAlertPreferencesRepositoryStub;
   readonly walletEventsRepositoryStub: WalletEventsRepositoryStub;
   readonly appConfigServiceStub: AppConfigServiceStub;
   readonly service: TrackingService;
@@ -114,6 +121,10 @@ const createTestContext = (): TestContext => {
     findOrCreateByUserId: vi.fn(),
     updateMinAmount: vi.fn(),
     updateMute: vi.fn(),
+    updateEventType: vi.fn(),
+  };
+  const userWalletAlertPreferencesRepositoryStub: UserWalletAlertPreferencesRepositoryStub = {
+    findByUserAndWalletId: vi.fn(),
     updateEventType: vi.fn(),
   };
   const walletEventsRepositoryStub: WalletEventsRepositoryStub = {
@@ -174,6 +185,16 @@ const createTestContext = (): TestContext => {
     created_at: new Date('2026-02-01T00:00:00.000Z'),
     updated_at: new Date('2026-02-01T00:00:00.000Z'),
   });
+  userWalletAlertPreferencesRepositoryStub.findByUserAndWalletId.mockResolvedValue(null);
+  userWalletAlertPreferencesRepositoryStub.updateEventType.mockResolvedValue({
+    id: 1,
+    user_id: 7,
+    wallet_id: 9,
+    allow_transfer: true,
+    allow_swap: false,
+    created_at: new Date('2026-02-01T00:00:00.000Z'),
+    updated_at: new Date('2026-02-01T00:00:00.000Z'),
+  });
   walletEventsRepositoryStub.listRecentByTrackedAddress.mockResolvedValue([]);
 
   const service: TrackingService = new TrackingService(
@@ -184,6 +205,7 @@ const createTestContext = (): TestContext => {
     historyCacheServiceStub as unknown as HistoryCacheService,
     historyRateLimiterServiceStub as unknown as HistoryRateLimiterService,
     userAlertPreferencesRepositoryStub as unknown as UserAlertPreferencesRepository,
+    userWalletAlertPreferencesRepositoryStub as unknown as UserWalletAlertPreferencesRepository,
     walletEventsRepositoryStub as unknown as WalletEventsRepository,
     appConfigServiceStub as unknown as AppConfigService,
   );
@@ -198,6 +220,7 @@ const createTestContext = (): TestContext => {
     historyCacheServiceStub,
     historyRateLimiterServiceStub,
     userAlertPreferencesRepositoryStub,
+    userWalletAlertPreferencesRepositoryStub,
     walletEventsRepositoryStub,
     appConfigServiceStub,
     service,
@@ -399,6 +422,66 @@ describe('TrackingService', (): void => {
     );
     expect(message).toContain('Текущие фильтры алертов');
     expect(message).toContain('transfer: on');
+  });
+
+  it('returns wallet alert filter state with global defaults when override is missing', async (): Promise<void> => {
+    const context: TestContext = createTestContext();
+    context.subscriptionsRepositoryStub.listByUserId.mockResolvedValue([
+      {
+        subscriptionId: 1,
+        walletId: 9,
+        walletAddress: '0x2F0b23f53734252Bda2277357e97e1517d6B042A',
+        walletLabel: 'Maker_ETH_Vault',
+        createdAt: new Date('2026-02-01T00:00:00.000Z'),
+      },
+    ]);
+    context.userWalletAlertPreferencesRepositoryStub.findByUserAndWalletId.mockResolvedValue(null);
+
+    const state = await context.service.getWalletAlertFilterState(context.userRef, '#9');
+
+    expect(state.walletId).toBe(9);
+    expect(state.walletLabel).toBe('Maker_ETH_Vault');
+    expect(state.allowTransfer).toBe(true);
+    expect(state.allowSwap).toBe(true);
+    expect(state.hasWalletOverride).toBe(false);
+  });
+
+  it('updates wallet filter and returns overridden state', async (): Promise<void> => {
+    const context: TestContext = createTestContext();
+    context.subscriptionsRepositoryStub.listByUserId.mockResolvedValue([
+      {
+        subscriptionId: 1,
+        walletId: 9,
+        walletAddress: '0x2F0b23f53734252Bda2277357e97e1517d6B042A',
+        walletLabel: 'Maker_ETH_Vault',
+        createdAt: new Date('2026-02-01T00:00:00.000Z'),
+      },
+    ]);
+    context.userWalletAlertPreferencesRepositoryStub.findByUserAndWalletId.mockResolvedValue({
+      id: 1,
+      user_id: 7,
+      wallet_id: 9,
+      allow_transfer: false,
+      allow_swap: true,
+      created_at: new Date('2026-02-01T00:00:00.000Z'),
+      updated_at: new Date('2026-02-01T00:00:00.000Z'),
+    });
+
+    const state = await context.service.setWalletEventTypeFilter(
+      context.userRef,
+      '#9',
+      AlertFilterToggleTarget.TRANSFER,
+      false,
+    );
+
+    expect(context.userWalletAlertPreferencesRepositoryStub.updateEventType).toHaveBeenCalledWith(
+      7,
+      9,
+      'transfer',
+      false,
+    );
+    expect(state.allowTransfer).toBe(false);
+    expect(state.hasWalletOverride).toBe(true);
   });
 
   it('returns wallet details by wallet id', async (): Promise<void> => {

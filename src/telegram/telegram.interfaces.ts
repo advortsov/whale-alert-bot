@@ -10,6 +10,8 @@ export enum SupportedTelegramCommand {
   WALLET = 'wallet',
   STATUS = 'status',
   FILTERS = 'filters',
+  WALLET_FILTERS = 'walletfilters',
+  WALLET_FILTER = 'wfilter',
   SETMIN = 'setmin',
   MUTE = 'mute',
   TRACK_HINT = 'track_hint',
@@ -50,6 +52,11 @@ export enum WalletCallbackAction {
   FILTERS = 'filters',
 }
 
+export enum WalletCallbackFilterTarget {
+  TRANSFER = 'transfer',
+  SWAP = 'swap',
+}
+
 export type WalletCallbackTarget = {
   readonly action: WalletCallbackAction;
   readonly targetType: WalletCallbackTargetType;
@@ -58,4 +65,6 @@ export type WalletCallbackTarget = {
   readonly muteMinutes: number | null;
   readonly historyOffset: number | null;
   readonly historyLimit: number | null;
+  readonly filterTarget: WalletCallbackFilterTarget | null;
+  readonly filterEnabled: boolean | null;
 };

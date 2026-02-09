@@ -20,3 +20,12 @@ export type UserAlertPreferences = {
   readonly allowSwap: boolean;
   readonly mutedUntil: Date | null;
 };
+
+export type WalletAlertFilterState = {
+  readonly walletId: number;
+  readonly walletAddress: string;
+  readonly walletLabel: string | null;
+  readonly allowTransfer: boolean;
+  readonly allowSwap: boolean;
+  readonly hasWalletOverride: boolean;
+};

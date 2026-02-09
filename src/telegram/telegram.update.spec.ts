@@ -9,6 +9,7 @@ import {
 import { TelegramUpdate } from './telegram.update';
 import type { RuntimeStatusService } from '../runtime/runtime-status.service';
 import { HistoryRequestSource } from '../tracking/history-rate-limiter.interfaces';
+import { AlertFilterToggleTarget } from '../tracking/tracking.interfaces';
 import type { TrackingService } from '../tracking/tracking.service';
 
 type ParsedMessageCommandView = {
@@ -163,6 +164,39 @@ describe('TelegramUpdate', (): void => {
     });
   });
 
+  it('parses /walletfilters command with wallet id', (): void => {
+    const trackingServiceStub: TrackingService = {} as TrackingService;
+    const update: TelegramUpdate = createUpdate(trackingServiceStub);
+    const privateApi: TelegramUpdatePrivateApi = update as unknown as TelegramUpdatePrivateApi;
+
+    const parsed: readonly ParsedMessageCommandView[] =
+      privateApi.parseMessageCommands('/walletfilters #12');
+
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0]).toMatchObject({
+      command: 'walletfilters',
+      args: ['#12'],
+      lineNumber: 1,
+    });
+  });
+
+  it('parses /wfilter command with filter args', (): void => {
+    const trackingServiceStub: TrackingService = {} as TrackingService;
+    const update: TelegramUpdate = createUpdate(trackingServiceStub);
+    const privateApi: TelegramUpdatePrivateApi = update as unknown as TelegramUpdatePrivateApi;
+
+    const parsed: readonly ParsedMessageCommandView[] = privateApi.parseMessageCommands(
+      '/wfilter #12 transfer off',
+    );
+
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0]).toMatchObject({
+      command: 'wfilter',
+      args: ['#12', 'transfer', 'off'],
+      lineNumber: 1,
+    });
+  });
+
   it('parses menu button text into mapped command', (): void => {
     const trackingServiceStub: TrackingService = {} as TrackingService;
     const update: TelegramUpdate = createUpdate(trackingServiceStub);
@@ -231,6 +265,38 @@ describe('TelegramUpdate', (): void => {
     const callbackTarget = privateApi.parseWalletCallbackData('wallet_history:abc');
 
     expect(callbackTarget).toBeNull();
+  });
+
+  it('parses wallet filters callback by wallet id', (): void => {
+    const trackingServiceStub: TrackingService = {} as TrackingService;
+    const update: TelegramUpdate = createUpdate(trackingServiceStub);
+    const privateApi: TelegramUpdatePrivateApi = update as unknown as TelegramUpdatePrivateApi;
+
+    const callbackTarget = privateApi.parseWalletCallbackData('wallet_filters:16');
+
+    expect(callbackTarget).toMatchObject({
+      action: WalletCallbackAction.FILTERS,
+      targetType: WalletCallbackTargetType.WALLET_ID,
+      walletId: 16,
+    });
+  });
+
+  it('parses wallet filter toggle callback payload', (): void => {
+    const trackingServiceStub: TrackingService = {} as TrackingService;
+    const update: TelegramUpdate = createUpdate(trackingServiceStub);
+    const privateApi: TelegramUpdatePrivateApi = update as unknown as TelegramUpdatePrivateApi;
+
+    const callbackTarget = privateApi.parseWalletCallbackData(
+      'wallet_filter_toggle:16:transfer:off',
+    );
+
+    expect(callbackTarget).toMatchObject({
+      action: WalletCallbackAction.FILTERS,
+      targetType: WalletCallbackTargetType.WALLET_ID,
+      walletId: 16,
+      filterTarget: 'transfer',
+      filterEnabled: false,
+    });
   });
 
   it('parses wallet history pagination callback payload', (): void => {
@@ -411,5 +477,109 @@ describe('TelegramUpdate', (): void => {
     const firstButton = replyOptions?.reply_markup?.inline_keyboard?.[0]?.[0];
 
     expect(firstButton?.callback_data).toBe('wallet_history_page:16:10:10');
+  });
+
+  it('handles wallet filters callback and returns inline toggle keyboard', async (): Promise<void> => {
+    const getWalletAlertFilterStateMock: ReturnType<typeof vi.fn> = vi.fn().mockResolvedValue({
+      walletId: 16,
+      walletAddress: '0x96b0Dc619A86572524c15C1fC9c42DA9A94BCAa0',
+      walletLabel: 'my',
+      allowTransfer: true,
+      allowSwap: false,
+      hasWalletOverride: true,
+    });
+    const trackingServiceStub = {
+      getWalletAlertFilterState: getWalletAlertFilterStateMock,
+    } as unknown as TrackingService;
+    const update: TelegramUpdate = createUpdate(trackingServiceStub);
+    const answerCbQueryMock: ReturnType<typeof vi.fn> = vi.fn().mockResolvedValue(undefined);
+    const replyMock: ReturnType<typeof vi.fn> = vi
+      .fn()
+      .mockResolvedValue({ message_id: 1500, text: 'ok' });
+    const callbackContext = {
+      callbackQuery: {
+        data: 'wallet_filters:16',
+      },
+      from: {
+        id: 42,
+        username: 'tester',
+      },
+      update: {
+        update_id: 500,
+      },
+      answerCbQuery: answerCbQueryMock,
+      reply: replyMock,
+    };
+
+    await update.onCallbackQuery(callbackContext as unknown as Context);
+
+    expect(getWalletAlertFilterStateMock).toHaveBeenCalledWith(
+      {
+        telegramId: '42',
+        username: 'tester',
+      },
+      '#16',
+    );
+    expect(replyMock).toHaveBeenCalledWith(
+      expect.stringContaining('Фильтры кошелька #16'),
+      expect.anything(),
+    );
+    const firstReplyCall: unknown[] | undefined = replyMock.mock.calls[0];
+    const replyOptions = firstReplyCall?.[1] as
+      | { reply_markup?: { inline_keyboard?: { callback_data?: string }[][] } }
+      | undefined;
+
+    expect(replyOptions?.reply_markup?.inline_keyboard?.[0]?.[0]?.callback_data).toBe(
+      'wallet_filter_toggle:16:transfer:off',
+    );
+  });
+
+  it('handles wallet filter toggle callback and applies wallet override', async (): Promise<void> => {
+    const setWalletEventTypeFilterMock: ReturnType<typeof vi.fn> = vi.fn().mockResolvedValue({
+      walletId: 16,
+      walletAddress: '0x96b0Dc619A86572524c15C1fC9c42DA9A94BCAa0',
+      walletLabel: 'my',
+      allowTransfer: false,
+      allowSwap: false,
+      hasWalletOverride: true,
+    });
+    const trackingServiceStub = {
+      setWalletEventTypeFilter: setWalletEventTypeFilterMock,
+    } as unknown as TrackingService;
+    const update: TelegramUpdate = createUpdate(trackingServiceStub);
+    const answerCbQueryMock: ReturnType<typeof vi.fn> = vi.fn().mockResolvedValue(undefined);
+    const replyMock: ReturnType<typeof vi.fn> = vi
+      .fn()
+      .mockResolvedValue({ message_id: 1600, text: 'ok' });
+    const callbackContext = {
+      callbackQuery: {
+        data: 'wallet_filter_toggle:16:transfer:off',
+      },
+      from: {
+        id: 42,
+        username: 'tester',
+      },
+      update: {
+        update_id: 600,
+      },
+      answerCbQuery: answerCbQueryMock,
+      reply: replyMock,
+    };
+
+    await update.onCallbackQuery(callbackContext as unknown as Context);
+
+    expect(setWalletEventTypeFilterMock).toHaveBeenCalledWith(
+      {
+        telegramId: '42',
+        username: 'tester',
+      },
+      '#16',
+      AlertFilterToggleTarget.TRANSFER,
+      false,
+    );
+    expect(replyMock).toHaveBeenCalledWith(
+      expect.stringContaining('Фильтры кошелька #16'),
+      expect.anything(),
+    );
   });
 });

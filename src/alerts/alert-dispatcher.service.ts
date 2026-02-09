@@ -7,8 +7,9 @@ import { type AlertDeliveryResult } from './alert.interfaces';
 import { ClassifiedEventType, type ClassifiedEvent } from '../chain/chain.types';
 import type { UserAlertPreferenceRow } from '../storage/database.types';
 import { SubscriptionsRepository } from '../storage/repositories/subscriptions.repository';
+import type { SubscriberWalletRecipient } from '../storage/repositories/subscriptions.repository.interfaces';
 import { UserAlertPreferencesRepository } from '../storage/repositories/user-alert-preferences.repository';
-import { UsersRepository } from '../storage/repositories/users.repository';
+import { UserWalletAlertPreferencesRepository } from '../storage/repositories/user-wallet-alert-preferences.repository';
 import { TelegramSenderService } from '../telegram/telegram-sender.service';
 
 @Injectable()
@@ -20,8 +21,8 @@ export class AlertDispatcherService {
     private readonly alertEnrichmentService: AlertEnrichmentService,
     private readonly alertSuppressionService: AlertSuppressionService,
     private readonly alertMessageFormatter: AlertMessageFormatter,
-    private readonly usersRepository: UsersRepository,
     private readonly userAlertPreferencesRepository: UserAlertPreferencesRepository,
+    private readonly userWalletAlertPreferencesRepository: UserWalletAlertPreferencesRepository,
     private readonly telegramSenderService: TelegramSenderService,
   ) {}
 
@@ -29,10 +30,12 @@ export class AlertDispatcherService {
     this.logger.debug(
       `dispatch start eventType=${event.eventType} trackedAddress=${event.trackedAddress} txHash=${event.txHash}`,
     );
-    const telegramIds: readonly string[] =
-      await this.subscriptionsRepository.getSubscriberTelegramIdsByAddress(event.trackedAddress);
+    const subscribers: readonly SubscriberWalletRecipient[] =
+      await this.subscriptionsRepository.listSubscriberWalletRecipientsByAddress(
+        event.trackedAddress,
+      );
 
-    if (telegramIds.length === 0) {
+    if (subscribers.length === 0) {
       this.logger.debug(
         `dispatch skipped no subscribers trackedAddress=${event.trackedAddress} txHash=${event.txHash}`,
       );
@@ -53,37 +56,37 @@ export class AlertDispatcherService {
     const deliveryResults: AlertDeliveryResult[] = [];
 
     this.logger.log(
-      `dispatch sending eventType=${event.eventType} recipients=${telegramIds.length} txHash=${event.txHash}`,
+      `dispatch sending eventType=${event.eventType} recipients=${subscribers.length} txHash=${event.txHash}`,
     );
-    for (const telegramId of telegramIds) {
+    for (const subscriber of subscribers) {
       const shouldSkipByPreferences: boolean = await this.shouldSkipByUserPreferences(
-        telegramId,
+        subscriber,
         enrichedEvent,
       );
 
       if (shouldSkipByPreferences) {
         this.logger.debug(
-          `dispatch skipped by user preferences telegramId=${telegramId} txHash=${event.txHash}`,
+          `dispatch skipped by user preferences telegramId=${subscriber.telegramId} walletId=${String(subscriber.walletId)} txHash=${event.txHash}`,
         );
         continue;
       }
 
       try {
-        await this.telegramSenderService.sendText(telegramId, message);
+        await this.telegramSenderService.sendText(subscriber.telegramId, message);
         deliveryResults.push({
-          telegramId,
+          telegramId: subscriber.telegramId,
           success: true,
           errorMessage: null,
         });
       } catch (error: unknown) {
         const errorMessage: string = error instanceof Error ? error.message : String(error);
         deliveryResults.push({
-          telegramId,
+          telegramId: subscriber.telegramId,
           success: false,
           errorMessage,
         });
         this.logger.warn(
-          `dispatch delivery failed telegramId=${telegramId} txHash=${event.txHash} reason=${errorMessage}`,
+          `dispatch delivery failed telegramId=${subscriber.telegramId} walletId=${String(subscriber.walletId)} txHash=${event.txHash} reason=${errorMessage}`,
         );
       }
     }
@@ -97,27 +100,31 @@ export class AlertDispatcherService {
   }
 
   private async shouldSkipByUserPreferences(
-    telegramId: string,
+    subscriber: SubscriberWalletRecipient,
     event: ClassifiedEvent,
   ): Promise<boolean> {
-    const user = await this.usersRepository.findByTelegramId(telegramId);
-
-    if (!user) {
-      return false;
-    }
-
     const preferences: UserAlertPreferenceRow =
-      await this.userAlertPreferencesRepository.findOrCreateByUserId(user.id);
+      await this.userAlertPreferencesRepository.findOrCreateByUserId(subscriber.userId);
+    const walletPreferences = await this.userWalletAlertPreferencesRepository.findByUserAndWalletId(
+      subscriber.userId,
+      subscriber.walletId,
+    );
+    const allowTransfer: boolean = walletPreferences
+      ? walletPreferences.allow_transfer
+      : preferences.allow_transfer;
+    const allowSwap: boolean = walletPreferences
+      ? walletPreferences.allow_swap
+      : preferences.allow_swap;
 
     if (preferences.muted_until !== null && preferences.muted_until.getTime() > Date.now()) {
       return true;
     }
 
-    if (event.eventType === ClassifiedEventType.TRANSFER && !preferences.allow_transfer) {
+    if (event.eventType === ClassifiedEventType.TRANSFER && !allowTransfer) {
       return true;
     }
 
-    if (event.eventType === ClassifiedEventType.SWAP && !preferences.allow_swap) {
+    if (event.eventType === ClassifiedEventType.SWAP && !allowSwap) {
       return true;
     }
 

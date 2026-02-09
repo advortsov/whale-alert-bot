@@ -8,6 +8,7 @@ import type { Message } from 'telegraf/typings/core/types/typegram';
 import {
   SupportedTelegramCommand,
   WalletCallbackAction,
+  WalletCallbackFilterTarget,
   WalletCallbackTargetType,
   type CommandExecutionResult,
   type ParsedMessageCommand,
@@ -22,6 +23,7 @@ import {
   AlertFilterToggleTarget,
   type TelegramUserRef,
   type TrackedWalletOption,
+  type WalletAlertFilterState,
 } from '../tracking/tracking.interfaces';
 import { TrackingService } from '../tracking/tracking.service';
 
@@ -35,6 +37,8 @@ const SUPPORTED_COMMAND_MAP: Readonly<Record<string, SupportedTelegramCommand>> 
   wallet: SupportedTelegramCommand.WALLET,
   status: SupportedTelegramCommand.STATUS,
   filters: SupportedTelegramCommand.FILTERS,
+  walletfilters: SupportedTelegramCommand.WALLET_FILTERS,
+  wfilter: SupportedTelegramCommand.WALLET_FILTER,
   setmin: SupportedTelegramCommand.SETMIN,
   mute: SupportedTelegramCommand.MUTE,
 };
@@ -63,6 +67,7 @@ const WALLET_MENU_CALLBACK_PREFIX: string = 'wallet_menu:';
 const WALLET_UNTRACK_CALLBACK_PREFIX: string = 'wallet_untrack:';
 const WALLET_MUTE_CALLBACK_PREFIX: string = 'wallet_mute:';
 const WALLET_FILTERS_CALLBACK_PREFIX: string = 'wallet_filters:';
+const WALLET_FILTER_TOGGLE_CALLBACK_PREFIX: string = 'wallet_filter_toggle:';
 const CALLBACK_HISTORY_LIMIT: number = 10;
 
 @Update()
@@ -228,6 +233,22 @@ export class TelegramUpdate {
           break;
         case SupportedTelegramCommand.FILTERS:
           message = await this.executeFiltersCommand(userRef, commandEntry, updateMeta);
+          break;
+        case SupportedTelegramCommand.WALLET_FILTERS:
+          {
+            const walletFiltersResult: CommandExecutionResult =
+              await this.executeWalletFiltersCommand(userRef, commandEntry, updateMeta);
+            message = walletFiltersResult.message;
+            replyOptions = walletFiltersResult.replyOptions;
+          }
+          break;
+        case SupportedTelegramCommand.WALLET_FILTER:
+          {
+            const walletFilterResult: CommandExecutionResult =
+              await this.executeWalletFilterCommand(userRef, commandEntry, updateMeta);
+            message = walletFilterResult.message;
+            replyOptions = walletFilterResult.replyOptions;
+          }
           break;
         case SupportedTelegramCommand.SETMIN:
           message = await this.executeSetMinCommand(userRef, commandEntry, updateMeta);
@@ -584,12 +605,34 @@ export class TelegramUpdate {
       };
     }
 
-    const message: string = await this.trackingService.getUserAlertFilters(userRef);
+    if (callbackTarget.walletId === null) {
+      throw new Error('Callback не содержит id кошелька для фильтров.');
+    }
+
+    let walletFilterState: WalletAlertFilterState;
+
+    if (callbackTarget.filterTarget !== null && callbackTarget.filterEnabled !== null) {
+      const target: AlertFilterToggleTarget =
+        callbackTarget.filterTarget === WalletCallbackFilterTarget.TRANSFER
+          ? AlertFilterToggleTarget.TRANSFER
+          : AlertFilterToggleTarget.SWAP;
+      walletFilterState = await this.trackingService.setWalletEventTypeFilter(
+        userRef,
+        `#${callbackTarget.walletId}`,
+        target,
+        callbackTarget.filterEnabled,
+      );
+    } else {
+      walletFilterState = await this.trackingService.getWalletAlertFilterState(
+        userRef,
+        `#${callbackTarget.walletId}`,
+      );
+    }
 
     return {
       lineNumber: 1,
-      message,
-      replyOptions: null,
+      message: this.formatWalletFiltersMessage(walletFilterState),
+      replyOptions: this.buildWalletFiltersInlineKeyboard(walletFilterState),
     };
   }
 
@@ -636,6 +679,75 @@ export class TelegramUpdate {
     };
   }
 
+  private buildWalletFiltersInlineKeyboard(
+    walletFilterState: WalletAlertFilterState,
+  ): ReplyOptions {
+    const walletId: number = walletFilterState.walletId;
+    const nextTransferState: boolean = !walletFilterState.allowTransfer;
+    const nextSwapState: boolean = !walletFilterState.allowSwap;
+    const rows: InlineKeyboardButton.CallbackButton[][] = [
+      [
+        {
+          text: `${walletFilterState.allowTransfer ? '✅' : '❌'} Transfer`,
+          callback_data: this.buildWalletFilterToggleCallbackData(
+            walletId,
+            WalletCallbackFilterTarget.TRANSFER,
+            nextTransferState,
+          ),
+        },
+        {
+          text: `${walletFilterState.allowSwap ? '✅' : '❌'} Swap`,
+          callback_data: this.buildWalletFilterToggleCallbackData(
+            walletId,
+            WalletCallbackFilterTarget.SWAP,
+            nextSwapState,
+          ),
+        },
+      ],
+      [
+        {
+          text: '📁 Назад',
+          callback_data: `${WALLET_MENU_CALLBACK_PREFIX}${String(walletId)}`,
+        },
+        {
+          text: '📜 История',
+          callback_data: `${WALLET_HISTORY_CALLBACK_PREFIX}${String(walletId)}`,
+        },
+      ],
+    ];
+
+    return Markup.inlineKeyboard(rows);
+  }
+
+  private buildWalletFilterToggleCallbackData(
+    walletId: number,
+    filterTarget: WalletCallbackFilterTarget,
+    enabled: boolean,
+  ): string {
+    const stateToken: string = enabled ? 'on' : 'off';
+    return `${WALLET_FILTER_TOGGLE_CALLBACK_PREFIX}${String(walletId)}:${filterTarget}:${stateToken}`;
+  }
+
+  private formatWalletFiltersMessage(walletFilterState: WalletAlertFilterState): string {
+    const labelText: string = walletFilterState.walletLabel ?? 'без ярлыка';
+    const overrideMode: string = walletFilterState.hasWalletOverride
+      ? 'персональные для кошелька'
+      : 'наследуются от /filters';
+
+    return [
+      `⚙️ Фильтры кошелька #${String(walletFilterState.walletId)} (${labelText})`,
+      `Address: ${walletFilterState.walletAddress}`,
+      `- transfer: ${walletFilterState.allowTransfer ? 'on' : 'off'}`,
+      `- swap: ${walletFilterState.allowSwap ? 'on' : 'off'}`,
+      `- режим: ${overrideMode}`,
+      '',
+      'Команды:',
+      `/walletfilters #${String(walletFilterState.walletId)}`,
+      `/wfilter #${String(walletFilterState.walletId)} transfer <on|off>`,
+      `/wfilter #${String(walletFilterState.walletId)} swap <on|off>`,
+    ].join('\n');
+  }
+
   private async executeFiltersCommand(
     userRef: TelegramUserRef | null,
     commandEntry: ParsedMessageCommand,
@@ -675,6 +787,115 @@ export class TelegramUpdate {
     }
 
     return this.trackingService.setEventTypeFilter(userRef, target, enabled);
+  }
+
+  private async executeWalletFiltersCommand(
+    userRef: TelegramUserRef | null,
+    commandEntry: ParsedMessageCommand,
+    updateMeta: UpdateMeta,
+  ): Promise<CommandExecutionResult> {
+    if (!userRef) {
+      this.logger.warn(
+        `Wallet filters command rejected: user context is missing line=${commandEntry.lineNumber} updateId=${updateMeta.updateId ?? 'n/a'}`,
+      );
+      return {
+        lineNumber: commandEntry.lineNumber,
+        message: 'Не удалось определить пользователя.',
+        replyOptions: null,
+      };
+    }
+
+    const rawWalletId: string | null = commandEntry.args[0] ?? null;
+
+    if (!rawWalletId) {
+      return {
+        lineNumber: commandEntry.lineNumber,
+        message: ['Передай id кошелька.', 'Формат: /walletfilters #3', 'Посмотреть id: /list'].join(
+          '\n',
+        ),
+        replyOptions: null,
+      };
+    }
+
+    const walletFilterState: WalletAlertFilterState =
+      await this.trackingService.getWalletAlertFilterState(userRef, rawWalletId);
+
+    return {
+      lineNumber: commandEntry.lineNumber,
+      message: this.formatWalletFiltersMessage(walletFilterState),
+      replyOptions: this.buildWalletFiltersInlineKeyboard(walletFilterState),
+    };
+  }
+
+  private async executeWalletFilterCommand(
+    userRef: TelegramUserRef | null,
+    commandEntry: ParsedMessageCommand,
+    updateMeta: UpdateMeta,
+  ): Promise<CommandExecutionResult> {
+    if (!userRef) {
+      this.logger.warn(
+        `Wallet filter command rejected: user context is missing line=${commandEntry.lineNumber} updateId=${updateMeta.updateId ?? 'n/a'}`,
+      );
+      return {
+        lineNumber: commandEntry.lineNumber,
+        message: 'Не удалось определить пользователя.',
+        replyOptions: null,
+      };
+    }
+
+    const rawWalletId: string | null = commandEntry.args[0] ?? null;
+    const targetArg: string | null = commandEntry.args[1] ?? null;
+    const stateArg: string | null = commandEntry.args[2] ?? null;
+
+    if (!rawWalletId || !targetArg || !stateArg) {
+      return {
+        lineNumber: commandEntry.lineNumber,
+        message: [
+          'Формат: /wfilter <#id> <transfer|swap> <on|off>',
+          'Пример: /wfilter #3 transfer off',
+        ].join('\n'),
+        replyOptions: null,
+      };
+    }
+
+    const target: AlertFilterToggleTarget | null = this.resolveAlertFilterTarget(targetArg);
+    const enabled: boolean | null = this.parseOnOffState(stateArg);
+
+    if (target === null || enabled === null) {
+      return {
+        lineNumber: commandEntry.lineNumber,
+        message: 'Неверные аргументы. Используй /wfilter <#id> <transfer|swap> <on|off>.',
+        replyOptions: null,
+      };
+    }
+
+    const walletFilterState: WalletAlertFilterState =
+      await this.trackingService.setWalletEventTypeFilter(userRef, rawWalletId, target, enabled);
+
+    return {
+      lineNumber: commandEntry.lineNumber,
+      message: this.formatWalletFiltersMessage(walletFilterState),
+      replyOptions: this.buildWalletFiltersInlineKeyboard(walletFilterState),
+    };
+  }
+
+  private resolveAlertFilterTarget(rawTarget: string): AlertFilterToggleTarget | null {
+    const normalizedTarget: string = rawTarget.trim().toLowerCase();
+    return ALERT_FILTER_TARGET_MAP[normalizedTarget] ?? null;
+  }
+
+  private parseOnOffState(rawState: string): boolean | null {
+    const normalizedState: string = rawState.trim().toLowerCase();
+
+    if (normalizedState === 'on') {
+      return true;
+    }
+
+    if (normalizedState === 'off') {
+      return false;
+    }
+
+    return null;
   }
 
   private async executeSetMinCommand(
@@ -744,6 +965,8 @@ export class TelegramUpdate {
       '/history <address|#id> [limit]',
       '/status',
       '/filters',
+      '/walletfilters <#id>',
+      '/wfilter <#id> <transfer|swap> <on|off>',
       '/setmin <amount>',
       '/mute <minutes|off>',
       '',
@@ -762,6 +985,8 @@ export class TelegramUpdate {
       '/history <address|#id> [limit] - последние транзакции',
       '/status - runtime статус watcher и quota',
       '/filters - показать/изменить фильтры',
+      '/walletfilters <#id> - фильтры конкретного кошелька',
+      '/wfilter <#id> <transfer|swap> <on|off> - переключить фильтр кошелька',
       '/setmin <amount> - минимальная сумма алерта',
       '/mute <minutes|off> - пауза алертов',
       '',
@@ -769,6 +994,8 @@ export class TelegramUpdate {
       '/track 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045 vitalik',
       '/history #1 10',
       '/filters transfer off',
+      '/walletfilters #3',
+      '/wfilter #3 transfer off',
       '/setmin 1000',
       '/mute 30',
       '/untrack #1',
@@ -986,6 +1213,8 @@ export class TelegramUpdate {
         muteMinutes: null,
         historyOffset: null,
         historyLimit: null,
+        filterTarget: null,
+        filterEnabled: null,
       };
     }
 
@@ -1006,6 +1235,8 @@ export class TelegramUpdate {
         muteMinutes: null,
         historyOffset: null,
         historyLimit: null,
+        filterTarget: null,
+        filterEnabled: null,
       };
     }
 
@@ -1024,18 +1255,68 @@ export class TelegramUpdate {
         muteMinutes: Number.parseInt(rawMinutes, 10),
         historyOffset: null,
         historyLimit: null,
+        filterTarget: null,
+        filterEnabled: null,
       };
     }
 
-    if (callbackData.startsWith(WALLET_FILTERS_CALLBACK_PREFIX)) {
+    if (callbackData.startsWith(WALLET_FILTER_TOGGLE_CALLBACK_PREFIX)) {
+      const rawPayload: string = callbackData.slice(WALLET_FILTER_TOGGLE_CALLBACK_PREFIX.length);
+      const payloadParts: readonly string[] = rawPayload.split(':');
+      const rawWalletId: string | undefined = payloadParts[0];
+      const rawFilterTarget: string | undefined = payloadParts[1];
+      const rawState: string | undefined = payloadParts[2];
+
+      if (
+        rawWalletId === undefined ||
+        rawFilterTarget === undefined ||
+        rawState === undefined ||
+        payloadParts.length !== 3
+      ) {
+        return null;
+      }
+
+      const walletId: number | null = this.parseWalletId(rawWalletId);
+      const filterTarget: WalletCallbackFilterTarget | null =
+        this.parseWalletCallbackFilterTarget(rawFilterTarget);
+      const filterEnabled: boolean | null = this.parseOnOffState(rawState);
+
+      if (walletId === null || filterTarget === null || filterEnabled === null) {
+        return null;
+      }
+
       return {
         action: WalletCallbackAction.FILTERS,
         targetType: WalletCallbackTargetType.WALLET_ID,
-        walletId: null,
+        walletId,
         walletAddress: null,
         muteMinutes: null,
         historyOffset: null,
         historyLimit: null,
+        filterTarget,
+        filterEnabled,
+      };
+    }
+
+    if (callbackData.startsWith(WALLET_FILTERS_CALLBACK_PREFIX)) {
+      const walletId: number | null = this.parseWalletId(
+        callbackData.slice(WALLET_FILTERS_CALLBACK_PREFIX.length),
+      );
+
+      if (walletId === null) {
+        return null;
+      }
+
+      return {
+        action: WalletCallbackAction.FILTERS,
+        targetType: WalletCallbackTargetType.WALLET_ID,
+        walletId,
+        walletAddress: null,
+        muteMinutes: null,
+        historyOffset: null,
+        historyLimit: null,
+        filterTarget: null,
+        filterEnabled: null,
       };
     }
 
@@ -1054,6 +1335,8 @@ export class TelegramUpdate {
         muteMinutes: null,
         historyOffset: 0,
         historyLimit: CALLBACK_HISTORY_LIMIT,
+        filterTarget: null,
+        filterEnabled: null,
       };
     }
 
@@ -1089,6 +1372,8 @@ export class TelegramUpdate {
         muteMinutes: null,
         historyOffset,
         historyLimit,
+        filterTarget: null,
+        filterEnabled: null,
       };
     }
 
@@ -1117,6 +1402,8 @@ export class TelegramUpdate {
         muteMinutes: null,
         historyOffset: 0,
         historyLimit,
+        filterTarget: null,
+        filterEnabled: null,
       };
     }
 
@@ -1137,6 +1424,8 @@ export class TelegramUpdate {
         muteMinutes: null,
         historyOffset: 0,
         historyLimit: CALLBACK_HISTORY_LIMIT,
+        filterTarget: null,
+        filterEnabled: null,
       };
     }
 
@@ -1177,6 +1466,22 @@ export class TelegramUpdate {
     }
 
     return parsedValue;
+  }
+
+  private parseWalletCallbackFilterTarget(
+    rawFilterTarget: string,
+  ): WalletCallbackFilterTarget | null {
+    const normalizedFilterTarget: string = rawFilterTarget.trim().toLowerCase();
+
+    if (normalizedFilterTarget === 'transfer') {
+      return WalletCallbackFilterTarget.TRANSFER;
+    }
+
+    if (normalizedFilterTarget === 'swap') {
+      return WalletCallbackFilterTarget.SWAP;
+    }
+
+    return null;
   }
 
   private getUpdateMeta(ctx: Context): UpdateMeta {
@@ -1290,7 +1595,7 @@ export class TelegramUpdate {
         },
         {
           text: '⚙️ Фильтры',
-          callback_data: WALLET_FILTERS_CALLBACK_PREFIX,
+          callback_data: `${WALLET_FILTERS_CALLBACK_PREFIX}${String(walletId)}`,
         },
       ],
     ];
