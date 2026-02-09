@@ -63,4 +63,26 @@ describe('HistoryRateLimiterService', (): void => {
       reason: HistoryRateLimitReason.OK,
     });
   });
+
+  it('returns quota snapshot with usage and callback retry info', (): void => {
+    const appConfigServiceStub: AppConfigServiceStub = {
+      historyRateLimitPerMinute: 3,
+      historyButtonCooldownSec: 3,
+    };
+    const service: HistoryRateLimiterService = new HistoryRateLimiterService(
+      appConfigServiceStub as unknown as AppConfigService,
+    );
+
+    service.evaluate('42', HistoryRequestSource.COMMAND, 1000);
+    service.evaluate('42', HistoryRequestSource.CALLBACK, 2000);
+    const snapshot = service.getSnapshot('42', 2500);
+
+    expect(snapshot).toEqual({
+      minuteLimit: 3,
+      minuteUsed: 2,
+      minuteRemaining: 1,
+      callbackCooldownSec: 3,
+      callbackRetryAfterSec: 3,
+    });
+  });
 });

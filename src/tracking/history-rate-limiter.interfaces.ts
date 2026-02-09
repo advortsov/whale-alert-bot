@@ -14,3 +14,11 @@ export type HistoryRateLimitDecision = {
   readonly retryAfterSec: number | null;
   readonly reason: HistoryRateLimitReason;
 };
+
+export type HistoryQuotaSnapshot = {
+  readonly minuteLimit: number;
+  readonly minuteUsed: number;
+  readonly minuteRemaining: number;
+  readonly callbackCooldownSec: number;
+  readonly callbackRetryAfterSec: number;
+};

@@ -15,6 +15,7 @@ import {
   type UpdateMeta,
   type WalletCallbackTarget,
 } from './telegram.interfaces';
+import { RuntimeStatusService } from '../runtime/runtime-status.service';
 import { HistoryRequestSource } from '../tracking/history-rate-limiter.interfaces';
 import {
   AlertFilterToggleTarget,
@@ -31,6 +32,7 @@ const SUPPORTED_COMMAND_MAP: Readonly<Record<string, SupportedTelegramCommand>> 
   untrack: SupportedTelegramCommand.UNTRACK,
   history: SupportedTelegramCommand.HISTORY,
   wallet: SupportedTelegramCommand.WALLET,
+  status: SupportedTelegramCommand.STATUS,
   filters: SupportedTelegramCommand.FILTERS,
   setmin: SupportedTelegramCommand.SETMIN,
   mute: SupportedTelegramCommand.MUTE,
@@ -40,6 +42,7 @@ const MENU_BUTTON_COMMAND_MAP: Readonly<Record<string, SupportedTelegramCommand>
   '🏠 Главное меню': SupportedTelegramCommand.START,
   '➕ Добавить адрес': SupportedTelegramCommand.TRACK_HINT,
   '📋 Мой список': SupportedTelegramCommand.LIST,
+  '📈 Статус': SupportedTelegramCommand.STATUS,
   '📜 История': SupportedTelegramCommand.HISTORY_HINT,
   '⚙️ Фильтры': SupportedTelegramCommand.FILTERS,
   '🗑 Удалить адрес': SupportedTelegramCommand.UNTRACK_HINT,
@@ -64,7 +67,10 @@ export class TelegramUpdate {
   private readonly logger: Logger = new Logger(TelegramUpdate.name);
   private readonly userCommandQueue: Map<string, Promise<void>> = new Map<string, Promise<void>>();
 
-  public constructor(private readonly trackingService: TrackingService) {}
+  public constructor(
+    private readonly trackingService: TrackingService,
+    private readonly runtimeStatusService: RuntimeStatusService,
+  ) {}
 
   @On('text')
   public async onText(@Ctx() ctx: Context): Promise<void> {
@@ -206,6 +212,9 @@ export class TelegramUpdate {
             message = walletResult.message;
             replyOptions = walletResult.replyOptions;
           }
+          break;
+        case SupportedTelegramCommand.STATUS:
+          message = await this.executeStatusCommand(userRef, commandEntry, updateMeta);
           break;
         case SupportedTelegramCommand.FILTERS:
           message = await this.executeFiltersCommand(userRef, commandEntry, updateMeta);
@@ -426,6 +435,35 @@ export class TelegramUpdate {
     };
   }
 
+  private async executeStatusCommand(
+    userRef: TelegramUserRef | null,
+    commandEntry: ParsedMessageCommand,
+    updateMeta: UpdateMeta,
+  ): Promise<string> {
+    if (!userRef) {
+      this.logger.warn(
+        `Status command rejected: user context is missing line=${commandEntry.lineNumber} updateId=${updateMeta.updateId ?? 'n/a'}`,
+      );
+      return 'Не удалось определить пользователя.';
+    }
+
+    const userStatus: string = await this.trackingService.getUserStatus(userRef);
+    const runtimeSnapshot = this.runtimeStatusService.getSnapshot();
+
+    return [
+      'Runtime watcher status:',
+      `- observed block: ${runtimeSnapshot.observedBlock ?? 'n/a'}`,
+      `- processed block: ${runtimeSnapshot.processedBlock ?? 'n/a'}`,
+      `- lag: ${runtimeSnapshot.lag ?? 'n/a'}`,
+      `- queue size: ${runtimeSnapshot.queueSize}`,
+      `- confirmations: ${runtimeSnapshot.confirmations}`,
+      `- backoff ms: ${runtimeSnapshot.backoffMs}`,
+      `- updated at: ${runtimeSnapshot.updatedAtIso ?? 'n/a'}`,
+      '',
+      userStatus,
+    ].join('\n');
+  }
+
   private async executeWalletCallbackAction(
     userRef: TelegramUserRef,
     callbackTarget: WalletCallbackTarget,
@@ -448,21 +486,30 @@ export class TelegramUpdate {
     }
 
     if (callbackTarget.action === WalletCallbackAction.HISTORY) {
-      const historyMessage: string =
+      let historyMessage: string;
+
+      if (
         callbackTarget.targetType === WalletCallbackTargetType.ADDRESS &&
         callbackTarget.walletAddress !== null
-          ? await this.trackingService.getAddressHistoryWithPolicy(
-              userRef,
-              callbackTarget.walletAddress,
-              CALLBACK_HISTORY_LIMIT,
-              HistoryRequestSource.CALLBACK,
-            )
-          : await this.trackingService.getAddressHistoryWithPolicy(
-              userRef,
-              `#${callbackTarget.walletId}`,
-              CALLBACK_HISTORY_LIMIT,
-              HistoryRequestSource.CALLBACK,
-            );
+      ) {
+        historyMessage = await this.trackingService.getAddressHistoryWithPolicy(
+          userRef,
+          callbackTarget.walletAddress,
+          CALLBACK_HISTORY_LIMIT,
+          HistoryRequestSource.CALLBACK,
+        );
+      } else {
+        if (callbackTarget.walletId === null) {
+          throw new Error('Callback не содержит id кошелька для истории.');
+        }
+
+        historyMessage = await this.trackingService.getAddressHistoryWithPolicy(
+          userRef,
+          `#${callbackTarget.walletId}`,
+          CALLBACK_HISTORY_LIMIT,
+          HistoryRequestSource.CALLBACK,
+        );
+      }
 
       return {
         lineNumber: 1,
@@ -617,6 +664,7 @@ export class TelegramUpdate {
       '/list',
       '/wallet #id',
       '/history <address|#id> [limit]',
+      '/status',
       '/filters',
       '/setmin <amount>',
       '/mute <minutes|off>',
@@ -634,6 +682,7 @@ export class TelegramUpdate {
       '/wallet <#id> - карточка кошелька и действия кнопками',
       '/untrack <address|id> - удалить адрес',
       '/history <address|#id> [limit] - последние транзакции',
+      '/status - runtime статус watcher и quota',
       '/filters - показать/изменить фильтры',
       '/setmin <amount> - минимальная сумма алерта',
       '/mute <minutes|off> - пауза алертов',
@@ -996,8 +1045,9 @@ export class TelegramUpdate {
 
   private buildReplyOptions(): ReplyOptions {
     return Markup.keyboard([
-      ['🏠 Главное меню', '📋 Мой список', '⚙️ Фильтры'],
-      ['➕ Добавить адрес', '📜 История', '🗑 Удалить адрес'],
+      ['🏠 Главное меню', '📋 Мой список', '📈 Статус'],
+      ['➕ Добавить адрес', '📜 История', '⚙️ Фильтры'],
+      ['🗑 Удалить адрес'],
       ['❓ Помощь'],
     ])
       .resize()

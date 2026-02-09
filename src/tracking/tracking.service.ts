@@ -7,6 +7,7 @@ import { EtherscanHistoryService } from './etherscan-history.service';
 import type { HistoryCacheEntry } from './history-cache.interfaces';
 import { HistoryCacheService } from './history-cache.service';
 import {
+  type HistoryQuotaSnapshot,
   HistoryRateLimitReason,
   HistoryRequestSource,
   type HistoryRateLimitDecision,
@@ -299,6 +300,26 @@ export class TrackingService {
     await this.userAlertPreferencesRepository.updateEventType(user.id, targetType, enabled);
 
     return `Фильтр ${target} -> ${enabled ? 'on' : 'off'}.`;
+  }
+
+  public async getUserStatus(userRef: TelegramUserRef): Promise<string> {
+    const user = await this.usersRepository.findOrCreate(userRef.telegramId, userRef.username);
+    const preferencesRow: UserAlertPreferenceRow =
+      await this.userAlertPreferencesRepository.findOrCreateByUserId(user.id);
+    const preferences: UserAlertPreferences = this.mapPreferences(preferencesRow);
+    const historyQuota: HistoryQuotaSnapshot = this.historyRateLimiterService.getSnapshot(
+      userRef.telegramId,
+    );
+
+    return [
+      'Пользовательский статус:',
+      `- min amount: ${preferences.minAmount.toFixed(6)}`,
+      `- transfer: ${preferences.allowTransfer ? 'on' : 'off'}`,
+      `- swap: ${preferences.allowSwap ? 'on' : 'off'}`,
+      `- mute до: ${preferences.mutedUntil ? this.formatTimestamp(preferences.mutedUntil) : 'выключен'}`,
+      `- history quota: ${historyQuota.minuteUsed}/${historyQuota.minuteLimit} (remaining ${historyQuota.minuteRemaining})`,
+      `- history callback cooldown retry: ${historyQuota.callbackRetryAfterSec} sec`,
+    ].join('\n');
   }
 
   public async getAddressHistory(

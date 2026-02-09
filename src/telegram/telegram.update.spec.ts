@@ -7,6 +7,7 @@ import {
   type WalletCallbackTarget,
 } from './telegram.interfaces';
 import { TelegramUpdate } from './telegram.update';
+import type { RuntimeStatusService } from '../runtime/runtime-status.service';
 import { HistoryRequestSource } from '../tracking/history-rate-limiter.interfaces';
 import type { TrackingService } from '../tracking/tracking.service';
 
@@ -21,10 +22,27 @@ type TelegramUpdatePrivateApi = {
   parseWalletCallbackData: (callbackData: string) => WalletCallbackTarget | null;
 };
 
+const createUpdate = (trackingServiceStub: TrackingService): TelegramUpdate => {
+  const runtimeStatusServiceStub: RuntimeStatusService = {
+    getSnapshot: () => ({
+      observedBlock: 100,
+      processedBlock: 99,
+      lag: 1,
+      queueSize: 0,
+      backoffMs: 0,
+      confirmations: 2,
+      updatedAtIso: '2026-02-09T00:00:00.000Z',
+    }),
+    setSnapshot: (): void => undefined,
+  } as unknown as RuntimeStatusService;
+
+  return new TelegramUpdate(trackingServiceStub, runtimeStatusServiceStub);
+};
+
 describe('TelegramUpdate', (): void => {
   it('parses multiple /track commands from one multiline message as separate commands', (): void => {
     const trackingServiceStub: TrackingService = {} as TrackingService;
-    const update: TelegramUpdate = new TelegramUpdate(trackingServiceStub);
+    const update: TelegramUpdate = createUpdate(trackingServiceStub);
     const privateApi: TelegramUpdatePrivateApi = update as unknown as TelegramUpdatePrivateApi;
 
     const parsed: readonly ParsedMessageCommandView[] = privateApi.parseMessageCommands(
@@ -51,7 +69,7 @@ describe('TelegramUpdate', (): void => {
 
   it('parses /history command with limit argument', (): void => {
     const trackingServiceStub: TrackingService = {} as TrackingService;
-    const update: TelegramUpdate = new TelegramUpdate(trackingServiceStub);
+    const update: TelegramUpdate = createUpdate(trackingServiceStub);
     const privateApi: TelegramUpdatePrivateApi = update as unknown as TelegramUpdatePrivateApi;
 
     const parsed: readonly ParsedMessageCommandView[] = privateApi.parseMessageCommands(
@@ -68,7 +86,7 @@ describe('TelegramUpdate', (): void => {
 
   it('parses /history command with wallet id argument', (): void => {
     const trackingServiceStub: TrackingService = {} as TrackingService;
-    const update: TelegramUpdate = new TelegramUpdate(trackingServiceStub);
+    const update: TelegramUpdate = createUpdate(trackingServiceStub);
     const privateApi: TelegramUpdatePrivateApi = update as unknown as TelegramUpdatePrivateApi;
 
     const parsed: readonly ParsedMessageCommandView[] =
@@ -84,7 +102,7 @@ describe('TelegramUpdate', (): void => {
 
   it('parses /filters command with toggle args', (): void => {
     const trackingServiceStub: TrackingService = {} as TrackingService;
-    const update: TelegramUpdate = new TelegramUpdate(trackingServiceStub);
+    const update: TelegramUpdate = createUpdate(trackingServiceStub);
     const privateApi: TelegramUpdatePrivateApi = update as unknown as TelegramUpdatePrivateApi;
 
     const parsed: readonly ParsedMessageCommandView[] =
@@ -100,7 +118,7 @@ describe('TelegramUpdate', (): void => {
 
   it('parses /setmin command with amount arg', (): void => {
     const trackingServiceStub: TrackingService = {} as TrackingService;
-    const update: TelegramUpdate = new TelegramUpdate(trackingServiceStub);
+    const update: TelegramUpdate = createUpdate(trackingServiceStub);
     const privateApi: TelegramUpdatePrivateApi = update as unknown as TelegramUpdatePrivateApi;
 
     const parsed: readonly ParsedMessageCommandView[] =
@@ -116,7 +134,7 @@ describe('TelegramUpdate', (): void => {
 
   it('parses /wallet command with wallet id', (): void => {
     const trackingServiceStub: TrackingService = {} as TrackingService;
-    const update: TelegramUpdate = new TelegramUpdate(trackingServiceStub);
+    const update: TelegramUpdate = createUpdate(trackingServiceStub);
     const privateApi: TelegramUpdatePrivateApi = update as unknown as TelegramUpdatePrivateApi;
 
     const parsed: readonly ParsedMessageCommandView[] =
@@ -130,9 +148,24 @@ describe('TelegramUpdate', (): void => {
     });
   });
 
+  it('parses /status command', (): void => {
+    const trackingServiceStub: TrackingService = {} as TrackingService;
+    const update: TelegramUpdate = createUpdate(trackingServiceStub);
+    const privateApi: TelegramUpdatePrivateApi = update as unknown as TelegramUpdatePrivateApi;
+
+    const parsed: readonly ParsedMessageCommandView[] = privateApi.parseMessageCommands('/status');
+
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0]).toMatchObject({
+      command: 'status',
+      args: [],
+      lineNumber: 1,
+    });
+  });
+
   it('parses menu button text into mapped command', (): void => {
     const trackingServiceStub: TrackingService = {} as TrackingService;
-    const update: TelegramUpdate = new TelegramUpdate(trackingServiceStub);
+    const update: TelegramUpdate = createUpdate(trackingServiceStub);
     const privateApi: TelegramUpdatePrivateApi = update as unknown as TelegramUpdatePrivateApi;
 
     const parsed: readonly ParsedMessageCommandView[] =
@@ -148,7 +181,7 @@ describe('TelegramUpdate', (): void => {
 
   it('parses wallet history callback data by wallet id', (): void => {
     const trackingServiceStub: TrackingService = {} as TrackingService;
-    const update: TelegramUpdate = new TelegramUpdate(trackingServiceStub);
+    const update: TelegramUpdate = createUpdate(trackingServiceStub);
     const privateApi: TelegramUpdatePrivateApi = update as unknown as TelegramUpdatePrivateApi;
 
     const callbackTarget = privateApi.parseWalletCallbackData('wallet_history:15');
@@ -162,7 +195,7 @@ describe('TelegramUpdate', (): void => {
 
   it('parses wallet history callback data by address', (): void => {
     const trackingServiceStub: TrackingService = {} as TrackingService;
-    const update: TelegramUpdate = new TelegramUpdate(trackingServiceStub);
+    const update: TelegramUpdate = createUpdate(trackingServiceStub);
     const privateApi: TelegramUpdatePrivateApi = update as unknown as TelegramUpdatePrivateApi;
 
     const callbackTarget = privateApi.parseWalletCallbackData(
@@ -178,7 +211,7 @@ describe('TelegramUpdate', (): void => {
 
   it('parses wallet menu callback by wallet id', (): void => {
     const trackingServiceStub: TrackingService = {} as TrackingService;
-    const update: TelegramUpdate = new TelegramUpdate(trackingServiceStub);
+    const update: TelegramUpdate = createUpdate(trackingServiceStub);
     const privateApi: TelegramUpdatePrivateApi = update as unknown as TelegramUpdatePrivateApi;
 
     const callbackTarget = privateApi.parseWalletCallbackData('wallet_menu:7');
@@ -192,7 +225,7 @@ describe('TelegramUpdate', (): void => {
 
   it('returns null for invalid wallet history callback data', (): void => {
     const trackingServiceStub: TrackingService = {} as TrackingService;
-    const update: TelegramUpdate = new TelegramUpdate(trackingServiceStub);
+    const update: TelegramUpdate = createUpdate(trackingServiceStub);
     const privateApi: TelegramUpdatePrivateApi = update as unknown as TelegramUpdatePrivateApi;
 
     const callbackTarget = privateApi.parseWalletCallbackData('wallet_history:abc');
@@ -207,7 +240,7 @@ describe('TelegramUpdate', (): void => {
     const trackingServiceStub = {
       getAddressHistoryWithPolicy: getAddressHistoryWithPolicyMock,
     } as unknown as TrackingService;
-    const update: TelegramUpdate = new TelegramUpdate(trackingServiceStub);
+    const update: TelegramUpdate = createUpdate(trackingServiceStub);
     const answerCbQueryMock: ReturnType<typeof vi.fn> = vi.fn().mockResolvedValue(undefined);
     const replyMock: ReturnType<typeof vi.fn> = vi
       .fn()

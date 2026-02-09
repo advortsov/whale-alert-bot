@@ -11,6 +11,7 @@ import type {
 } from './interfaces/rpc-provider.interface';
 import { ProviderFailoverService } from './providers/provider-failover.service';
 import { ProviderFactory } from './providers/provider.factory';
+import { RuntimeStatusService } from '../runtime/runtime-status.service';
 import { ChainCheckpointsRepository } from '../storage/repositories/chain-checkpoints.repository';
 import { ProcessedEventsRepository } from '../storage/repositories/processed-events.repository';
 import { SubscriptionsRepository } from '../storage/repositories/subscriptions.repository';
@@ -36,6 +37,7 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
     private readonly appConfigService: AppConfigService,
     private readonly providerFactory: ProviderFactory,
     private readonly providerFailoverService: ProviderFailoverService,
+    private readonly runtimeStatusService: RuntimeStatusService,
     private readonly chainCheckpointsRepository: ChainCheckpointsRepository,
     private readonly subscriptionsRepository: SubscriptionsRepository,
     private readonly processedEventsRepository: ProcessedEventsRepository,
@@ -46,6 +48,7 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
   public async onModuleInit(): Promise<void> {
     if (!this.appConfigService.chainWatcherEnabled) {
       this.logger.log('Chain watcher is disabled by config.');
+      this.publishRuntimeSnapshot();
       return;
     }
 
@@ -65,6 +68,7 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
     );
 
     this.startHeartbeat();
+    this.publishRuntimeSnapshot();
     this.logger.log('Chain watcher subscribed to new Ethereum blocks.');
   }
 
@@ -163,6 +167,8 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
     if (!this.isBlockQueueProcessing) {
       void this.processBlockQueue();
     }
+
+    this.publishRuntimeSnapshot();
   }
 
   private async processBlockQueue(): Promise<void> {
@@ -187,6 +193,7 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
             ChainId.ETHEREUM_MAINNET,
             nextBlockNumber,
           );
+          this.publishRuntimeSnapshot();
         } catch (error: unknown) {
           const errorMessage: string = error instanceof Error ? error.message : String(error);
           this.logger.warn(
@@ -399,6 +406,7 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
       this.logger.log(
         `heartbeat observedBlock=${this.lastObservedBlockNumber ?? 'n/a'} processedBlock=${this.lastProcessedBlockNumber ?? 'n/a'} lag=${lag ?? 'n/a'} queueSize=${this.blockQueue.length} confirmations=${this.appConfigService.chainReorgConfirmations} backoffMs=${currentBackoffMs}`,
       );
+      this.publishRuntimeSnapshot();
     }, intervalMs);
 
     this.heartbeatTimer.unref();
@@ -423,5 +431,22 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
     this.logger.log(
       `startup rpc smoke-check primary=${primaryHealth.ok ? 'ok' : 'fail'} (${primaryHealth.details}), fallback=${fallbackHealth.ok ? 'ok' : 'fail'} (${fallbackHealth.details})`,
     );
+  }
+
+  private publishRuntimeSnapshot(): void {
+    const lag: number | null =
+      this.lastObservedBlockNumber !== null && this.lastProcessedBlockNumber !== null
+        ? this.lastObservedBlockNumber - this.lastProcessedBlockNumber
+        : null;
+
+    this.runtimeStatusService.setSnapshot({
+      observedBlock: this.lastObservedBlockNumber,
+      processedBlock: this.lastProcessedBlockNumber,
+      lag,
+      queueSize: this.blockQueue.length,
+      backoffMs: this.providerFailoverService.getCurrentBackoffMs(),
+      confirmations: this.appConfigService.chainReorgConfirmations,
+      updatedAtIso: new Date().toISOString(),
+    });
   }
 }

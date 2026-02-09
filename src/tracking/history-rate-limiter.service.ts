@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import {
+  type HistoryQuotaSnapshot,
   HistoryRateLimitReason,
   HistoryRequestSource,
   type HistoryRateLimitDecision,
@@ -58,6 +59,25 @@ export class HistoryRateLimiterService {
       allowed: true,
       retryAfterSec: null,
       reason: HistoryRateLimitReason.OK,
+    };
+  }
+
+  public getSnapshot(userId: string, nowEpochMs: number = Date.now()): HistoryQuotaSnapshot {
+    const requestTimestamps: number[] = this.cleanupWindow(userId, nowEpochMs);
+    const minuteLimit: number = this.appConfigService.historyRateLimitPerMinute;
+    const minuteUsed: number = requestTimestamps.length;
+    const minuteRemaining: number = Math.max(minuteLimit - minuteUsed, 0);
+    const callbackDecision: HistoryRateLimitDecision | null = this.evaluateCallbackCooldown(
+      userId,
+      nowEpochMs,
+    );
+
+    return {
+      minuteLimit,
+      minuteUsed,
+      minuteRemaining,
+      callbackCooldownSec: this.appConfigService.historyButtonCooldownSec,
+      callbackRetryAfterSec: callbackDecision?.retryAfterSec ?? 0,
     };
   }
 

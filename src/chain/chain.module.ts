@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { ChainStreamService } from './chain-stream.service';
 import { EventClassifierService } from './event-classifier.service';
 import { AlertsModule } from '../alerts/alerts.module';
+import { RuntimeModule } from '../runtime/runtime.module';
 import { StorageModule } from '../storage/storage.module';
 import { FALLBACK_RPC_PROVIDER, PRIMARY_RPC_PROVIDER } from './constants/chain.tokens';
 import { AlchemyPrimaryProvider } from './providers/alchemy-primary.provider';
@@ -12,7 +13,7 @@ import { ProviderFactory } from './providers/provider.factory';
 import { RpcThrottlerService } from './providers/rpc-throttler.service';
 
 @Module({
-  imports: [StorageModule, AlertsModule],
+  imports: [StorageModule, AlertsModule, RuntimeModule],
   providers: [
     AlchemyPrimaryProvider,
     InfuraFallbackProvider,

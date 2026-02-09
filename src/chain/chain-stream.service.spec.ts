@@ -20,6 +20,7 @@ import type { ProviderFailoverService } from './providers/provider-failover.serv
 import type { ProviderFactory } from './providers/provider.factory';
 import type { AlertDispatcherService } from '../alerts/alert-dispatcher.service';
 import type { AppConfigService } from '../config/app-config.service';
+import type { RuntimeStatusService } from '../runtime/runtime-status.service';
 import type { ChainCheckpointsRepository } from '../storage/repositories/chain-checkpoints.repository';
 import type { ProcessedEventsRepository } from '../storage/repositories/processed-events.repository';
 import type { SubscriptionsRepository } from '../storage/repositories/subscriptions.repository';
@@ -178,11 +179,24 @@ describe('ChainStreamService', (): void => {
       chainHeartbeatIntervalSec: 3600,
       chainReorgConfirmations: 0,
     } as unknown as AppConfigService;
+    const runtimeStatusService: RuntimeStatusService = {
+      setSnapshot: (): void => undefined,
+      getSnapshot: () => ({
+        observedBlock: null,
+        processedBlock: null,
+        lag: null,
+        queueSize: 0,
+        backoffMs: 0,
+        confirmations: 0,
+        updatedAtIso: null,
+      }),
+    } as unknown as RuntimeStatusService;
 
     const service: ChainStreamService = new ChainStreamService(
       appConfigService,
       providerFactory,
       providerFailoverService,
+      runtimeStatusService,
       chainCheckpointsRepository,
       subscriptionsRepository,
       processedEventsRepository,
@@ -272,11 +286,24 @@ describe('ChainStreamService', (): void => {
       chainHeartbeatIntervalSec: 3600,
       chainReorgConfirmations: 2,
     } as unknown as AppConfigService;
+    const runtimeStatusService: RuntimeStatusService = {
+      setSnapshot: (): void => undefined,
+      getSnapshot: () => ({
+        observedBlock: null,
+        processedBlock: null,
+        lag: null,
+        queueSize: 0,
+        backoffMs: 0,
+        confirmations: 0,
+        updatedAtIso: null,
+      }),
+    } as unknown as RuntimeStatusService;
 
     const service: ChainStreamService = new ChainStreamService(
       appConfigService,
       providerFactory,
       providerFailoverService,
+      runtimeStatusService,
       chainCheckpointsRepository,
       subscriptionsRepository,
       processedEventsRepository,
@@ -384,11 +411,24 @@ describe('ChainStreamService', (): void => {
       chainHeartbeatIntervalSec: 3600,
       chainReorgConfirmations: 2,
     } as unknown as AppConfigService;
+    const runtimeStatusService: RuntimeStatusService = {
+      setSnapshot: (): void => undefined,
+      getSnapshot: () => ({
+        observedBlock: null,
+        processedBlock: null,
+        lag: null,
+        queueSize: 0,
+        backoffMs: 0,
+        confirmations: 0,
+        updatedAtIso: null,
+      }),
+    } as unknown as RuntimeStatusService;
 
     const service: ChainStreamService = new ChainStreamService(
       appConfigService,
       providerFactory,
       providerFailoverService,
+      runtimeStatusService,
       chainCheckpointsRepository,
       subscriptionsRepository,
       processedEventsRepository,

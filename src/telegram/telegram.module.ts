@@ -5,6 +5,7 @@ import type { TelegrafModuleOptions } from 'nestjs-telegraf/dist/interfaces/tele
 import { TelegramSenderService } from './telegram-sender.service';
 import { TelegramUpdate } from './telegram.update';
 import { AppConfigService } from '../config/app-config.service';
+import { RuntimeModule } from '../runtime/runtime.module';
 import { TrackingModule } from '../tracking/tracking.module';
 
 const createTelegrafOptions = (appConfigService: AppConfigService): TelegrafModuleOptions => {
@@ -23,6 +24,7 @@ const createTelegrafOptions = (appConfigService: AppConfigService): TelegrafModu
 @Module({
   imports: [
     TrackingModule,
+    RuntimeModule,
     TelegrafModule.forRootAsync({
       inject: [AppConfigService],
       useFactory: createTelegrafOptions,

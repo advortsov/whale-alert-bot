@@ -48,6 +48,7 @@ type HistoryCacheServiceStub = {
 
 type HistoryRateLimiterServiceStub = {
   readonly evaluate: ReturnType<typeof vi.fn>;
+  readonly getSnapshot: ReturnType<typeof vi.fn>;
 };
 
 type UserAlertPreferencesRepositoryStub = {
@@ -100,6 +101,7 @@ const createTestContext = (): TestContext => {
   };
   const historyRateLimiterServiceStub: HistoryRateLimiterServiceStub = {
     evaluate: vi.fn(),
+    getSnapshot: vi.fn(),
   };
   const userAlertPreferencesRepositoryStub: UserAlertPreferencesRepositoryStub = {
     findOrCreateByUserId: vi.fn(),
@@ -124,6 +126,13 @@ const createTestContext = (): TestContext => {
 
   usersRepositoryStub.findOrCreate.mockResolvedValue(userRow);
   historyRateLimiterServiceStub.evaluate.mockReturnValue(allowDecision);
+  historyRateLimiterServiceStub.getSnapshot.mockReturnValue({
+    minuteLimit: 12,
+    minuteUsed: 2,
+    minuteRemaining: 10,
+    callbackCooldownSec: 3,
+    callbackRetryAfterSec: 0,
+  });
   userAlertPreferencesRepositoryStub.findOrCreateByUserId.mockResolvedValue({
     id: 1,
     user_id: 7,
@@ -358,5 +367,17 @@ describe('TrackingService', (): void => {
     expect(message).toContain('Кошелек #9');
     expect(message).toContain('Maker_ETH_Vault');
     expect(message).toContain('/history #9 10');
+  });
+
+  it('returns user status with quota snapshot', async (): Promise<void> => {
+    const context: TestContext = createTestContext();
+
+    const message: string = await context.service.getUserStatus(context.userRef);
+
+    expect(context.historyRateLimiterServiceStub.getSnapshot).toHaveBeenCalledWith(
+      context.userRef.telegramId,
+    );
+    expect(message).toContain('Пользовательский статус');
+    expect(message).toContain('history quota: 2/12');
   });
 });

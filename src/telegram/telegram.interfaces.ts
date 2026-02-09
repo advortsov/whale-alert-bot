@@ -8,6 +8,7 @@ export enum SupportedTelegramCommand {
   UNTRACK = 'untrack',
   HISTORY = 'history',
   WALLET = 'wallet',
+  STATUS = 'status',
   FILTERS = 'filters',
   SETMIN = 'setmin',
   MUTE = 'mute',
