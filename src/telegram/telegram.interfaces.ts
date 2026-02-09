@@ -56,4 +56,6 @@ export type WalletCallbackTarget = {
   readonly walletId: number | null;
   readonly walletAddress: string | null;
   readonly muteMinutes: number | null;
+  readonly historyOffset: number | null;
+  readonly historyLimit: number | null;
 };

@@ -44,6 +44,7 @@ export class WalletEventsRepository {
   public async listRecentByTrackedAddress(
     trackedAddress: string,
     limit: number,
+    offset: number = 0,
   ): Promise<readonly WalletEventHistoryView[]> {
     const rows: readonly {
       chain_id: number;
@@ -84,6 +85,7 @@ export class WalletEventsRepository {
       .where('tracked_address', '=', trackedAddress.toLowerCase())
       .orderBy('occurred_at', 'desc')
       .limit(limit)
+      .offset(offset)
       .execute();
 
     return rows.map(

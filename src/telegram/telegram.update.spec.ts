@@ -233,6 +233,38 @@ describe('TelegramUpdate', (): void => {
     expect(callbackTarget).toBeNull();
   });
 
+  it('parses wallet history pagination callback payload', (): void => {
+    const trackingServiceStub: TrackingService = {} as TrackingService;
+    const update: TelegramUpdate = createUpdate(trackingServiceStub);
+    const privateApi: TelegramUpdatePrivateApi = update as unknown as TelegramUpdatePrivateApi;
+
+    const callbackTarget = privateApi.parseWalletCallbackData('wallet_history_page:16:10:10');
+
+    expect(callbackTarget).toMatchObject({
+      action: WalletCallbackAction.HISTORY,
+      targetType: WalletCallbackTargetType.WALLET_ID,
+      walletId: 16,
+      historyOffset: 10,
+      historyLimit: 10,
+    });
+  });
+
+  it('parses wallet history refresh callback payload', (): void => {
+    const trackingServiceStub: TrackingService = {} as TrackingService;
+    const update: TelegramUpdate = createUpdate(trackingServiceStub);
+    const privateApi: TelegramUpdatePrivateApi = update as unknown as TelegramUpdatePrivateApi;
+
+    const callbackTarget = privateApi.parseWalletCallbackData('wallet_history_refresh:16:10');
+
+    expect(callbackTarget).toMatchObject({
+      action: WalletCallbackAction.HISTORY,
+      targetType: WalletCallbackTargetType.WALLET_ID,
+      walletId: 16,
+      historyOffset: 0,
+      historyLimit: 10,
+    });
+  });
+
   it('uses policy-aware history method for callback and returns cooldown error text', async (): Promise<void> => {
     const getAddressHistoryWithPolicyMock: ReturnType<typeof vi.fn> = vi
       .fn()
@@ -321,5 +353,63 @@ describe('TelegramUpdate', (): void => {
     const replyOptions: unknown = firstReplyCall?.[1];
     expect(typeof replyOptions).toBe('object');
     expect(replyOptions).not.toBeNull();
+  });
+
+  it('routes wallet history callback by wallet id to paged policy method', async (): Promise<void> => {
+    const getAddressHistoryPageWithPolicyMock: ReturnType<typeof vi.fn> = vi
+      .fn()
+      .mockResolvedValue({
+        message: '<b>История</b> page',
+        resolvedAddress: '0x96b0Dc619A86572524c15C1fC9c42DA9A94BCAa0',
+        walletId: 16,
+        limit: 10,
+        offset: 0,
+        hasNextPage: true,
+      });
+    const trackingServiceStub = {
+      getAddressHistoryPageWithPolicy: getAddressHistoryPageWithPolicyMock,
+    } as unknown as TrackingService;
+    const update: TelegramUpdate = createUpdate(trackingServiceStub);
+    const answerCbQueryMock: ReturnType<typeof vi.fn> = vi.fn().mockResolvedValue(undefined);
+    const replyMock: ReturnType<typeof vi.fn> = vi
+      .fn()
+      .mockResolvedValue({ message_id: 1200, text: 'ok' });
+    const callbackContext = {
+      callbackQuery: {
+        data: 'wallet_history:16',
+      },
+      from: {
+        id: 42,
+        username: 'tester',
+      },
+      update: {
+        update_id: 400,
+      },
+      answerCbQuery: answerCbQueryMock,
+      reply: replyMock,
+    };
+
+    await update.onCallbackQuery(callbackContext as unknown as Context);
+
+    expect(getAddressHistoryPageWithPolicyMock).toHaveBeenCalledWith(
+      {
+        telegramId: '42',
+        username: 'tester',
+      },
+      '#16',
+      '10',
+      '0',
+      HistoryRequestSource.CALLBACK,
+    );
+    expect(answerCbQueryMock).toHaveBeenCalledWith('Выполняю действие...');
+    expect(replyMock).toHaveBeenCalledWith('<b>История</b> page', expect.anything());
+
+    const firstReplyCall: unknown[] | undefined = replyMock.mock.calls[0];
+    const replyOptions = firstReplyCall?.[1] as
+      | { reply_markup?: { inline_keyboard?: { callback_data?: string }[][] } }
+      | undefined;
+    const firstButton = replyOptions?.reply_markup?.inline_keyboard?.[0]?.[0];
+
+    expect(firstButton?.callback_data).toBe('wallet_history_page:16:10:10');
   });
 });

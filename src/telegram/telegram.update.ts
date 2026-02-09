@@ -16,6 +16,7 @@ import {
   type WalletCallbackTarget,
 } from './telegram.interfaces';
 import { RuntimeStatusService } from '../runtime/runtime-status.service';
+import type { HistoryPageResult } from '../tracking/history-page.interfaces';
 import { HistoryRequestSource } from '../tracking/history-rate-limiter.interfaces';
 import {
   AlertFilterToggleTarget,
@@ -56,11 +57,13 @@ const ALERT_FILTER_TARGET_MAP: Readonly<Record<string, AlertFilterToggleTarget>>
 
 const WALLET_HISTORY_CALLBACK_PREFIX: string = 'wallet_history:';
 const WALLET_HISTORY_ADDR_CALLBACK_PREFIX: string = 'wallet_history_addr:';
+const WALLET_HISTORY_PAGE_CALLBACK_PREFIX: string = 'wallet_history_page:';
+const WALLET_HISTORY_REFRESH_CALLBACK_PREFIX: string = 'wallet_history_refresh:';
 const WALLET_MENU_CALLBACK_PREFIX: string = 'wallet_menu:';
 const WALLET_UNTRACK_CALLBACK_PREFIX: string = 'wallet_untrack:';
 const WALLET_MUTE_CALLBACK_PREFIX: string = 'wallet_mute:';
 const WALLET_FILTERS_CALLBACK_PREFIX: string = 'wallet_filters:';
-const CALLBACK_HISTORY_LIMIT: string = '10';
+const CALLBACK_HISTORY_LIMIT: number = 10;
 
 @Update()
 export class TelegramUpdate {
@@ -199,8 +202,15 @@ export class TelegramUpdate {
           message = await this.executeUntrackCommand(userRef, commandEntry, updateMeta);
           break;
         case SupportedTelegramCommand.HISTORY:
-          message = await this.executeHistoryCommand(userRef, commandEntry, updateMeta);
-          replyOptions = this.buildHistoryReplyOptions();
+          {
+            const historyResult: CommandExecutionResult = await this.executeHistoryCommand(
+              userRef,
+              commandEntry,
+              updateMeta,
+            );
+            message = historyResult.message;
+            replyOptions = historyResult.replyOptions;
+          }
           break;
         case SupportedTelegramCommand.WALLET:
           {
@@ -359,7 +369,7 @@ export class TelegramUpdate {
     userRef: TelegramUserRef | null,
     commandEntry: ParsedMessageCommand,
     updateMeta: UpdateMeta,
-  ): Promise<string> {
+  ): Promise<CommandExecutionResult> {
     const rawAddress: string | null = commandEntry.args[0] ?? null;
     const rawLimit: string | null = commandEntry.args[1] ?? null;
 
@@ -367,33 +377,50 @@ export class TelegramUpdate {
       this.logger.debug(
         `History command rejected: missing address line=${commandEntry.lineNumber} updateId=${updateMeta.updateId ?? 'n/a'}`,
       );
-      return [
-        'Передай адрес или id из /list.',
-        'Формат: /history <address|#id> [limit]',
-        'Примеры:',
-        '/history #3 10',
-        '/history 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045 5',
-      ].join('\n');
+      return {
+        lineNumber: commandEntry.lineNumber,
+        message: [
+          'Передай адрес или id из /list.',
+          'Формат: /history <address|#id> [limit]',
+          'Примеры:',
+          '/history #3 10',
+          '/history 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045 5',
+        ].join('\n'),
+        replyOptions: null,
+      };
     }
 
     if (!userRef) {
       this.logger.warn(
         `History command rejected: user context is missing line=${commandEntry.lineNumber} updateId=${updateMeta.updateId ?? 'n/a'}`,
       );
-      return 'Не удалось определить пользователя.';
+      return {
+        lineNumber: commandEntry.lineNumber,
+        message: 'Не удалось определить пользователя.',
+        replyOptions: null,
+      };
     }
 
-    const responseMessage: string = await this.trackingService.getAddressHistoryWithPolicy(
-      userRef,
-      rawAddress,
-      rawLimit,
-      HistoryRequestSource.COMMAND,
-    );
+    const historyPage: HistoryPageResult =
+      await this.trackingService.getAddressHistoryPageWithPolicy(
+        userRef,
+        rawAddress,
+        rawLimit,
+        null,
+        HistoryRequestSource.COMMAND,
+      );
     this.logger.log(
       `History command success line=${commandEntry.lineNumber} telegramId=${userRef.telegramId} address=${rawAddress} limit=${rawLimit ?? 'default'} updateId=${updateMeta.updateId ?? 'n/a'}`,
     );
 
-    return responseMessage;
+    return {
+      lineNumber: commandEntry.lineNumber,
+      message: historyPage.message,
+      replyOptions:
+        historyPage.walletId !== null
+          ? this.buildHistoryActionInlineKeyboard(historyPage)
+          : this.buildHistoryReplyOptions(),
+    };
   }
 
   private async executeWalletCommand(
@@ -487,6 +514,7 @@ export class TelegramUpdate {
 
     if (callbackTarget.action === WalletCallbackAction.HISTORY) {
       let historyMessage: string;
+      let historyReplyOptions: ReplyOptions = this.buildHistoryReplyOptions();
 
       if (
         callbackTarget.targetType === WalletCallbackTargetType.ADDRESS &&
@@ -495,7 +523,7 @@ export class TelegramUpdate {
         historyMessage = await this.trackingService.getAddressHistoryWithPolicy(
           userRef,
           callbackTarget.walletAddress,
-          CALLBACK_HISTORY_LIMIT,
+          String(CALLBACK_HISTORY_LIMIT),
           HistoryRequestSource.CALLBACK,
         );
       } else {
@@ -503,18 +531,25 @@ export class TelegramUpdate {
           throw new Error('Callback не содержит id кошелька для истории.');
         }
 
-        historyMessage = await this.trackingService.getAddressHistoryWithPolicy(
-          userRef,
-          `#${callbackTarget.walletId}`,
-          CALLBACK_HISTORY_LIMIT,
-          HistoryRequestSource.CALLBACK,
-        );
+        const historyOffset: number = callbackTarget.historyOffset ?? 0;
+        const historyLimit: number = callbackTarget.historyLimit ?? CALLBACK_HISTORY_LIMIT;
+        const historyPage: HistoryPageResult =
+          await this.trackingService.getAddressHistoryPageWithPolicy(
+            userRef,
+            `#${callbackTarget.walletId}`,
+            String(historyLimit),
+            String(historyOffset),
+            HistoryRequestSource.CALLBACK,
+          );
+
+        historyMessage = historyPage.message;
+        historyReplyOptions = this.buildHistoryActionInlineKeyboard(historyPage);
       }
 
       return {
         lineNumber: 1,
         message: historyMessage,
-        replyOptions: this.buildHistoryReplyOptions(),
+        replyOptions: historyReplyOptions,
       };
     }
 
@@ -555,6 +590,49 @@ export class TelegramUpdate {
       lineNumber: 1,
       message,
       replyOptions: null,
+    };
+  }
+
+  private buildHistoryActionInlineKeyboard(historyPage: HistoryPageResult): ReplyOptions {
+    const walletId: number | null = historyPage.walletId;
+    const rows: InlineKeyboardButton.CallbackButton[][] = [];
+
+    if (walletId !== null && historyPage.hasNextPage) {
+      rows.push([
+        {
+          text: '➡️ Еще 10',
+          callback_data: `${WALLET_HISTORY_PAGE_CALLBACK_PREFIX}${String(walletId)}:${String(historyPage.offset + historyPage.limit)}:${String(historyPage.limit)}`,
+        },
+      ]);
+    }
+
+    if (walletId !== null) {
+      rows.push([
+        {
+          text: '🔄 Обновить',
+          callback_data: `${WALLET_HISTORY_REFRESH_CALLBACK_PREFIX}${String(walletId)}:${String(historyPage.limit)}`,
+        },
+        {
+          text: '📁 Назад',
+          callback_data: `${WALLET_MENU_CALLBACK_PREFIX}${String(walletId)}`,
+        },
+      ]);
+      rows.push([
+        {
+          text: '🗑 Удалить',
+          callback_data: `${WALLET_UNTRACK_CALLBACK_PREFIX}${String(walletId)}`,
+        },
+      ]);
+    }
+
+    const keyboard = Markup.inlineKeyboard(rows);
+
+    return {
+      reply_markup: keyboard.reply_markup,
+      parse_mode: 'HTML',
+      link_preview_options: {
+        is_disabled: true,
+      },
     };
   }
 
@@ -906,6 +984,8 @@ export class TelegramUpdate {
         walletId,
         walletAddress: null,
         muteMinutes: null,
+        historyOffset: null,
+        historyLimit: null,
       };
     }
 
@@ -924,6 +1004,8 @@ export class TelegramUpdate {
         walletId,
         walletAddress: null,
         muteMinutes: null,
+        historyOffset: null,
+        historyLimit: null,
       };
     }
 
@@ -940,6 +1022,8 @@ export class TelegramUpdate {
         walletId: null,
         walletAddress: null,
         muteMinutes: Number.parseInt(rawMinutes, 10),
+        historyOffset: null,
+        historyLimit: null,
       };
     }
 
@@ -950,6 +1034,8 @@ export class TelegramUpdate {
         walletId: null,
         walletAddress: null,
         muteMinutes: null,
+        historyOffset: null,
+        historyLimit: null,
       };
     }
 
@@ -966,6 +1052,71 @@ export class TelegramUpdate {
         walletId: null,
         walletAddress: rawAddress,
         muteMinutes: null,
+        historyOffset: 0,
+        historyLimit: CALLBACK_HISTORY_LIMIT,
+      };
+    }
+
+    if (callbackData.startsWith(WALLET_HISTORY_PAGE_CALLBACK_PREFIX)) {
+      const rawPayload: string = callbackData.slice(WALLET_HISTORY_PAGE_CALLBACK_PREFIX.length);
+      const payloadParts: readonly string[] = rawPayload.split(':');
+      const rawWalletId: string | undefined = payloadParts[0];
+      const rawOffset: string | undefined = payloadParts[1];
+      const rawLimit: string | undefined = payloadParts[2];
+
+      if (
+        rawWalletId === undefined ||
+        rawOffset === undefined ||
+        rawLimit === undefined ||
+        payloadParts.length !== 3
+      ) {
+        return null;
+      }
+
+      const walletId: number | null = this.parseWalletId(rawWalletId);
+      const historyOffset: number | null = this.parseNonNegativeNumber(rawOffset);
+      const historyLimit: number | null = this.parsePositiveNumber(rawLimit);
+
+      if (walletId === null || historyOffset === null || historyLimit === null) {
+        return null;
+      }
+
+      return {
+        action: WalletCallbackAction.HISTORY,
+        targetType: WalletCallbackTargetType.WALLET_ID,
+        walletId,
+        walletAddress: null,
+        muteMinutes: null,
+        historyOffset,
+        historyLimit,
+      };
+    }
+
+    if (callbackData.startsWith(WALLET_HISTORY_REFRESH_CALLBACK_PREFIX)) {
+      const rawPayload: string = callbackData.slice(WALLET_HISTORY_REFRESH_CALLBACK_PREFIX.length);
+      const payloadParts: readonly string[] = rawPayload.split(':');
+      const rawWalletId: string | undefined = payloadParts[0];
+      const rawLimit: string | undefined = payloadParts[1];
+
+      if (rawWalletId === undefined || rawLimit === undefined || payloadParts.length !== 2) {
+        return null;
+      }
+
+      const walletId: number | null = this.parseWalletId(rawWalletId);
+      const historyLimit: number | null = this.parsePositiveNumber(rawLimit);
+
+      if (walletId === null || historyLimit === null) {
+        return null;
+      }
+
+      return {
+        action: WalletCallbackAction.HISTORY,
+        targetType: WalletCallbackTargetType.WALLET_ID,
+        walletId,
+        walletAddress: null,
+        muteMinutes: null,
+        historyOffset: 0,
+        historyLimit,
       };
     }
 
@@ -984,6 +1135,8 @@ export class TelegramUpdate {
         walletId,
         walletAddress: null,
         muteMinutes: null,
+        historyOffset: 0,
+        historyLimit: CALLBACK_HISTORY_LIMIT,
       };
     }
 
@@ -998,6 +1151,32 @@ export class TelegramUpdate {
     }
 
     return Number.parseInt(normalizedWalletId, 10);
+  }
+
+  private parseNonNegativeNumber(rawValue: string): number | null {
+    const normalizedValue: string = rawValue.trim();
+
+    if (!/^\d+$/.test(normalizedValue)) {
+      return null;
+    }
+
+    const parsedValue: number = Number.parseInt(normalizedValue, 10);
+
+    if (!Number.isSafeInteger(parsedValue) || parsedValue < 0) {
+      return null;
+    }
+
+    return parsedValue;
+  }
+
+  private parsePositiveNumber(rawValue: string): number | null {
+    const parsedValue: number | null = this.parseNonNegativeNumber(rawValue);
+
+    if (parsedValue === null || parsedValue <= 0) {
+      return null;
+    }
+
+    return parsedValue;
   }
 
   private getUpdateMeta(ctx: Context): UpdateMeta {

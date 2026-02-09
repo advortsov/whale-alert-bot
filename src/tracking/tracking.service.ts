@@ -6,6 +6,7 @@ import type { HistoryTransactionItem } from './etherscan-history.interfaces';
 import { EtherscanHistoryService } from './etherscan-history.service';
 import type { HistoryCacheEntry } from './history-cache.interfaces';
 import { HistoryCacheService } from './history-cache.service';
+import type { HistoryPageResult } from './history-page.interfaces';
 import {
   type HistoryQuotaSnapshot,
   HistoryRateLimitReason,
@@ -352,6 +353,79 @@ export class TrackingService {
     );
   }
 
+  public async getAddressHistoryPageWithPolicy(
+    userRef: TelegramUserRef,
+    rawAddress: string,
+    rawLimit: string | null,
+    rawOffset: string | null,
+    source: HistoryRequestSource,
+  ): Promise<HistoryPageResult> {
+    const user = await this.usersRepository.findOrCreate(userRef.telegramId, userRef.username);
+    const historyTarget = await this.resolveHistoryTarget(user.id, rawAddress);
+    const limit: number = this.parseHistoryLimit(rawLimit);
+    const offset: number = this.parseHistoryOffset(rawOffset);
+
+    if (offset === 0) {
+      const message: string = await this.getAddressHistoryWithPolicy(
+        userRef,
+        rawAddress,
+        String(limit),
+        source,
+      );
+      const nextPageProbe: readonly WalletEventHistoryView[] =
+        await this.walletEventsRepository.listRecentByTrackedAddress(
+          historyTarget.address,
+          limit + 1,
+          0,
+        );
+
+      return {
+        message,
+        resolvedAddress: historyTarget.address,
+        walletId: historyTarget.walletId,
+        limit,
+        offset: 0,
+        hasNextPage: nextPageProbe.length > limit,
+      };
+    }
+
+    const rateLimitDecision: HistoryRateLimitDecision = this.historyRateLimiterService.evaluate(
+      userRef.telegramId,
+      source,
+    );
+
+    if (!rateLimitDecision.allowed) {
+      throw new Error(this.buildHistoryRetryMessage(rateLimitDecision));
+    }
+
+    const localEventsWithProbe: readonly WalletEventHistoryView[] =
+      await this.walletEventsRepository.listRecentByTrackedAddress(
+        historyTarget.address,
+        limit + 1,
+        offset,
+      );
+
+    if (localEventsWithProbe.length === 0) {
+      throw new Error('Нет дополнительных локальных событий. Нажми «Обновить».');
+    }
+
+    const pageEvents: readonly WalletEventHistoryView[] = localEventsWithProbe.slice(0, limit);
+    const message: string = this.formatWalletEventsHistoryMessage(
+      historyTarget.address,
+      pageEvents,
+      offset,
+    );
+
+    return {
+      message,
+      resolvedAddress: historyTarget.address,
+      walletId: historyTarget.walletId,
+      limit,
+      offset,
+      hasNextPage: localEventsWithProbe.length > limit,
+    };
+  }
+
   public async getAddressHistoryWithPolicy(
     userRef: TelegramUserRef,
     rawAddress: string,
@@ -363,7 +437,8 @@ export class TrackingService {
     );
 
     const user = await this.usersRepository.findOrCreate(userRef.telegramId, userRef.username);
-    const normalizedAddress: string = await this.resolveHistoryAddress(user.id, rawAddress);
+    const historyTarget = await this.resolveHistoryTarget(user.id, rawAddress);
+    const normalizedAddress: string = historyTarget.address;
     const limit: number = this.parseHistoryLimit(rawLimit);
     const rateLimitDecision: HistoryRateLimitDecision = this.historyRateLimiterService.evaluate(
       userRef.telegramId,
@@ -468,7 +543,13 @@ export class TrackingService {
     return Number.parseInt(normalizedIdentifier, 10);
   }
 
-  private async resolveHistoryAddress(userId: number, rawAddress: string): Promise<string> {
+  private async resolveHistoryTarget(
+    userId: number,
+    rawAddress: string,
+  ): Promise<{
+    readonly address: string;
+    readonly walletId: number | null;
+  }> {
     const walletId: number | null = this.parseWalletId(rawAddress);
 
     if (walletId !== null) {
@@ -479,7 +560,10 @@ export class TrackingService {
         throw new Error(`Не нашел адрес с id #${walletId}. Сначала проверь /list.`);
       }
 
-      return matchedSubscription.walletAddress;
+      return {
+        address: matchedSubscription.walletAddress,
+        walletId,
+      };
     }
 
     if (!isEthereumAddressCandidate(rawAddress)) {
@@ -503,7 +587,10 @@ export class TrackingService {
       );
     }
 
-    return normalizedAddress;
+    return {
+      address: normalizedAddress,
+      walletId: null,
+    };
   }
 
   private parseHistoryLimit(rawLimit: string | null): number {
@@ -528,6 +615,26 @@ export class TrackingService {
     }
 
     return limit;
+  }
+
+  private parseHistoryOffset(rawOffset: string | null): number {
+    if (!rawOffset) {
+      return 0;
+    }
+
+    const normalizedValue: string = rawOffset.trim();
+
+    if (!/^\d+$/.test(normalizedValue)) {
+      throw new Error(`Неверный offset "${rawOffset}". Используй целое число >= 0.`);
+    }
+
+    const offset: number = Number.parseInt(normalizedValue, 10);
+
+    if (offset < 0 || offset > 10_000) {
+      throw new Error(`Неверный offset "${rawOffset}". Используй значение от 0 до 10000.`);
+    }
+
+    return offset;
   }
 
   private mapPreferences(row: UserAlertPreferenceRow): UserAlertPreferences {
@@ -617,6 +724,7 @@ export class TrackingService {
   private formatWalletEventsHistoryMessage(
     normalizedAddress: string,
     events: readonly WalletEventHistoryView[],
+    offset: number = 0,
   ): string {
     const rows: string[] = events.map((event, index: number): string => {
       const txUrl: string = this.buildTxUrl(event.txHash);
@@ -633,9 +741,12 @@ export class TrackingService {
       ].join('\n');
     });
 
+    const startIndex: number = offset + 1;
+    const endIndex: number = offset + events.length;
+
     return [
       `📜 <b>История</b> <code>${normalizedAddress}</code>`,
-      `Последние ${events.length} событий (локальная БД):`,
+      `Локальные события ${startIndex}-${endIndex}:`,
       ...rows,
     ].join('\n\n');
   }

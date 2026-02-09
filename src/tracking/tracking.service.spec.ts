@@ -304,7 +304,7 @@ describe('TrackingService', (): void => {
       HistoryRequestSource.COMMAND,
     );
 
-    expect(message).toContain('локальная БД');
+    expect(message).toContain('Локальные события');
     expect(message).toContain('Tx #1');
     expect(context.etherscanHistoryServiceStub.loadRecentTransactions).not.toHaveBeenCalled();
     expect(context.historyCacheServiceStub.set).toHaveBeenCalledTimes(1);
@@ -470,6 +470,81 @@ describe('TrackingService', (): void => {
 
     expect(message).toBe('cached by string wallet id');
     expect(context.etherscanHistoryServiceStub.loadRecentTransactions).not.toHaveBeenCalled();
+  });
+
+  it('returns paged local history with navigation metadata', async (): Promise<void> => {
+    const context: TestContext = createTestContext();
+    context.historyCacheServiceStub.getFresh.mockReturnValue(null);
+    context.walletEventsRepositoryStub.listRecentByTrackedAddress
+      .mockResolvedValueOnce([
+        {
+          chainId: 1,
+          txHash: '0xpage0',
+          logIndex: 1,
+          trackedAddress: '0xd8da6bf26964af9d7eed9e03e53415d37aa96045',
+          eventType: 'TRANSFER',
+          direction: 'OUT',
+          contractAddress: '0x1111111111111111111111111111111111111111',
+          tokenAddress: '0x1111111111111111111111111111111111111111',
+          tokenSymbol: 'USDT',
+          tokenDecimals: 6,
+          tokenAmountRaw: '1000000',
+          valueFormatted: '1.0',
+          dex: null,
+          pair: null,
+          occurredAt: new Date('2026-02-09T12:00:00.000Z'),
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          chainId: 1,
+          txHash: '0xpage0',
+          logIndex: 1,
+          trackedAddress: '0xd8da6bf26964af9d7eed9e03e53415d37aa96045',
+          eventType: 'TRANSFER',
+          direction: 'OUT',
+          contractAddress: '0x1111111111111111111111111111111111111111',
+          tokenAddress: '0x1111111111111111111111111111111111111111',
+          tokenSymbol: 'USDT',
+          tokenDecimals: 6,
+          tokenAmountRaw: '1000000',
+          valueFormatted: '1.0',
+          dex: null,
+          pair: null,
+          occurredAt: new Date('2026-02-09T12:00:00.000Z'),
+        },
+        {
+          chainId: 1,
+          txHash: '0xprobe',
+          logIndex: 2,
+          trackedAddress: '0xd8da6bf26964af9d7eed9e03e53415d37aa96045',
+          eventType: 'TRANSFER',
+          direction: 'IN',
+          contractAddress: '0x1111111111111111111111111111111111111111',
+          tokenAddress: '0x1111111111111111111111111111111111111111',
+          tokenSymbol: 'USDT',
+          tokenDecimals: 6,
+          tokenAmountRaw: '2000000',
+          valueFormatted: '2.0',
+          dex: null,
+          pair: null,
+          occurredAt: new Date('2026-02-09T11:00:00.000Z'),
+        },
+      ]);
+
+    const result = await context.service.getAddressHistoryPageWithPolicy(
+      context.userRef,
+      '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
+      '1',
+      '0',
+      HistoryRequestSource.CALLBACK,
+    );
+
+    expect(result.walletId).toBeNull();
+    expect(result.limit).toBe(1);
+    expect(result.offset).toBe(0);
+    expect(result.hasNextPage).toBe(true);
+    expect(result.message).toContain('Локальные события 1-1');
   });
 
   it('returns user status with quota snapshot', async (): Promise<void> => {
