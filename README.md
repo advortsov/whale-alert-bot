@@ -67,7 +67,22 @@ npm run db:migrate
 - `IPrimaryRpcProvider` и `IFallbackRpcProvider` как отдельные интерфейсы.
 - `ProviderFactory` создает primary/fallback без строковых ролей.
 - `ProviderFailoverService` выполняет fallback при ошибке primary.
+- `RpcThrottlerService` ограничивает темп RPC и включает backoff при rate-limit/timeout.
 - v1 провайдеры: Alchemy (primary), Infura (fallback).
+
+## Параметры watcher (безопасные defaults для free API)
+
+```env
+CHAIN_WATCHER_ENABLED=false
+CHAIN_RECEIPT_CONCURRENCY=2
+CHAIN_RPC_MIN_INTERVAL_MS=350
+CHAIN_BACKOFF_BASE_MS=1000
+CHAIN_BACKOFF_MAX_MS=30000
+CHAIN_BLOCK_QUEUE_MAX=120
+CHAIN_HEARTBEAT_INTERVAL_SEC=60
+```
+
+Fail-fast правило: если `CHAIN_WATCHER_ENABLED=true`, то `ETH_ALCHEMY_WSS_URL` и `ETH_INFURA_WSS_URL` обязательны.
 
 ## Workflow внешних API
 
@@ -85,6 +100,13 @@ docker compose up --build
 ```
 
 В `docker-compose.yml` зафиксирована точная версия Postgres: `postgres:16.4-alpine`.
+
+## Rate-limit recovery runbook
+
+1. Включить `LOG_LEVEL=info` (или `debug` на диагностику).
+2. Проверить heartbeat лог watcher: lag/queue/backoff.
+3. При росте `backoffMs` сервис не падает, а снижает темп и продолжает обработку.
+4. Если lag долго растет, временно увеличить `CHAIN_RPC_MIN_INTERVAL_MS` и/или уменьшить `CHAIN_RECEIPT_CONCURRENCY`.
 
 ## Важно по Telegram polling
 

@@ -7,6 +7,7 @@ import {
 } from 'ethers';
 
 import type {
+  BlockWithTransactions,
   BlockHandler,
   ISubscriptionHandle,
   ProviderHealth,
@@ -52,6 +53,19 @@ abstract class BaseRpcProvider implements IRpcProvider {
   public async getBlock(blockNumber: number): Promise<Block | null> {
     const wsProvider: WebSocketProvider = this.getOrCreateProvider();
     return wsProvider.getBlock(blockNumber);
+  }
+
+  public async getBlockWithTransactions(
+    blockNumber: number,
+  ): Promise<BlockWithTransactions | null> {
+    const wsProvider: WebSocketProvider = this.getOrCreateProvider();
+    const block: Block | null = await wsProvider.getBlock(blockNumber, true);
+
+    if (!block) {
+      return null;
+    }
+
+    return block as BlockWithTransactions;
   }
 
   public async getTransaction(txHash: string): Promise<TransactionResponse | null> {

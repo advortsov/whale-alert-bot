@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 
-import { normalizeEthereumAddress, tryNormalizeEthereumAddress } from './address.util';
+import { isEthereumAddressCandidate, tryNormalizeEthereumAddress } from './address.util';
 import { SubscriptionsRepository } from '../storage/repositories/subscriptions.repository';
 import { TrackedWalletsRepository } from '../storage/repositories/tracked-wallets.repository';
 import { UsersRepository } from '../storage/repositories/users.repository';
@@ -28,7 +28,22 @@ export class TrackingService {
     this.logger.debug(
       `trackAddress start telegramId=${userRef.telegramId} rawAddress=${rawAddress} label=${label ?? 'n/a'}`,
     );
-    const normalizedAddress: string = normalizeEthereumAddress(rawAddress);
+    if (!isEthereumAddressCandidate(rawAddress)) {
+      this.logger.warn(
+        `trackAddress invalid format telegramId=${userRef.telegramId} rawAddress=${rawAddress}`,
+      );
+      throw new Error('Неверный Ethereum адрес. Используй формат 0x + 40 hex-символов.');
+    }
+
+    const normalizedAddress: string | null = tryNormalizeEthereumAddress(rawAddress);
+
+    if (!normalizedAddress) {
+      this.logger.warn(
+        `trackAddress invalid checksum telegramId=${userRef.telegramId} rawAddress=${rawAddress}`,
+      );
+      throw new Error('Неверный Ethereum адрес. Проверь символы и checksum.');
+    }
+
     this.logger.debug(`trackAddress normalizedAddress=${normalizedAddress}`);
 
     const user = await this.usersRepository.findOrCreate(userRef.telegramId, userRef.username);

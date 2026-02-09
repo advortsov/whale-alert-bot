@@ -21,6 +21,12 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   TELEGRAM_ENABLED: booleanSchema.default(false),
   CHAIN_WATCHER_ENABLED: booleanSchema.default(false),
+  CHAIN_RECEIPT_CONCURRENCY: z.coerce.number().int().positive().default(2),
+  CHAIN_RPC_MIN_INTERVAL_MS: z.coerce.number().int().min(0).default(350),
+  CHAIN_BACKOFF_BASE_MS: z.coerce.number().int().positive().default(1000),
+  CHAIN_BACKOFF_MAX_MS: z.coerce.number().int().positive().default(30000),
+  CHAIN_BLOCK_QUEUE_MAX: z.coerce.number().int().positive().default(120),
+  CHAIN_HEARTBEAT_INTERVAL_SEC: z.coerce.number().int().positive().default(60),
   BOT_TOKEN: z.string().trim().min(1).optional(),
   DATABASE_URL: z.url(),
   ETH_ALCHEMY_WSS_URL: z.url().optional(),
@@ -37,6 +43,7 @@ export class AppConfigService {
 
   public constructor() {
     const parsedEnv: ParsedEnv = envSchema.parse(process.env);
+    this.assertWatcherConfig(parsedEnv);
 
     this.config = {
       nodeEnv: parsedEnv.NODE_ENV,
@@ -44,6 +51,12 @@ export class AppConfigService {
       logLevel: parsedEnv.LOG_LEVEL,
       telegramEnabled: parsedEnv.TELEGRAM_ENABLED,
       chainWatcherEnabled: parsedEnv.CHAIN_WATCHER_ENABLED,
+      chainReceiptConcurrency: parsedEnv.CHAIN_RECEIPT_CONCURRENCY,
+      chainRpcMinIntervalMs: parsedEnv.CHAIN_RPC_MIN_INTERVAL_MS,
+      chainBackoffBaseMs: parsedEnv.CHAIN_BACKOFF_BASE_MS,
+      chainBackoffMaxMs: parsedEnv.CHAIN_BACKOFF_MAX_MS,
+      chainBlockQueueMax: parsedEnv.CHAIN_BLOCK_QUEUE_MAX,
+      chainHeartbeatIntervalSec: parsedEnv.CHAIN_HEARTBEAT_INTERVAL_SEC,
       botToken: parsedEnv.BOT_TOKEN ?? null,
       databaseUrl: parsedEnv.DATABASE_URL,
       ethAlchemyWssUrl: parsedEnv.ETH_ALCHEMY_WSS_URL ?? null,
@@ -73,6 +86,30 @@ export class AppConfigService {
     return this.config.chainWatcherEnabled;
   }
 
+  public get chainReceiptConcurrency(): number {
+    return this.config.chainReceiptConcurrency;
+  }
+
+  public get chainRpcMinIntervalMs(): number {
+    return this.config.chainRpcMinIntervalMs;
+  }
+
+  public get chainBackoffBaseMs(): number {
+    return this.config.chainBackoffBaseMs;
+  }
+
+  public get chainBackoffMaxMs(): number {
+    return this.config.chainBackoffMaxMs;
+  }
+
+  public get chainBlockQueueMax(): number {
+    return this.config.chainBlockQueueMax;
+  }
+
+  public get chainHeartbeatIntervalSec(): number {
+    return this.config.chainHeartbeatIntervalSec;
+  }
+
   public get botToken(): string | null {
     return this.config.botToken;
   }
@@ -95,6 +132,24 @@ export class AppConfigService {
 
   public get etherscanTxBaseUrl(): string {
     return this.config.etherscanTxBaseUrl;
+  }
+
+  private assertWatcherConfig(parsedEnv: ParsedEnv): void {
+    if (parsedEnv.CHAIN_BACKOFF_MAX_MS < parsedEnv.CHAIN_BACKOFF_BASE_MS) {
+      throw new Error('CHAIN_BACKOFF_MAX_MS must be >= CHAIN_BACKOFF_BASE_MS');
+    }
+
+    if (!parsedEnv.CHAIN_WATCHER_ENABLED) {
+      return;
+    }
+
+    if (!parsedEnv.ETH_ALCHEMY_WSS_URL) {
+      throw new Error('ETH_ALCHEMY_WSS_URL is required when CHAIN_WATCHER_ENABLED=true');
+    }
+
+    if (!parsedEnv.ETH_INFURA_WSS_URL) {
+      throw new Error('ETH_INFURA_WSS_URL is required when CHAIN_WATCHER_ENABLED=true');
+    }
   }
 
   private parseAllowlist(rawValue: string | undefined): readonly string[] {

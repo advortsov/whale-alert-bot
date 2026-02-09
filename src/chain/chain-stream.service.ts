@@ -1,22 +1,39 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import type { Block, Log, TransactionReceipt, TransactionResponse } from 'ethers';
+import type { Log, TransactionReceipt, TransactionResponse } from 'ethers';
 
 import { ChainId, ClassifiedEventType, type ObservedTransaction } from './chain.types';
 import { EventClassifierService } from './event-classifier.service';
 import { AlertDispatcherService } from '../alerts/alert-dispatcher.service';
 import { AppConfigService } from '../config/app-config.service';
-import type { ISubscriptionHandle } from './interfaces/rpc-provider.interface';
+import type {
+  BlockWithTransactions,
+  ISubscriptionHandle,
+} from './interfaces/rpc-provider.interface';
 import { ProviderFailoverService } from './providers/provider-failover.service';
+import { ProviderFactory } from './providers/provider.factory';
 import { ProcessedEventsRepository } from '../storage/repositories/processed-events.repository';
 import { SubscriptionsRepository } from '../storage/repositories/subscriptions.repository';
+
+type MatchedTransaction = {
+  readonly txHash: string;
+  readonly txFrom: string;
+  readonly txTo: string | null;
+  readonly trackedAddress: string;
+};
 
 @Injectable()
 export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
   private readonly logger: Logger = new Logger(ChainStreamService.name);
   private subscriptionHandle: ISubscriptionHandle | null = null;
+  private readonly blockQueue: number[] = [];
+  private isBlockQueueProcessing: boolean = false;
+  private lastObservedBlockNumber: number | null = null;
+  private lastProcessedBlockNumber: number | null = null;
+  private heartbeatTimer: NodeJS.Timeout | null = null;
 
   public constructor(
     private readonly appConfigService: AppConfigService,
+    private readonly providerFactory: ProviderFactory,
     private readonly providerFailoverService: ProviderFailoverService,
     private readonly subscriptionsRepository: SubscriptionsRepository,
     private readonly processedEventsRepository: ProcessedEventsRepository,
@@ -30,19 +47,88 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
+    await this.logStartupProviderChecks();
+
     this.subscriptionHandle = await this.providerFailoverService.execute((provider) =>
-      provider.subscribeBlocks(
-        (blockNumber: number): Promise<void> => this.processBlock(blockNumber),
-      ),
+      provider.subscribeBlocks(async (blockNumber: number): Promise<void> => {
+        this.enqueueBlock(blockNumber);
+      }),
     );
 
+    this.startHeartbeat();
     this.logger.log('Chain watcher subscribed to new Ethereum blocks.');
   }
 
   public async onModuleDestroy(): Promise<void> {
+    this.stopHeartbeat();
+
     if (this.subscriptionHandle) {
       await this.subscriptionHandle.stop();
       this.subscriptionHandle = null;
+    }
+  }
+
+  private enqueueBlock(blockNumber: number): void {
+    this.lastObservedBlockNumber = blockNumber;
+
+    if (this.lastProcessedBlockNumber !== null && blockNumber <= this.lastProcessedBlockNumber) {
+      this.logger.debug(
+        `enqueueBlock skip old block blockNumber=${blockNumber} lastProcessed=${this.lastProcessedBlockNumber}`,
+      );
+      return;
+    }
+
+    if (this.blockQueue.includes(blockNumber)) {
+      this.logger.debug(`enqueueBlock skip duplicate blockNumber=${blockNumber}`);
+      return;
+    }
+
+    if (this.blockQueue.length >= this.appConfigService.chainBlockQueueMax) {
+      const droppedCount: number = this.blockQueue.length;
+      this.blockQueue.splice(0, this.blockQueue.length, blockNumber);
+      this.logger.warn(
+        `block queue overflow: dropped=${droppedCount}, retainedLatest=${blockNumber}`,
+      );
+    } else {
+      this.blockQueue.push(blockNumber);
+    }
+
+    if (!this.isBlockQueueProcessing) {
+      void this.processBlockQueue();
+    }
+  }
+
+  private async processBlockQueue(): Promise<void> {
+    if (this.isBlockQueueProcessing) {
+      return;
+    }
+
+    this.isBlockQueueProcessing = true;
+
+    try {
+      while (this.blockQueue.length > 0) {
+        const nextBlockNumber: number | undefined = this.blockQueue.shift();
+
+        if (typeof nextBlockNumber !== 'number') {
+          continue;
+        }
+
+        try {
+          await this.processBlock(nextBlockNumber);
+          this.lastProcessedBlockNumber = nextBlockNumber;
+        } catch (error: unknown) {
+          const errorMessage: string = error instanceof Error ? error.message : String(error);
+          this.logger.warn(
+            `processBlockQueue failed blockNumber=${nextBlockNumber} reason=${errorMessage}`,
+          );
+        }
+      }
+    } finally {
+      this.isBlockQueueProcessing = false;
+
+      if (this.blockQueue.length > 0) {
+        void this.processBlockQueue();
+      }
     }
   }
 
@@ -63,8 +149,8 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
       trackedAddresses.map((address: string): string => address.toLowerCase()),
     );
 
-    const block: Block | null = await this.providerFailoverService.execute((provider) =>
-      provider.getBlock(blockNumber),
+    const block: BlockWithTransactions | null = await this.providerFailoverService.execute(
+      (provider) => provider.getBlockWithTransactions(blockNumber),
     );
 
     if (!block) {
@@ -72,62 +158,106 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    this.logger.debug(
-      `processBlock loaded blockNumber=${blockNumber} txCount=${block.transactions.length}`,
+    const matchedTransactions: readonly MatchedTransaction[] = this.collectMatchedTransactions(
+      block.prefetchedTransactions,
+      trackedAddressSet,
     );
 
-    for (const txHash of block.transactions) {
-      await this.processTransaction(txHash, trackedAddressSet);
+    this.logger.debug(
+      `processBlock loaded blockNumber=${blockNumber} txCount=${block.prefetchedTransactions.length} matchedCount=${matchedTransactions.length}`,
+    );
+
+    if (matchedTransactions.length === 0) {
+      return;
+    }
+
+    await this.processMatchedTransactions(matchedTransactions);
+  }
+
+  private collectMatchedTransactions(
+    transactions: readonly TransactionResponse[],
+    trackedAddressSet: ReadonlySet<string>,
+  ): readonly MatchedTransaction[] {
+    const matchedTransactions: MatchedTransaction[] = [];
+
+    for (const transaction of transactions) {
+      const txFrom: string = transaction.from.toLowerCase();
+      const txTo: string | null = transaction.to ? transaction.to.toLowerCase() : null;
+      const matchedAddress: string | null = this.matchTrackedAddress(
+        txFrom,
+        txTo,
+        trackedAddressSet,
+      );
+
+      if (!matchedAddress) {
+        continue;
+      }
+
+      matchedTransactions.push({
+        txHash: transaction.hash,
+        txFrom,
+        txTo,
+        trackedAddress: matchedAddress,
+      });
+    }
+
+    return matchedTransactions;
+  }
+
+  private async processMatchedTransactions(
+    matchedTransactions: readonly MatchedTransaction[],
+  ): Promise<void> {
+    const concurrency: number = Math.max(this.appConfigService.chainReceiptConcurrency, 1);
+
+    for (let index: number = 0; index < matchedTransactions.length; index += concurrency) {
+      const chunk: readonly MatchedTransaction[] = matchedTransactions.slice(
+        index,
+        index + concurrency,
+      );
+      await Promise.all(
+        chunk.map(async (matchedTransaction: MatchedTransaction): Promise<void> => {
+          try {
+            await this.processMatchedTransaction(matchedTransaction);
+          } catch (error: unknown) {
+            const errorMessage: string = error instanceof Error ? error.message : String(error);
+            this.logger.warn(
+              `processMatchedTransactions failed txHash=${matchedTransaction.txHash} reason=${errorMessage}`,
+            );
+          }
+        }),
+      );
     }
   }
 
-  private async processTransaction(
-    txHash: string,
-    trackedAddressSet: ReadonlySet<string>,
-  ): Promise<void> {
-    this.logger.debug(`processTransaction start txHash=${txHash}`);
-    const transaction: TransactionResponse | null = await this.providerFailoverService.execute(
-      (provider) => provider.getTransaction(txHash),
+  private async processMatchedTransaction(matchedTransaction: MatchedTransaction): Promise<void> {
+    this.logger.debug(
+      `processMatchedTransaction start txHash=${matchedTransaction.txHash} address=${matchedTransaction.trackedAddress}`,
     );
 
-    if (!transaction) {
-      this.logger.debug(`processTransaction skip tx not found txHash=${txHash}`);
-      return;
-    }
-
-    const txFrom: string = transaction.from.toLowerCase();
-    const txTo: string | null = transaction.to ? transaction.to.toLowerCase() : null;
-
-    const matchedAddress: string | null = this.matchTrackedAddress(txFrom, txTo, trackedAddressSet);
-
-    if (!matchedAddress) {
-      this.logger.debug(`processTransaction skip unmatched txHash=${txHash}`);
-      return;
-    }
-    this.logger.debug(`processTransaction matched txHash=${txHash} address=${matchedAddress}`);
-
     const receipt: TransactionReceipt | null = await this.providerFailoverService.execute(
-      (provider) => provider.getTransactionReceipt(txHash),
+      (provider) => provider.getTransactionReceipt(matchedTransaction.txHash),
     );
 
     const observedTransaction: ObservedTransaction = {
       chainId: ChainId.ETHEREUM_MAINNET,
-      txHash,
-      trackedAddress: matchedAddress,
-      txFrom,
-      txTo,
+      txHash: matchedTransaction.txHash,
+      trackedAddress: matchedTransaction.trackedAddress,
+      txFrom: matchedTransaction.txFrom,
+      txTo: matchedTransaction.txTo,
       logs: this.extractLogs(receipt),
     };
 
     const classifiedEvent = this.eventClassifierService.classify(observedTransaction);
 
     if (classifiedEvent.eventType === ClassifiedEventType.UNKNOWN) {
-      this.logger.debug(`processTransaction classified UNKNOWN txHash=${txHash}`);
+      this.logger.debug(
+        `processMatchedTransaction classified UNKNOWN txHash=${matchedTransaction.txHash}`,
+      );
       return;
     }
 
     this.logger.log(
-      `processTransaction classified eventType=${classifiedEvent.eventType} txHash=${txHash} address=${matchedAddress}`,
+      `processMatchedTransaction classified eventType=${classifiedEvent.eventType} txHash=${matchedTransaction.txHash} address=${matchedTransaction.trackedAddress}`,
     );
 
     const alreadyProcessed: boolean = await this.processedEventsRepository.hasProcessed({
@@ -138,7 +268,9 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
     });
 
     if (alreadyProcessed) {
-      this.logger.debug(`processTransaction skip already processed txHash=${txHash}`);
+      this.logger.debug(
+        `processMatchedTransaction skip already processed txHash=${matchedTransaction.txHash}`,
+      );
       return;
     }
 
@@ -150,7 +282,7 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
     });
 
     await this.alertDispatcherService.dispatch(classifiedEvent);
-    this.logger.debug(`processTransaction dispatched txHash=${txHash}`);
+    this.logger.debug(`processMatchedTransaction dispatched txHash=${matchedTransaction.txHash}`);
   }
 
   private matchTrackedAddress(
@@ -182,5 +314,43 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
       data: log.data,
       logIndex: log.index,
     }));
+  }
+
+  private startHeartbeat(): void {
+    const intervalMs: number = this.appConfigService.chainHeartbeatIntervalSec * 1000;
+
+    this.heartbeatTimer = setInterval((): void => {
+      const lag: number | null =
+        this.lastObservedBlockNumber !== null && this.lastProcessedBlockNumber !== null
+          ? this.lastObservedBlockNumber - this.lastProcessedBlockNumber
+          : null;
+      const currentBackoffMs: number = this.providerFailoverService.getCurrentBackoffMs();
+      this.logger.log(
+        `heartbeat observedBlock=${this.lastObservedBlockNumber ?? 'n/a'} processedBlock=${this.lastProcessedBlockNumber ?? 'n/a'} lag=${lag ?? 'n/a'} queueSize=${this.blockQueue.length} backoffMs=${currentBackoffMs}`,
+      );
+    }, intervalMs);
+
+    this.heartbeatTimer.unref();
+  }
+
+  private stopHeartbeat(): void {
+    if (!this.heartbeatTimer) {
+      return;
+    }
+
+    clearInterval(this.heartbeatTimer);
+    this.heartbeatTimer = null;
+  }
+
+  private async logStartupProviderChecks(): Promise<void> {
+    const primaryProvider = this.providerFactory.createPrimary(ChainId.ETHEREUM_MAINNET);
+    const fallbackProvider = this.providerFactory.createFallback(ChainId.ETHEREUM_MAINNET);
+
+    const primaryHealth = await primaryProvider.healthCheck();
+    const fallbackHealth = await fallbackProvider.healthCheck();
+
+    this.logger.log(
+      `startup rpc smoke-check primary=${primaryHealth.ok ? 'ok' : 'fail'} (${primaryHealth.details}), fallback=${fallbackHealth.ok ? 'ok' : 'fail'} (${fallbackHealth.details})`,
+    );
   }
 }

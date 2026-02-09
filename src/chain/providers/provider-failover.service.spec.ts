@@ -1,11 +1,20 @@
 import { ProviderFailoverService } from './provider-failover.service';
 import { ProviderFactory } from './provider.factory';
+import { RpcThrottlerService } from './rpc-throttler.service';
+import type { AppConfigService } from '../../config/app-config.service';
 import type {
+  BlockWithTransactions,
   IFallbackRpcProvider,
   IPrimaryRpcProvider,
   ISubscriptionHandle,
   ProviderHealth,
 } from '../interfaces/rpc-provider.interface';
+
+class RpcConfigStub {
+  public readonly chainRpcMinIntervalMs: number = 0;
+  public readonly chainBackoffBaseMs: number = 1;
+  public readonly chainBackoffMaxMs: number = 10;
+}
 
 class PrimaryProviderStub implements IPrimaryRpcProvider {
   public getName(): string {
@@ -14,11 +23,17 @@ class PrimaryProviderStub implements IPrimaryRpcProvider {
 
   public async subscribeBlocks(): Promise<ISubscriptionHandle> {
     return {
-      stop: async (): Promise<void> => undefined,
+      stop: async (): Promise<void> => {
+        return;
+      },
     };
   }
 
   public async getBlock(): Promise<null> {
+    return null;
+  }
+
+  public async getBlockWithTransactions(): Promise<BlockWithTransactions | null> {
     return null;
   }
 
@@ -46,11 +61,17 @@ class FallbackProviderStub implements IFallbackRpcProvider {
 
   public async subscribeBlocks(): Promise<ISubscriptionHandle> {
     return {
-      stop: async (): Promise<void> => undefined,
+      stop: async (): Promise<void> => {
+        return;
+      },
     };
   }
 
   public async getBlock(): Promise<null> {
+    return null;
+  }
+
+  public async getBlockWithTransactions(): Promise<BlockWithTransactions | null> {
     return null;
   }
 
@@ -77,7 +98,10 @@ describe('ProviderFailoverService', (): void => {
     const fallback: IFallbackRpcProvider = new FallbackProviderStub();
 
     const factory: ProviderFactory = new ProviderFactory(primary, fallback);
-    const service: ProviderFailoverService = new ProviderFailoverService(factory);
+    const throttler: RpcThrottlerService = new RpcThrottlerService(
+      new RpcConfigStub() as unknown as AppConfigService,
+    );
+    const service: ProviderFailoverService = new ProviderFailoverService(factory, throttler);
 
     const result: string = await service.execute(async (provider): Promise<string> => {
       if (provider.getName() === 'primary') {

@@ -2,6 +2,10 @@ import type { Block, TransactionReceipt, TransactionResponse } from 'ethers';
 
 import type { ChainId } from '../chain.types';
 
+export type BlockWithTransactions = Block & {
+  readonly prefetchedTransactions: readonly TransactionResponse[];
+};
+
 export type ProviderHealth = {
   readonly provider: string;
   readonly ok: boolean;
@@ -18,6 +22,7 @@ export interface IRpcProvider {
   getName(): string;
   subscribeBlocks(handler: BlockHandler): Promise<ISubscriptionHandle>;
   getBlock(blockNumber: number): Promise<Block | null>;
+  getBlockWithTransactions(blockNumber: number): Promise<BlockWithTransactions | null>;
   getTransaction(txHash: string): Promise<TransactionResponse | null>;
   getTransactionReceipt(txHash: string): Promise<TransactionReceipt | null>;
   healthCheck(): Promise<ProviderHealth>;

@@ -13,10 +13,15 @@ enum SupportedTelegramCommand {
   UNTRACK = 'untrack',
 }
 
-type ParsedTextCommand = {
-  readonly command: SupportedTelegramCommand | null;
+type ParsedMessageCommand = {
+  readonly command: SupportedTelegramCommand;
   readonly args: readonly string[];
-  readonly rawText: string;
+  readonly lineNumber: number;
+};
+
+type CommandExecutionResult = {
+  readonly lineNumber: number;
+  readonly message: string;
 };
 
 type UpdateMeta = {
@@ -53,9 +58,9 @@ export class TelegramUpdate {
       return;
     }
 
-    const parsedCommand: ParsedTextCommand = this.parseTextCommand(text);
+    const parsedCommands: readonly ParsedMessageCommand[] = this.parseMessageCommands(text);
 
-    if (parsedCommand.command === null) {
+    if (parsedCommands.length === 0) {
       this.logger.debug(
         `Ignore non-command text updateId=${updateMeta.updateId ?? 'n/a'} chatId=${updateMeta.chatId ?? 'n/a'} messageId=${updateMeta.messageId ?? 'n/a'} text="${text}"`,
       );
@@ -63,206 +68,222 @@ export class TelegramUpdate {
     }
 
     this.logger.log(
-      `Incoming command=${parsedCommand.command} updateId=${updateMeta.updateId ?? 'n/a'} chatId=${updateMeta.chatId ?? 'n/a'} messageId=${updateMeta.messageId ?? 'n/a'} telegramId=${userRef?.telegramId ?? 'unknown'} payload="${text}"`,
+      `Incoming commands count=${parsedCommands.length} updateId=${updateMeta.updateId ?? 'n/a'} chatId=${updateMeta.chatId ?? 'n/a'} messageId=${updateMeta.messageId ?? 'n/a'} telegramId=${userRef?.telegramId ?? 'unknown'}`,
     );
 
-    switch (parsedCommand.command) {
-      case SupportedTelegramCommand.START:
-        await this.handleStart(ctx, userRef, updateMeta);
-        return;
-      case SupportedTelegramCommand.HELP:
-        await this.handleHelp(ctx, userRef, updateMeta);
-        return;
-      case SupportedTelegramCommand.TRACK:
-        await this.handleTrack(ctx, userRef, updateMeta, parsedCommand.args);
-        return;
-      case SupportedTelegramCommand.LIST:
-        await this.handleList(ctx, userRef, updateMeta);
-        return;
-      case SupportedTelegramCommand.UNTRACK:
-        await this.handleUntrack(ctx, userRef, updateMeta, parsedCommand.args);
-        return;
-      default:
-        await this.replyWithLog(ctx, 'Неизвестная команда. Используй /help.', updateMeta);
+    try {
+      const results: readonly CommandExecutionResult[] =
+        userRef !== null
+          ? await this.runSequentialForUser(
+              userRef.telegramId,
+              async (): Promise<readonly CommandExecutionResult[]> =>
+                this.executeParsedCommands(parsedCommands, userRef, updateMeta),
+            )
+          : await this.executeParsedCommands(parsedCommands, userRef, updateMeta);
+
+      const replyText: string = this.formatExecutionResults(results);
+      await this.replyWithLog(ctx, replyText, updateMeta);
+    } catch (error: unknown) {
+      const errorMessage: string = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Command batch failed: ${errorMessage}`);
+      await this.replyWithLog(ctx, `Ошибка обработки команд: ${errorMessage}`, updateMeta);
     }
   }
 
-  private async handleStart(
-    ctx: Context,
+  private async executeParsedCommands(
+    commands: readonly ParsedMessageCommand[],
     userRef: TelegramUserRef | null,
     updateMeta: UpdateMeta,
-  ): Promise<void> {
-    this.logger.log(
-      `Handle /start telegramId=${userRef?.telegramId ?? 'unknown'} username=${userRef?.username ?? 'n/a'} updateId=${updateMeta.updateId ?? 'n/a'}`,
-    );
+  ): Promise<readonly CommandExecutionResult[]> {
+    const results: CommandExecutionResult[] = [];
 
-    await this.replyWithLog(
-      ctx,
-      [
-        'Привет. Я отслеживаю активность китов в Ethereum.',
-        'Команды:',
-        '/track <address> [label]',
-        '/list',
-        '/untrack <address|id>',
-        '/help',
-      ].join('\n'),
-      updateMeta,
-    );
+    for (const commandEntry of commands) {
+      let message: string;
+
+      switch (commandEntry.command) {
+        case SupportedTelegramCommand.START:
+          this.logger.log(
+            `Handle /start line=${commandEntry.lineNumber} telegramId=${userRef?.telegramId ?? 'unknown'} updateId=${updateMeta.updateId ?? 'n/a'}`,
+          );
+          message = this.buildStartMessage();
+          break;
+        case SupportedTelegramCommand.HELP:
+          this.logger.debug(
+            `Handle /help line=${commandEntry.lineNumber} telegramId=${userRef?.telegramId ?? 'unknown'} updateId=${updateMeta.updateId ?? 'n/a'}`,
+          );
+          message = this.buildHelpMessage();
+          break;
+        case SupportedTelegramCommand.TRACK:
+          message = await this.executeTrackCommand(userRef, commandEntry, updateMeta);
+          break;
+        case SupportedTelegramCommand.LIST:
+          message = await this.executeListCommand(userRef, commandEntry, updateMeta);
+          break;
+        case SupportedTelegramCommand.UNTRACK:
+          message = await this.executeUntrackCommand(userRef, commandEntry, updateMeta);
+          break;
+        default:
+          message = 'Неизвестная команда. Используй /help.';
+      }
+
+      results.push({
+        lineNumber: commandEntry.lineNumber,
+        message,
+      });
+    }
+
+    return results;
   }
 
-  private async handleHelp(
-    ctx: Context,
+  private async executeTrackCommand(
     userRef: TelegramUserRef | null,
+    commandEntry: ParsedMessageCommand,
     updateMeta: UpdateMeta,
-  ): Promise<void> {
-    this.logger.debug(
-      `Handle /help telegramId=${userRef?.telegramId ?? 'unknown'} username=${userRef?.username ?? 'n/a'} updateId=${updateMeta.updateId ?? 'n/a'}`,
-    );
-
-    await this.replyWithLog(
-      ctx,
-      [
-        'Использование:',
-        '/track <address> [label] - добавить адрес',
-        '/list - показать отслеживаемые адреса',
-        '/untrack <address|id> - удалить адрес',
-      ].join('\n'),
-      updateMeta,
-    );
-  }
-
-  private async handleTrack(
-    ctx: Context,
-    userRef: TelegramUserRef | null,
-    updateMeta: UpdateMeta,
-    args: readonly string[],
-  ): Promise<void> {
-    const address: string | null = args[0] ?? null;
-    const label: string | null = args.length > 1 ? args.slice(1).join(' ') : null;
+  ): Promise<string> {
+    const address: string | null = commandEntry.args[0] ?? null;
+    const labelRaw: string | null =
+      commandEntry.args.length > 1 ? commandEntry.args.slice(1).join(' ') : null;
+    const label: string | null = labelRaw && labelRaw.trim().length > 0 ? labelRaw.trim() : null;
 
     if (!address) {
       this.logger.debug(
-        `Track command rejected: missing address argument updateId=${updateMeta.updateId ?? 'n/a'}`,
+        `Track command rejected: missing address line=${commandEntry.lineNumber} updateId=${updateMeta.updateId ?? 'n/a'}`,
       );
-      await this.replyWithLog(ctx, 'Передай адрес: /track <address> [label]', updateMeta);
-      return;
+      return 'Передай адрес: /track <address> [label]';
     }
 
     if (!userRef) {
       this.logger.warn(
-        `Track command rejected: user context is missing updateId=${updateMeta.updateId ?? 'n/a'}`,
+        `Track command rejected: user context is missing line=${commandEntry.lineNumber} updateId=${updateMeta.updateId ?? 'n/a'}`,
       );
-      await this.replyWithLog(ctx, 'Не удалось определить пользователя.', updateMeta);
-      return;
+      return 'Не удалось определить пользователя.';
     }
 
-    try {
-      await this.runSequentialForUser(userRef.telegramId, async (): Promise<void> => {
-        const responseMessage: string = await this.trackingService.trackAddress(
-          userRef,
-          address,
-          label,
-        );
-        this.logger.log(
-          `Track command success for telegramId=${userRef.telegramId} address=${address} updateId=${updateMeta.updateId ?? 'n/a'}`,
-        );
-        await this.replyWithLog(ctx, responseMessage, updateMeta);
-      });
-    } catch (error: unknown) {
-      const errorMessage: string = error instanceof Error ? error.message : String(error);
-      this.logger.warn(`Track command failed: ${errorMessage}`);
-      await this.replyWithLog(ctx, `Не удалось добавить адрес: ${errorMessage}`, updateMeta);
-    }
+    const responseMessage: string = await this.trackingService.trackAddress(
+      userRef,
+      address,
+      label,
+    );
+    this.logger.log(
+      `Track command success line=${commandEntry.lineNumber} telegramId=${userRef.telegramId} address=${address} updateId=${updateMeta.updateId ?? 'n/a'}`,
+    );
+
+    return responseMessage;
   }
 
-  private async handleList(
-    ctx: Context,
+  private async executeListCommand(
     userRef: TelegramUserRef | null,
+    commandEntry: ParsedMessageCommand,
     updateMeta: UpdateMeta,
-  ): Promise<void> {
+  ): Promise<string> {
     if (!userRef) {
       this.logger.warn(
-        `List command rejected: user context is missing updateId=${updateMeta.updateId ?? 'n/a'}`,
+        `List command rejected: user context is missing line=${commandEntry.lineNumber} updateId=${updateMeta.updateId ?? 'n/a'}`,
       );
-      await this.replyWithLog(ctx, 'Не удалось определить пользователя.', updateMeta);
-      return;
+      return 'Не удалось определить пользователя.';
     }
 
-    try {
-      await this.runSequentialForUser(userRef.telegramId, async (): Promise<void> => {
-        const responseMessage: string = await this.trackingService.listTrackedAddresses(userRef);
-        this.logger.debug(
-          `List command success for telegramId=${userRef.telegramId} updateId=${updateMeta.updateId ?? 'n/a'}`,
-        );
-        await this.replyWithLog(ctx, responseMessage, updateMeta);
-      });
-    } catch (error: unknown) {
-      const errorMessage: string = error instanceof Error ? error.message : String(error);
-      this.logger.warn(`List command failed: ${errorMessage}`);
-      await this.replyWithLog(ctx, `Не удалось получить список: ${errorMessage}`, updateMeta);
-    }
+    const responseMessage: string = await this.trackingService.listTrackedAddresses(userRef);
+    this.logger.debug(
+      `List command success line=${commandEntry.lineNumber} telegramId=${userRef.telegramId} updateId=${updateMeta.updateId ?? 'n/a'}`,
+    );
+
+    return responseMessage;
   }
 
-  private async handleUntrack(
-    ctx: Context,
+  private async executeUntrackCommand(
     userRef: TelegramUserRef | null,
+    commandEntry: ParsedMessageCommand,
     updateMeta: UpdateMeta,
-    args: readonly string[],
-  ): Promise<void> {
-    const rawIdentifier: string | null = args[0] ?? null;
+  ): Promise<string> {
+    const rawIdentifier: string | null = commandEntry.args[0] ?? null;
 
     if (!rawIdentifier) {
       this.logger.debug(
-        `Untrack command rejected: missing id/address argument updateId=${updateMeta.updateId ?? 'n/a'}`,
+        `Untrack command rejected: missing id/address line=${commandEntry.lineNumber} updateId=${updateMeta.updateId ?? 'n/a'}`,
       );
-      await this.replyWithLog(ctx, 'Передай id или адрес: /untrack <address|id>', updateMeta);
-      return;
+      return 'Передай id или адрес: /untrack <address|id>';
     }
 
     if (!userRef) {
       this.logger.warn(
-        `Untrack command rejected: user context is missing updateId=${updateMeta.updateId ?? 'n/a'}`,
+        `Untrack command rejected: user context is missing line=${commandEntry.lineNumber} updateId=${updateMeta.updateId ?? 'n/a'}`,
       );
-      await this.replyWithLog(ctx, 'Не удалось определить пользователя.', updateMeta);
-      return;
+      return 'Не удалось определить пользователя.';
     }
 
-    try {
-      await this.runSequentialForUser(userRef.telegramId, async (): Promise<void> => {
-        const responseMessage: string = await this.trackingService.untrackAddress(
-          userRef,
-          rawIdentifier,
-        );
-        this.logger.log(
-          `Untrack command success for telegramId=${userRef.telegramId} identifier=${rawIdentifier} updateId=${updateMeta.updateId ?? 'n/a'}`,
-        );
-        await this.replyWithLog(ctx, responseMessage, updateMeta);
-      });
-    } catch (error: unknown) {
-      const errorMessage: string = error instanceof Error ? error.message : String(error);
-      this.logger.warn(`Untrack command failed: ${errorMessage}`);
-      await this.replyWithLog(ctx, `Не удалось удалить адрес: ${errorMessage}`, updateMeta);
-    }
+    const responseMessage: string = await this.trackingService.untrackAddress(
+      userRef,
+      rawIdentifier,
+    );
+    this.logger.log(
+      `Untrack command success line=${commandEntry.lineNumber} telegramId=${userRef.telegramId} identifier=${rawIdentifier} updateId=${updateMeta.updateId ?? 'n/a'}`,
+    );
+
+    return responseMessage;
   }
 
-  private async runSequentialForUser(telegramId: string, task: () => Promise<void>): Promise<void> {
+  private buildStartMessage(): string {
+    return [
+      'Привет. Я отслеживаю активность китов в Ethereum.',
+      'Команды:',
+      '/track <address> [label]',
+      '/list',
+      '/untrack <address|id>',
+      '/help',
+    ].join('\n');
+  }
+
+  private buildHelpMessage(): string {
+    return [
+      'Использование:',
+      '/track <address> [label] - добавить адрес',
+      '/list - показать отслеживаемые адреса',
+      '/untrack <address|id> - удалить адрес',
+    ].join('\n');
+  }
+
+  private formatExecutionResults(results: readonly CommandExecutionResult[]): string {
+    if (results.length === 1) {
+      const singleResult: CommandExecutionResult | undefined = results[0];
+
+      if (!singleResult) {
+        return 'Команда не распознана.';
+      }
+
+      return singleResult.message;
+    }
+
+    return results
+      .map(
+        (result: CommandExecutionResult): string =>
+          `Строка ${result.lineNumber}: ${result.message}`,
+      )
+      .join('\n');
+  }
+
+  private async runSequentialForUser<T>(telegramId: string, task: () => Promise<T>): Promise<T> {
     const previousTask: Promise<void> = this.userCommandQueue.get(telegramId) ?? Promise.resolve();
 
-    const nextTask: Promise<void> = previousTask
+    const taskPromise: Promise<T> = previousTask
       .catch((): void => undefined)
-      .then(async (): Promise<void> => {
+      .then(async (): Promise<T> => {
         this.logger.debug(`Command queue start telegramId=${telegramId}`);
-        await task();
-      })
+        return task();
+      });
+
+    const queuePromise: Promise<void> = taskPromise
+      .then((): void => undefined)
+      .catch((): void => undefined)
       .finally((): void => {
-        if (this.userCommandQueue.get(telegramId) === nextTask) {
+        if (this.userCommandQueue.get(telegramId) === queuePromise) {
           this.userCommandQueue.delete(telegramId);
         }
         this.logger.debug(`Command queue finish telegramId=${telegramId}`);
       });
 
-    this.userCommandQueue.set(telegramId, nextTask);
-    await nextTask;
+    this.userCommandQueue.set(telegramId, queuePromise);
+    return taskPromise;
   }
 
   private getUserRef(ctx: Context): TelegramUserRef | null {
@@ -286,48 +307,60 @@ export class TelegramUpdate {
     return message.text;
   }
 
-  private parseTextCommand(rawText: string): ParsedTextCommand {
-    const trimmedText: string = rawText.trim();
+  private parseMessageCommands(rawText: string): readonly ParsedMessageCommand[] {
+    const lines: readonly string[] = rawText.split(/\r?\n/);
+    const parsedCommands: ParsedMessageCommand[] = [];
 
-    if (!trimmedText.startsWith('/')) {
-      return {
-        command: null,
-        args: [],
-        rawText,
-      };
+    for (let lineIndex: number = 0; lineIndex < lines.length; lineIndex += 1) {
+      const rawLine: string = lines[lineIndex]?.trim() ?? '';
+
+      if (rawLine.length === 0 || !rawLine.startsWith('/')) {
+        continue;
+      }
+
+      const parts: readonly string[] = rawLine.split(/\s+/);
+      const commandToken: string | undefined = parts[0];
+
+      if (!commandToken) {
+        continue;
+      }
+
+      const commandWithMention: string = commandToken.slice(1);
+      const commandBase: string | undefined = commandWithMention.split('@')[0];
+
+      if (!commandBase) {
+        continue;
+      }
+
+      const commandName: string = commandBase.toLowerCase();
+      const command: SupportedTelegramCommand | null = this.resolveSupportedCommand(commandName);
+
+      if (!command) {
+        continue;
+      }
+
+      const commandLineNumber: number = lineIndex + 1;
+      let args: readonly string[] = parts.slice(1);
+
+      if (command === SupportedTelegramCommand.TRACK && args.length === 1) {
+        const nextLine: string | undefined = lines[lineIndex + 1];
+        const nextTrimmedLine: string = nextLine?.trim() ?? '';
+        const currentAddressArg: string | undefined = args[0];
+
+        if (currentAddressArg && nextTrimmedLine.length > 0 && !nextTrimmedLine.startsWith('/')) {
+          args = [currentAddressArg, nextTrimmedLine];
+          lineIndex += 1;
+        }
+      }
+
+      parsedCommands.push({
+        command,
+        args,
+        lineNumber: commandLineNumber,
+      });
     }
 
-    const parts: string[] = trimmedText.split(/\s+/);
-    const commandToken: string | undefined = parts[0];
-
-    if (!commandToken) {
-      return {
-        command: null,
-        args: [],
-        rawText,
-      };
-    }
-
-    const commandWithMention: string = commandToken.slice(1);
-    const commandBase: string | undefined = commandWithMention.split('@')[0];
-
-    if (!commandBase) {
-      return {
-        command: null,
-        args: [],
-        rawText,
-      };
-    }
-
-    const commandName: string = commandBase.toLowerCase();
-    const args: readonly string[] = parts.slice(1);
-    const command: SupportedTelegramCommand | null = this.resolveSupportedCommand(commandName);
-
-    return {
-      command,
-      args,
-      rawText,
-    };
+    return parsedCommands;
   }
 
   private resolveSupportedCommand(commandName: string): SupportedTelegramCommand | null {

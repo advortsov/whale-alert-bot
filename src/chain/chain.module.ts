@@ -9,6 +9,7 @@ import { AlchemyPrimaryProvider } from './providers/alchemy-primary.provider';
 import { InfuraFallbackProvider } from './providers/infura-fallback.provider';
 import { ProviderFailoverService } from './providers/provider-failover.service';
 import { ProviderFactory } from './providers/provider.factory';
+import { RpcThrottlerService } from './providers/rpc-throttler.service';
 
 @Module({
   imports: [StorageModule, AlertsModule],
@@ -24,6 +25,7 @@ import { ProviderFactory } from './providers/provider.factory';
       useExisting: InfuraFallbackProvider,
     },
     ProviderFactory,
+    RpcThrottlerService,
     ProviderFailoverService,
     EventClassifierService,
     ChainStreamService,
