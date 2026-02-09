@@ -1,0 +1,42 @@
+services:
+  postgres:
+    image: postgres:16.4-alpine
+    container_name: whale-alert-postgres
+    environment:
+      POSTGRES_DB: whale_alert_bot
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - '5432:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: ${PORT:-3000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      TELEGRAM_ENABLED: ${TELEGRAM_ENABLED:-false}
+      CHAIN_WATCHER_ENABLED: ${CHAIN_WATCHER_ENABLED:-false}
+      DATABASE_URL: ${DATABASE_URL:-postgres://postgres:postgres@postgres:5432/whale_alert_bot}
+      BOT_TOKEN: ${BOT_TOKEN:-0000000000:TEST_TOKEN_FOR_DOCKER}
+      ETH_ALCHEMY_WSS_URL: ${ETH_ALCHEMY_WSS_URL:-wss://example.invalid/alchemy}
+      ETH_INFURA_WSS_URL: ${ETH_INFURA_WSS_URL:-wss://example.invalid/infura}
+      ETHERSCAN_TX_BASE_URL: ${ETHERSCAN_TX_BASE_URL:-https://etherscan.io/tx/}
+    ports:
+      - '3000:3000'
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

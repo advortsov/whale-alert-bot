@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16.4-alpine
+        env:
+          POSTGRES_DB: whale_alert_bot
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      NODE_ENV: test
+      PORT: 3000
+      LOG_LEVEL: info
+      TELEGRAM_ENABLED: false
+      CHAIN_WATCHER_ENABLED: false
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/whale_alert_bot
+      BOT_TOKEN: 0000000000:TEST_TOKEN_FOR_CI
+      ETH_ALCHEMY_WSS_URL: wss://example.invalid/alchemy
+      ETH_INFURA_WSS_URL: wss://example.invalid/infura
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run db:validate
+      - run: npm run typecheck
+      - run: npm run test
+      - run: npm run build
