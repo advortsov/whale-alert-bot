@@ -154,4 +154,48 @@ describe('LocalBotHarness', (): void => {
     });
     expect(result.replies[0]?.text).toContain('История');
   });
+
+  it('returns wallet card keyboard with tap-only actions', async (): Promise<void> => {
+    const trackingServiceStub: TrackingServiceStub = createTrackingServiceStub();
+    trackingServiceStub.getWalletDetails.mockResolvedValue('wallet card');
+    const runtimeStatusServiceStub: RuntimeStatusServiceStub = createRuntimeStatusServiceStub();
+    const harness: LocalBotHarness = new LocalBotHarness({
+      trackingService: trackingServiceStub as unknown as TrackingService,
+      runtimeStatusService: runtimeStatusServiceStub as unknown as RuntimeStatusService,
+    });
+
+    const result: HarnessRunResult = await harness.sendText({
+      user: {
+        telegramId: '42',
+        username: 'tester',
+      },
+      text: '/wallet #16',
+    });
+
+    const replyOptions = result.replies[0]?.options as
+      | {
+          readonly reply_markup?: {
+            readonly inline_keyboard?: readonly (readonly { readonly callback_data?: string }[])[];
+          };
+        }
+      | null
+      | undefined;
+    const inlineKeyboard: readonly (readonly { readonly callback_data?: string }[])[] =
+      replyOptions?.reply_markup?.inline_keyboard ?? [];
+    const callbackDataList: string[] = [];
+
+    for (const row of inlineKeyboard) {
+      for (const button of row) {
+        if (typeof button.callback_data === 'string') {
+          callbackDataList.push(button.callback_data);
+        }
+      }
+    }
+
+    expect(callbackDataList).toContain('wallet_history_refresh:16:10:all:all');
+    expect(callbackDataList).toContain('wallet_history_refresh:16:10:erc20:all');
+    expect(callbackDataList).toContain('wallet_filters:16');
+    expect(callbackDataList).toContain('wallet_menu:16');
+    expect(callbackDataList).toContain('wallet_untrack:16');
+  });
 });

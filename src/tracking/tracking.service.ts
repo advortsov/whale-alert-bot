@@ -43,6 +43,7 @@ export class TrackingService {
   private readonly logger: Logger = new Logger(TrackingService.name);
   private static readonly DEFAULT_HISTORY_LIMIT: number = 5;
   private static readonly MAX_HISTORY_LIMIT: number = 20;
+  private static readonly WALLET_CARD_RECENT_EVENTS_LIMIT: number = 3;
 
   public constructor(
     private readonly usersRepository: UsersRepository,
@@ -210,14 +211,36 @@ export class TrackingService {
     }
 
     const labelText: string = matchedSubscription.walletLabel ?? 'без ярлыка';
+    const [globalPreferences, walletPreferences, recentEvents] = await Promise.all([
+      this.userAlertPreferencesRepository.findOrCreateByUserId(user.id),
+      this.userWalletAlertPreferencesRepository.findByUserAndWalletId(user.id, walletId),
+      this.walletEventsRepository.listRecentByTrackedAddress(
+        ChainKey.ETHEREUM_MAINNET,
+        matchedSubscription.walletAddress,
+        TrackingService.WALLET_CARD_RECENT_EVENTS_LIMIT,
+        0,
+      ),
+    ]);
+    const allowTransfer: boolean = walletPreferences
+      ? walletPreferences.allow_transfer
+      : globalPreferences.allow_transfer;
+    const allowSwap: boolean = walletPreferences
+      ? walletPreferences.allow_swap
+      : globalPreferences.allow_swap;
+    const filterSource: string = walletPreferences === null ? 'global' : 'wallet override';
+    const recentEventRows: readonly string[] = this.formatWalletCardRecentEvents(recentEvents);
 
     return [
-      `Кошелек #${walletId}`,
-      `Label: ${labelText}`,
-      `Address: ${matchedSubscription.walletAddress}`,
-      `История: /history #${walletId} 10`,
-      `Фильтры: /walletfilters #${walletId}`,
-      `Удалить: /untrack #${walletId}`,
+      `💼 Кошелек #${walletId}`,
+      `⛓ Сеть: ${ChainKey.ETHEREUM_MAINNET}`,
+      `🏷 Label: ${labelText}`,
+      `📍 Address: ${matchedSubscription.walletAddress}`,
+      `🔔 Фильтры: transfer=${allowTransfer ? 'on' : 'off'}, swap=${allowSwap ? 'on' : 'off'} (${filterSource})`,
+      '',
+      `🧾 Последние события (${recentEvents.length}/${TrackingService.WALLET_CARD_RECENT_EVENTS_LIMIT}):`,
+      ...recentEventRows,
+      '',
+      '👇 Действия доступны кнопками ниже.',
     ].join('\n');
   }
 
@@ -992,6 +1015,23 @@ export class TrackingService {
       `Локальные события ${startIndex}-${endIndex}:`,
       ...rows,
     ].join('\n\n');
+  }
+
+  private formatWalletCardRecentEvents(
+    events: readonly WalletEventHistoryView[],
+  ): readonly string[] {
+    if (events.length === 0) {
+      return ['- пока нет локальных событий'];
+    }
+
+    return events.map((event, index: number): string => {
+      const txHashShort: string = this.shortHash(event.txHash);
+      const directionLabel: string = this.resolveDirectionLabel(event.direction);
+      const eventValue: string = this.resolveEventValue(event);
+      const eventTimestamp: string = this.formatTimestamp(event.occurredAt);
+
+      return `${index + 1}. ${directionLabel} ${event.eventType} • ${eventValue} • ${eventTimestamp} • ${txHashShort}`;
+    });
   }
 
   private buildStaleMessage(cachedHistoryMessage: string): string {

@@ -1688,21 +1688,37 @@ export class TelegramUpdate {
       [
         {
           text: '📜 История',
-          callback_data: `${WALLET_HISTORY_CALLBACK_PREFIX}${String(walletId)}`,
+          callback_data: [
+            `${WALLET_HISTORY_REFRESH_CALLBACK_PREFIX}${String(walletId)}`,
+            String(CALLBACK_HISTORY_LIMIT),
+            HistoryKind.ALL,
+            HistoryDirectionFilter.ALL,
+          ].join(':'),
         },
         {
-          text: '🗑 Удалить',
-          callback_data: `${WALLET_UNTRACK_CALLBACK_PREFIX}${String(walletId)}`,
+          text: '🪙 ERC20',
+          callback_data: [
+            `${WALLET_HISTORY_REFRESH_CALLBACK_PREFIX}${String(walletId)}`,
+            String(CALLBACK_HISTORY_LIMIT),
+            HistoryKind.ERC20,
+            HistoryDirectionFilter.ALL,
+          ].join(':'),
         },
       ],
       [
         {
-          text: '⏸ Mute 30m',
-          callback_data: `${WALLET_MUTE_CALLBACK_PREFIX}30`,
-        },
-        {
           text: '⚙️ Фильтры',
           callback_data: `${WALLET_FILTERS_CALLBACK_PREFIX}${String(walletId)}`,
+        },
+        {
+          text: '🔄 Обновить',
+          callback_data: `${WALLET_MENU_CALLBACK_PREFIX}${String(walletId)}`,
+        },
+      ],
+      [
+        {
+          text: '🗑 Удалить',
+          callback_data: `${WALLET_UNTRACK_CALLBACK_PREFIX}${String(walletId)}`,
         },
       ],
     ];

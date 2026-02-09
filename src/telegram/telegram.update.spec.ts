@@ -419,9 +419,20 @@ describe('TelegramUpdate', (): void => {
     expect(replyMock).toHaveBeenCalledWith('Кошелек #16\nAddress: 0x96b0...', expect.anything());
 
     const firstReplyCall: unknown[] | undefined = replyMock.mock.calls[0];
-    const replyOptions: unknown = firstReplyCall?.[1];
-    expect(typeof replyOptions).toBe('object');
-    expect(replyOptions).not.toBeNull();
+    const replyOptions = firstReplyCall?.[1] as
+      | { reply_markup?: { inline_keyboard?: { callback_data?: string }[][] } }
+      | undefined;
+    const keyboardRows = replyOptions?.reply_markup?.inline_keyboard ?? [];
+    const callbackDataList: string[] = keyboardRows
+      .flat()
+      .map((button) => button.callback_data)
+      .filter((value): value is string => typeof value === 'string');
+
+    expect(callbackDataList).toContain('wallet_history_refresh:16:10:all:all');
+    expect(callbackDataList).toContain('wallet_history_refresh:16:10:erc20:all');
+    expect(callbackDataList).toContain('wallet_filters:16');
+    expect(callbackDataList).toContain('wallet_menu:16');
+    expect(callbackDataList).toContain('wallet_untrack:16');
   });
 
   it('routes wallet history callback by wallet id to paged policy method', async (): Promise<void> => {
