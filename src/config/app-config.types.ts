@@ -22,4 +22,8 @@ export type AppConfig = {
   readonly etherscanTxBaseUrl: string;
   readonly etherscanApiBaseUrl: string;
   readonly etherscanApiKey: string | null;
+  readonly historyCacheTtlSec: number;
+  readonly historyRateLimitPerMinute: number;
+  readonly historyButtonCooldownSec: number;
+  readonly historyStaleOnErrorSec: number;
 };

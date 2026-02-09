@@ -13,6 +13,7 @@ import {
   type UpdateMeta,
   type WalletHistoryCallbackTarget,
 } from './telegram.interfaces';
+import { HistoryRequestSource } from '../tracking/history-rate-limiter.interfaces';
 import type { TelegramUserRef, TrackedWalletOption } from '../tracking/tracking.interfaces';
 import { TrackingService } from '../tracking/tracking.service';
 
@@ -119,15 +120,17 @@ export class TelegramUpdate {
     try {
       const historyMessage: string =
         callbackTarget.targetType === 'address'
-          ? await this.trackingService.getAddressHistory(
+          ? await this.trackingService.getAddressHistoryWithPolicy(
               userRef,
               callbackTarget.walletAddress,
               CALLBACK_HISTORY_LIMIT,
+              HistoryRequestSource.CALLBACK,
             )
-          : await this.trackingService.getAddressHistory(
+          : await this.trackingService.getAddressHistoryWithPolicy(
               userRef,
               `#${callbackTarget.walletId}`,
               CALLBACK_HISTORY_LIMIT,
+              HistoryRequestSource.CALLBACK,
             );
       await this.replyWithLog(ctx, historyMessage, updateMeta, this.buildHistoryReplyOptions());
     } catch (error: unknown) {
@@ -342,10 +345,11 @@ export class TelegramUpdate {
       return 'Не удалось определить пользователя.';
     }
 
-    const responseMessage: string = await this.trackingService.getAddressHistory(
+    const responseMessage: string = await this.trackingService.getAddressHistoryWithPolicy(
       userRef,
       rawAddress,
       rawLimit,
+      HistoryRequestSource.COMMAND,
     );
     this.logger.log(
       `History command success line=${commandEntry.lineNumber} telegramId=${userRef.telegramId} address=${rawAddress} limit=${rawLimit ?? 'default'} updateId=${updateMeta.updateId ?? 'n/a'}`,

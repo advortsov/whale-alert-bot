@@ -2,7 +2,16 @@ import { Injectable, Logger } from '@nestjs/common';
 import { formatUnits } from 'ethers';
 
 import { isEthereumAddressCandidate, tryNormalizeEthereumAddress } from './address.util';
+import type { HistoryTransactionItem } from './etherscan-history.interfaces';
 import { EtherscanHistoryService } from './etherscan-history.service';
+import type { HistoryCacheEntry } from './history-cache.interfaces';
+import { HistoryCacheService } from './history-cache.service';
+import {
+  HistoryRateLimitReason,
+  HistoryRequestSource,
+  type HistoryRateLimitDecision,
+} from './history-rate-limiter.interfaces';
+import { HistoryRateLimiterService } from './history-rate-limiter.service';
 import type { TelegramUserRef, TrackedWalletOption } from './tracking.interfaces';
 import { AppConfigService } from '../config/app-config.service';
 import { SubscriptionsRepository } from '../storage/repositories/subscriptions.repository';
@@ -20,6 +29,8 @@ export class TrackingService {
     private readonly trackedWalletsRepository: TrackedWalletsRepository,
     private readonly subscriptionsRepository: SubscriptionsRepository,
     private readonly etherscanHistoryService: EtherscanHistoryService,
+    private readonly historyCacheService: HistoryCacheService,
+    private readonly historyRateLimiterService: HistoryRateLimiterService,
     private readonly appConfigService: AppConfigService,
   ) {}
 
@@ -193,45 +204,100 @@ export class TrackingService {
     rawAddress: string,
     rawLimit: string | null,
   ): Promise<string> {
+    return this.getAddressHistoryWithPolicy(
+      userRef,
+      rawAddress,
+      rawLimit,
+      HistoryRequestSource.COMMAND,
+    );
+  }
+
+  public async getAddressHistoryWithPolicy(
+    userRef: TelegramUserRef,
+    rawAddress: string,
+    rawLimit: string | null,
+    source: HistoryRequestSource,
+  ): Promise<string> {
     this.logger.debug(
-      `getAddressHistory start telegramId=${userRef.telegramId} rawAddress=${rawAddress} rawLimit=${rawLimit ?? 'n/a'}`,
+      `getAddressHistoryWithPolicy start telegramId=${userRef.telegramId} source=${source} rawAddress=${rawAddress} rawLimit=${rawLimit ?? 'n/a'}`,
     );
 
     const user = await this.usersRepository.findOrCreate(userRef.telegramId, userRef.username);
     const normalizedAddress: string = await this.resolveHistoryAddress(user.id, rawAddress);
-
     const limit: number = this.parseHistoryLimit(rawLimit);
-    const transactions = await this.etherscanHistoryService.loadRecentTransactions(
+    const rateLimitDecision: HistoryRateLimitDecision = this.historyRateLimiterService.evaluate(
+      userRef.telegramId,
+      source,
+    );
+
+    if (!rateLimitDecision.allowed) {
+      this.logger.warn(
+        `history_rate_limited telegramId=${userRef.telegramId} source=${source} address=${normalizedAddress} limit=${String(limit)} reason=${rateLimitDecision.reason} retryAfterSec=${String(rateLimitDecision.retryAfterSec ?? 0)}`,
+      );
+
+      const staleEntry: HistoryCacheEntry | null = this.historyCacheService.getStale(
+        normalizedAddress,
+        limit,
+      );
+
+      if (staleEntry) {
+        this.logger.warn(
+          `history_stale_served telegramId=${userRef.telegramId} source=${source} address=${normalizedAddress} limit=${String(limit)} reason=local_rate_limit`,
+        );
+        return this.buildStaleMessage(staleEntry.message);
+      }
+
+      throw new Error(this.buildHistoryRetryMessage(rateLimitDecision));
+    }
+
+    const freshEntry: HistoryCacheEntry | null = this.historyCacheService.getFresh(
       normalizedAddress,
       limit,
     );
 
-    if (transactions.length === 0) {
-      return `История для ${normalizedAddress} пуста.`;
+    if (freshEntry) {
+      this.logger.debug(
+        `history_cache_hit telegramId=${userRef.telegramId} source=${source} address=${normalizedAddress} limit=${String(limit)}`,
+      );
+      return freshEntry.message;
     }
 
-    const rows: string[] = transactions.map((tx, index: number): string => {
-      const direction: string =
-        tx.from.toLowerCase() === normalizedAddress.toLowerCase() ? 'OUT' : 'IN';
-      const date: Date = new Date(tx.timestampSec * 1000);
-      const formattedValue: string = this.formatAssetValue(tx.valueRaw, tx.assetDecimals);
-      const statusIcon: string = tx.isError ? '🔴' : '🟢';
-      const directionIcon: string = direction === 'OUT' ? '↗️ OUT' : '↘️ IN';
-      const escapedAssetSymbol: string = this.escapeHtml(tx.assetSymbol);
-      const txUrl: string = this.buildTxUrl(tx.hash);
+    this.logger.debug(
+      `history_cache_miss telegramId=${userRef.telegramId} source=${source} address=${normalizedAddress} limit=${String(limit)}`,
+    );
 
-      return [
-        `<a href="${txUrl}">Tx #${index + 1}</a> ${statusIcon} ${directionIcon} <b>${formattedValue} ${escapedAssetSymbol}</b>`,
-        `🕒 <code>${this.formatTimestamp(date)}</code>`,
-        `🔹 <code>${this.shortHash(tx.hash)}</code>`,
-      ].join('\n');
-    });
+    try {
+      const transactions = await this.etherscanHistoryService.loadRecentTransactions(
+        normalizedAddress,
+        limit,
+      );
+      const historyMessage: string = this.formatHistoryMessage(normalizedAddress, transactions);
+      this.historyCacheService.set(normalizedAddress, limit, historyMessage);
+      return historyMessage;
+    } catch (error: unknown) {
+      const errorMessage: string = error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `history_fetch_failed telegramId=${userRef.telegramId} source=${source} address=${normalizedAddress} limit=${String(limit)} reason=${errorMessage}`,
+      );
 
-    return [
-      `📜 <b>История</b> <code>${normalizedAddress}</code>`,
-      `Последние ${transactions.length} tx:`,
-      ...rows,
-    ].join('\n\n');
+      if (!this.isRateLimitOrTimeout(errorMessage)) {
+        throw error;
+      }
+
+      const staleEntry: HistoryCacheEntry | null = this.historyCacheService.getStale(
+        normalizedAddress,
+        limit,
+      );
+
+      if (staleEntry) {
+        this.logger.warn(
+          `history_stale_served telegramId=${userRef.telegramId} source=${source} address=${normalizedAddress} limit=${String(limit)} reason=external_rate_limit`,
+        );
+        return this.buildStaleMessage(staleEntry.message);
+      }
+
+      throw new Error(this.buildHistoryRetryMessage(rateLimitDecision));
+    }
   }
 
   private parseWalletId(rawIdentifier: string): number | null {
@@ -306,6 +372,67 @@ export class TrackingService {
     }
 
     return limit;
+  }
+
+  private formatHistoryMessage(
+    normalizedAddress: string,
+    transactions: readonly HistoryTransactionItem[],
+  ): string {
+    if (transactions.length === 0) {
+      return `История для ${normalizedAddress} пуста.`;
+    }
+
+    const rows: string[] = transactions.map((tx, index: number): string => {
+      const direction: string =
+        tx.from.toLowerCase() === normalizedAddress.toLowerCase() ? 'OUT' : 'IN';
+      const date: Date = new Date(tx.timestampSec * 1000);
+      const formattedValue: string = this.formatAssetValue(tx.valueRaw, tx.assetDecimals);
+      const statusIcon: string = tx.isError ? '🔴' : '🟢';
+      const directionIcon: string = direction === 'OUT' ? '↗️ OUT' : '↘️ IN';
+      const escapedAssetSymbol: string = this.escapeHtml(tx.assetSymbol);
+      const txUrl: string = this.buildTxUrl(tx.hash);
+
+      return [
+        `<a href="${txUrl}">Tx #${index + 1}</a> ${statusIcon} ${directionIcon} <b>${formattedValue} ${escapedAssetSymbol}</b>`,
+        `🕒 <code>${this.formatTimestamp(date)}</code>`,
+        `🔹 <code>${this.shortHash(tx.hash)}</code>`,
+      ].join('\n');
+    });
+
+    return [
+      `📜 <b>История</b> <code>${normalizedAddress}</code>`,
+      `Последние ${transactions.length} tx:`,
+      ...rows,
+    ].join('\n\n');
+  }
+
+  private buildStaleMessage(cachedHistoryMessage: string): string {
+    return [
+      '⚠️ Показал кешированную историю (данные могут быть неактуальны).',
+      cachedHistoryMessage,
+    ].join('\n\n');
+  }
+
+  private buildHistoryRetryMessage(decision: HistoryRateLimitDecision): string {
+    const retryAfterSec: number = decision.retryAfterSec ?? 1;
+
+    if (decision.reason === HistoryRateLimitReason.CALLBACK_COOLDOWN) {
+      return `Слишком часто нажимаешь кнопку истории. Повтори через ${String(retryAfterSec)} сек.`;
+    }
+
+    return `Слишком много запросов к истории. Повтори через ${String(retryAfterSec)} сек.`;
+  }
+
+  private isRateLimitOrTimeout(errorMessage: string): boolean {
+    const normalizedMessage: string = errorMessage.toLowerCase();
+
+    return (
+      normalizedMessage.includes('rate limit') ||
+      normalizedMessage.includes('http 429') ||
+      normalizedMessage.includes('timeout') ||
+      normalizedMessage.includes('aborted') ||
+      normalizedMessage.includes('too many requests')
+    );
   }
 
   private formatAssetValue(valueRaw: string, decimals: number): string {

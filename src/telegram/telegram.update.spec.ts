@@ -1,6 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import type { Context } from 'telegraf';
+import { describe, expect, it, vi } from 'vitest';
 
 import { TelegramUpdate } from './telegram.update';
+import { HistoryRequestSource } from '../tracking/history-rate-limiter.interfaces';
 import type { TrackingService } from '../tracking/tracking.service';
 
 type ParsedMessageCommandView = {
@@ -136,5 +138,50 @@ describe('TelegramUpdate', (): void => {
     const callbackTarget = privateApi.parseWalletHistoryCallbackData('wallet_history:abc');
 
     expect(callbackTarget).toBeNull();
+  });
+
+  it('uses policy-aware history method for callback and returns cooldown error text', async (): Promise<void> => {
+    const getAddressHistoryWithPolicyMock: ReturnType<typeof vi.fn> = vi
+      .fn()
+      .mockRejectedValue(new Error('Слишком часто нажимаешь кнопку истории. Повтори через 2 сек.'));
+    const trackingServiceStub = {
+      getAddressHistoryWithPolicy: getAddressHistoryWithPolicyMock,
+    } as unknown as TrackingService;
+    const update: TelegramUpdate = new TelegramUpdate(trackingServiceStub);
+    const answerCbQueryMock: ReturnType<typeof vi.fn> = vi.fn().mockResolvedValue(undefined);
+    const replyMock: ReturnType<typeof vi.fn> = vi
+      .fn()
+      .mockResolvedValue({ message_id: 777, text: 'ok' });
+    const callbackContext = {
+      callbackQuery: {
+        data: 'wallet_history_addr:0x96b0Dc619A86572524c15C1fC9c42DA9A94BCAa0',
+      },
+      from: {
+        id: 42,
+        username: 'tester',
+      },
+      update: {
+        update_id: 100,
+      },
+      answerCbQuery: answerCbQueryMock,
+      reply: replyMock,
+    };
+
+    await update.onCallbackQuery(callbackContext as unknown as Context);
+
+    expect(getAddressHistoryWithPolicyMock).toHaveBeenCalledWith(
+      {
+        telegramId: '42',
+        username: 'tester',
+      },
+      '0x96b0Dc619A86572524c15C1fC9c42DA9A94BCAa0',
+      '10',
+      HistoryRequestSource.CALLBACK,
+    );
+    expect(answerCbQueryMock).toHaveBeenCalledWith('Загружаю историю...');
+    expect(replyMock).toHaveBeenCalledWith(
+      'Ошибка обработки команд: Слишком часто нажимаешь кнопку истории. Повтори через 2 сек.',
+      expect.anything(),
+    );
   });
 });

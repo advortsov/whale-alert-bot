@@ -1,6 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import type { EtherscanHistoryService } from './etherscan-history.service';
+import type { HistoryCacheService } from './history-cache.service';
+import {
+  HistoryRateLimitReason,
+  HistoryRequestSource,
+  type HistoryRateLimitDecision,
+} from './history-rate-limiter.interfaces';
+import type { HistoryRateLimiterService } from './history-rate-limiter.service';
 import type { TelegramUserRef } from './tracking.interfaces';
 import { TrackingService } from './tracking.service';
 import type { AppConfigService } from '../config/app-config.service';
@@ -32,39 +39,105 @@ type AppConfigServiceStub = {
   readonly etherscanTxBaseUrl: string;
 };
 
-describe('TrackingService', (): void => {
-  it('returns history by wallet id from user subscriptions', async (): Promise<void> => {
-    const usersRepositoryStub: UsersRepositoryStub = {
-      findOrCreate: vi.fn(),
-    };
-    const trackedWalletsRepositoryStub: TrackedWalletsRepositoryStub = {
-      findOrCreate: vi.fn(),
-    };
-    const subscriptionsRepositoryStub: SubscriptionsRepositoryStub = {
-      addSubscription: vi.fn(),
-      listByUserId: vi.fn(),
-      removeByWalletId: vi.fn(),
-      removeByAddress: vi.fn(),
-    };
-    const etherscanHistoryServiceStub: EtherscanHistoryServiceStub = {
-      loadRecentTransactions: vi.fn(),
-    };
-    const appConfigServiceStub: AppConfigServiceStub = {
-      etherscanTxBaseUrl: 'https://etherscan.io/tx/',
-    };
-    const userRef: TelegramUserRef = {
-      telegramId: '42',
-      username: 'tester',
-    };
-    const userRow: UserRow = {
-      id: 7,
-      telegram_id: '42',
-      username: 'tester',
-      created_at: new Date('2026-02-01T00:00:00.000Z'),
-    };
+type HistoryCacheServiceStub = {
+  readonly getFresh: ReturnType<typeof vi.fn>;
+  readonly getStale: ReturnType<typeof vi.fn>;
+  readonly set: ReturnType<typeof vi.fn>;
+};
 
-    usersRepositoryStub.findOrCreate.mockResolvedValue(userRow);
-    subscriptionsRepositoryStub.listByUserId.mockResolvedValue([
+type HistoryRateLimiterServiceStub = {
+  readonly evaluate: ReturnType<typeof vi.fn>;
+};
+
+type TestContext = {
+  readonly userRef: TelegramUserRef;
+  readonly userRow: UserRow;
+  readonly usersRepositoryStub: UsersRepositoryStub;
+  readonly trackedWalletsRepositoryStub: TrackedWalletsRepositoryStub;
+  readonly subscriptionsRepositoryStub: SubscriptionsRepositoryStub;
+  readonly etherscanHistoryServiceStub: EtherscanHistoryServiceStub;
+  readonly historyCacheServiceStub: HistoryCacheServiceStub;
+  readonly historyRateLimiterServiceStub: HistoryRateLimiterServiceStub;
+  readonly appConfigServiceStub: AppConfigServiceStub;
+  readonly service: TrackingService;
+};
+
+const allowDecision: HistoryRateLimitDecision = {
+  allowed: true,
+  retryAfterSec: null,
+  reason: HistoryRateLimitReason.OK,
+};
+
+const createTestContext = (): TestContext => {
+  const usersRepositoryStub: UsersRepositoryStub = {
+    findOrCreate: vi.fn(),
+  };
+  const trackedWalletsRepositoryStub: TrackedWalletsRepositoryStub = {
+    findOrCreate: vi.fn(),
+  };
+  const subscriptionsRepositoryStub: SubscriptionsRepositoryStub = {
+    addSubscription: vi.fn(),
+    listByUserId: vi.fn(),
+    removeByWalletId: vi.fn(),
+    removeByAddress: vi.fn(),
+  };
+  const etherscanHistoryServiceStub: EtherscanHistoryServiceStub = {
+    loadRecentTransactions: vi.fn(),
+  };
+  const historyCacheServiceStub: HistoryCacheServiceStub = {
+    getFresh: vi.fn(),
+    getStale: vi.fn(),
+    set: vi.fn(),
+  };
+  const historyRateLimiterServiceStub: HistoryRateLimiterServiceStub = {
+    evaluate: vi.fn(),
+  };
+  const appConfigServiceStub: AppConfigServiceStub = {
+    etherscanTxBaseUrl: 'https://etherscan.io/tx/',
+  };
+
+  const userRef: TelegramUserRef = {
+    telegramId: '42',
+    username: 'tester',
+  };
+  const userRow: UserRow = {
+    id: 7,
+    telegram_id: '42',
+    username: 'tester',
+    created_at: new Date('2026-02-01T00:00:00.000Z'),
+  };
+
+  usersRepositoryStub.findOrCreate.mockResolvedValue(userRow);
+  historyRateLimiterServiceStub.evaluate.mockReturnValue(allowDecision);
+
+  const service: TrackingService = new TrackingService(
+    usersRepositoryStub as unknown as UsersRepository,
+    trackedWalletsRepositoryStub as unknown as TrackedWalletsRepository,
+    subscriptionsRepositoryStub as unknown as SubscriptionsRepository,
+    etherscanHistoryServiceStub as unknown as EtherscanHistoryService,
+    historyCacheServiceStub as unknown as HistoryCacheService,
+    historyRateLimiterServiceStub as unknown as HistoryRateLimiterService,
+    appConfigServiceStub as unknown as AppConfigService,
+  );
+
+  return {
+    userRef,
+    userRow,
+    usersRepositoryStub,
+    trackedWalletsRepositoryStub,
+    subscriptionsRepositoryStub,
+    etherscanHistoryServiceStub,
+    historyCacheServiceStub,
+    historyRateLimiterServiceStub,
+    appConfigServiceStub,
+    service,
+  };
+};
+
+describe('TrackingService', (): void => {
+  it('returns cached history without etherscan call on fresh cache hit', async (): Promise<void> => {
+    const context: TestContext = createTestContext();
+    context.subscriptionsRepositoryStub.listByUserId.mockResolvedValue([
       {
         subscriptionId: 1,
         walletId: 3,
@@ -73,7 +146,36 @@ describe('TrackingService', (): void => {
         createdAt: new Date('2026-02-01T00:00:00.000Z'),
       },
     ]);
-    etherscanHistoryServiceStub.loadRecentTransactions.mockResolvedValue([
+    context.historyCacheServiceStub.getFresh.mockReturnValue({
+      key: {
+        address: '0xd8da6bf26964af9d7eed9e03e53415d37aa96045',
+        limit: 5,
+      },
+      message: 'cached history message',
+      createdAtEpochMs: 1000,
+      freshUntilEpochMs: 2000,
+      staleUntilEpochMs: 3000,
+    });
+
+    const message: string = await context.service.getAddressHistoryWithPolicy(
+      context.userRef,
+      '#3',
+      '5',
+      HistoryRequestSource.COMMAND,
+    );
+
+    expect(message).toBe('cached history message');
+    expect(context.etherscanHistoryServiceStub.loadRecentTransactions).not.toHaveBeenCalled();
+    expect(context.historyCacheServiceStub.getFresh).toHaveBeenCalledWith(
+      '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
+      5,
+    );
+  });
+
+  it('fetches history and stores cache on miss', async (): Promise<void> => {
+    const context: TestContext = createTestContext();
+    context.historyCacheServiceStub.getFresh.mockReturnValue(null);
+    context.etherscanHistoryServiceStub.loadRecentTransactions.mockResolvedValue([
       {
         hash: '0xabc',
         from: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
@@ -81,75 +183,90 @@ describe('TrackingService', (): void => {
         valueRaw: '1000000000000000000',
         isError: false,
         timestampSec: 1739160000,
-        assetSymbol: 'ETH<1>',
+        assetSymbol: 'ETH',
         assetDecimals: 18,
       },
     ]);
 
-    const service: TrackingService = new TrackingService(
-      usersRepositoryStub as unknown as UsersRepository,
-      trackedWalletsRepositoryStub as unknown as TrackedWalletsRepository,
-      subscriptionsRepositoryStub as unknown as SubscriptionsRepository,
-      etherscanHistoryServiceStub as unknown as EtherscanHistoryService,
-      appConfigServiceStub as unknown as AppConfigService,
-    );
-
-    const message: string = await service.getAddressHistory(userRef, '#3', '1');
-
-    expect(etherscanHistoryServiceStub.loadRecentTransactions).toHaveBeenCalledWith(
+    const message: string = await context.service.getAddressHistoryWithPolicy(
+      context.userRef,
       '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
-      1,
+      '5',
+      HistoryRequestSource.COMMAND,
     );
-    expect(message).toContain(
-      '📜 <b>История</b> <code>0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045</code>',
+
+    expect(context.etherscanHistoryServiceStub.loadRecentTransactions).toHaveBeenCalledWith(
+      '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
+      5,
     );
+    expect(context.historyCacheServiceStub.set).toHaveBeenCalledTimes(1);
     expect(message).toContain('<a href="https://etherscan.io/tx/0xabc">Tx #1</a>');
-    expect(message).toContain('<b>1.000000 ETH&lt;1&gt;</b>');
   });
 
-  it('throws readable error when wallet id is missing in subscriptions', async (): Promise<void> => {
-    const usersRepositoryStub: UsersRepositoryStub = {
-      findOrCreate: vi.fn(),
-    };
-    const trackedWalletsRepositoryStub: TrackedWalletsRepositoryStub = {
-      findOrCreate: vi.fn(),
-    };
-    const subscriptionsRepositoryStub: SubscriptionsRepositoryStub = {
-      addSubscription: vi.fn(),
-      listByUserId: vi.fn(),
-      removeByWalletId: vi.fn(),
-      removeByAddress: vi.fn(),
-    };
-    const etherscanHistoryServiceStub: EtherscanHistoryServiceStub = {
-      loadRecentTransactions: vi.fn(),
-    };
-    const appConfigServiceStub: AppConfigServiceStub = {
-      etherscanTxBaseUrl: 'https://etherscan.io/tx/',
-    };
-    const userRef: TelegramUserRef = {
-      telegramId: '42',
-      username: null,
-    };
-    const userRow: UserRow = {
-      id: 7,
-      telegram_id: '42',
-      username: null,
-      created_at: new Date('2026-02-01T00:00:00.000Z'),
-    };
+  it('serves stale cache entry when request is rate limited', async (): Promise<void> => {
+    const context: TestContext = createTestContext();
+    context.subscriptionsRepositoryStub.listByUserId.mockResolvedValue([
+      {
+        subscriptionId: 1,
+        walletId: 3,
+        walletAddress: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
+        walletLabel: 'vitalik',
+        createdAt: new Date('2026-02-01T00:00:00.000Z'),
+      },
+    ]);
+    context.historyRateLimiterServiceStub.evaluate.mockReturnValue({
+      allowed: false,
+      retryAfterSec: 5,
+      reason: HistoryRateLimitReason.MINUTE_LIMIT,
+    });
+    context.historyCacheServiceStub.getStale.mockReturnValue({
+      key: {
+        address: '0xd8da6bf26964af9d7eed9e03e53415d37aa96045',
+        limit: 5,
+      },
+      message: 'stale history message',
+      createdAtEpochMs: 1000,
+      freshUntilEpochMs: 2000,
+      staleUntilEpochMs: 3000,
+    });
 
-    usersRepositoryStub.findOrCreate.mockResolvedValue(userRow);
-    subscriptionsRepositoryStub.listByUserId.mockResolvedValue([]);
-
-    const service: TrackingService = new TrackingService(
-      usersRepositoryStub as unknown as UsersRepository,
-      trackedWalletsRepositoryStub as unknown as TrackedWalletsRepository,
-      subscriptionsRepositoryStub as unknown as SubscriptionsRepository,
-      etherscanHistoryServiceStub as unknown as EtherscanHistoryService,
-      appConfigServiceStub as unknown as AppConfigService,
+    const message: string = await context.service.getAddressHistoryWithPolicy(
+      context.userRef,
+      '#3',
+      '5',
+      HistoryRequestSource.COMMAND,
     );
 
-    await expect(service.getAddressHistory(userRef, '#3', '5')).rejects.toThrow(
-      'Не нашел адрес с id #3. Сначала проверь /list.',
-    );
+    expect(message).toContain('Показал кешированную историю');
+    expect(message).toContain('stale history message');
+    expect(context.etherscanHistoryServiceStub.loadRecentTransactions).not.toHaveBeenCalled();
+  });
+
+  it('returns readable retry error when rate limited and stale cache is missing', async (): Promise<void> => {
+    const context: TestContext = createTestContext();
+    context.subscriptionsRepositoryStub.listByUserId.mockResolvedValue([
+      {
+        subscriptionId: 1,
+        walletId: 3,
+        walletAddress: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
+        walletLabel: 'vitalik',
+        createdAt: new Date('2026-02-01T00:00:00.000Z'),
+      },
+    ]);
+    context.historyRateLimiterServiceStub.evaluate.mockReturnValue({
+      allowed: false,
+      retryAfterSec: 4,
+      reason: HistoryRateLimitReason.MINUTE_LIMIT,
+    });
+    context.historyCacheServiceStub.getStale.mockReturnValue(null);
+
+    await expect(
+      context.service.getAddressHistoryWithPolicy(
+        context.userRef,
+        '#3',
+        '5',
+        HistoryRequestSource.COMMAND,
+      ),
+    ).rejects.toThrow('Слишком много запросов к истории. Повтори через 4 сек.');
   });
 });

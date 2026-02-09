@@ -83,6 +83,10 @@ CHAIN_BLOCK_QUEUE_MAX=120
 CHAIN_HEARTBEAT_INTERVAL_SEC=60
 ETHERSCAN_API_BASE_URL=https://api.etherscan.io/v2/api
 ETHERSCAN_API_KEY=your_free_key
+HISTORY_CACHE_TTL_SEC=120
+HISTORY_RATE_LIMIT_PER_MINUTE=12
+HISTORY_BUTTON_COOLDOWN_SEC=3
+HISTORY_STALE_ON_ERROR_SEC=600
 ```
 
 Fail-fast правило: если `CHAIN_WATCHER_ENABLED=true`, то `ETH_ALCHEMY_WSS_URL` и `ETH_INFURA_WSS_URL` обязательны.
@@ -110,6 +114,13 @@ docker compose up --build
 2. Проверить heartbeat лог watcher: lag/queue/backoff.
 3. При росте `backoffMs` сервис не падает, а снижает темп и продолжает обработку.
 4. Если lag долго растет, временно увеличить `CHAIN_RPC_MIN_INTERVAL_MS` и/или уменьшить `CHAIN_RECEIPT_CONCURRENCY`.
+
+## History rate-limit/cache runbook
+
+1. `/history` использует in-memory fresh cache (`HISTORY_CACHE_TTL_SEC`) и stale fallback (`HISTORY_STALE_ON_ERROR_SEC`).
+2. Лимиты на пользователя: `HISTORY_RATE_LIMIT_PER_MINUTE`.
+3. Для inline-кнопок действует отдельный cooldown: `HISTORY_BUTTON_COOLDOWN_SEC`.
+4. При лимите/временной ошибке Etherscan бот пытается отдать stale-кэш, иначе возвращает `retryAfter` сообщение.
 
 ## Важно по Telegram polling
 

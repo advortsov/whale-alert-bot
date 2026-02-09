@@ -35,6 +35,10 @@ const envSchema = z.object({
   ETHERSCAN_TX_BASE_URL: z.url().default('https://etherscan.io/tx/'),
   ETHERSCAN_API_BASE_URL: z.url().default('https://api.etherscan.io/v2/api'),
   ETHERSCAN_API_KEY: z.string().trim().min(1).optional(),
+  HISTORY_CACHE_TTL_SEC: z.coerce.number().int().positive().default(120),
+  HISTORY_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(12),
+  HISTORY_BUTTON_COOLDOWN_SEC: z.coerce.number().int().min(0).default(3),
+  HISTORY_STALE_ON_ERROR_SEC: z.coerce.number().int().positive().default(600),
 });
 
 type ParsedEnv = z.infer<typeof envSchema>;
@@ -67,6 +71,10 @@ export class AppConfigService {
       etherscanTxBaseUrl: parsedEnv.ETHERSCAN_TX_BASE_URL,
       etherscanApiBaseUrl: parsedEnv.ETHERSCAN_API_BASE_URL,
       etherscanApiKey: parsedEnv.ETHERSCAN_API_KEY ?? null,
+      historyCacheTtlSec: parsedEnv.HISTORY_CACHE_TTL_SEC,
+      historyRateLimitPerMinute: parsedEnv.HISTORY_RATE_LIMIT_PER_MINUTE,
+      historyButtonCooldownSec: parsedEnv.HISTORY_BUTTON_COOLDOWN_SEC,
+      historyStaleOnErrorSec: parsedEnv.HISTORY_STALE_ON_ERROR_SEC,
     };
   }
 
@@ -144,6 +152,22 @@ export class AppConfigService {
 
   public get etherscanApiKey(): string | null {
     return this.config.etherscanApiKey;
+  }
+
+  public get historyCacheTtlSec(): number {
+    return this.config.historyCacheTtlSec;
+  }
+
+  public get historyRateLimitPerMinute(): number {
+    return this.config.historyRateLimitPerMinute;
+  }
+
+  public get historyButtonCooldownSec(): number {
+    return this.config.historyButtonCooldownSec;
+  }
+
+  public get historyStaleOnErrorSec(): number {
+    return this.config.historyStaleOnErrorSec;
   }
 
   private assertWatcherConfig(parsedEnv: ParsedEnv): void {
