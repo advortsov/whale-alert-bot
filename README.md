@@ -1,6 +1,6 @@
 # Whale Alert Bot
 
-Telegram-бот на `NestJS + TypeScript` для отслеживания активности китов в Ethereum.
+Telegram-бот на `NestJS + TypeScript` для отслеживания активности китов в Ethereum и Solana.
 
 ## Стек
 
@@ -84,7 +84,7 @@ npm run db:migrate
 
 ## Multichain-ready архитектура (Core + Adapters, домены)
 
-Текущий runtime остается только Ethereum, но код подготовлен к подключению других сетей (Solana/TRON) через порты и chain-key.
+Текущий runtime поддерживает Ethereum + Solana, а контракты уже подготовлены к подключению TRON и других сетей через порты и `chain_key`.
 
 - `src/core/chains`: ключи сетей и базовые chain-контракты (`ChainKey`).
 - `src/core/ports/rpc`: доменный порт RPC/block stream.
@@ -95,8 +95,8 @@ npm run db:migrate
 
 Технические ограничения этапа:
 
-- live watcher только `ethereum_mainnet`;
-- контракты уже учитывают `solana_mainnet` и `tron_mainnet`, но без runtime-обработчика;
+- production-фокус пока на `ethereum_mainnet`, Solana включается staged-rollout (см. ниже);
+- `tron_mainnet` пока только в контрактах/enum без runtime watcher;
 - все chain-specific данные в БД помечаются `chain_key`.
 
 ## Параметры watcher (безопасные defaults для free API)
@@ -207,7 +207,7 @@ npm run test:telegram:harness
 
 1. Многострочные команды в одном сообщении.
 2. Команда `/status` (runtime + пользовательский статус).
-3. Callback-история (`wallet_history_addr:*`) с policy `source=callback`.
+3. Callback-история по `walletId` (`wallet_history:*`) с policy `source=callback`.
 
 ## Rate-limit recovery runbook
 
@@ -217,6 +217,21 @@ npm run test:telegram:harness
 4. Если lag долго растет, временно увеличить `CHAIN_RPC_MIN_INTERVAL_MS` и/или уменьшить `CHAIN_RECEIPT_CONCURRENCY`.
 5. `CHAIN_REORG_CONFIRMATIONS` задает сколько подтверждений ждать перед обработкой блока.
 6. На старте watcher восстанавливается из `chain_checkpoints` и догоняет пропущенные finalized блоки.
+
+## Solana staged rollout runbook
+
+1. Стартовый режим:
+   `SOLANA_WATCHER_ENABLED=false`, Solana доступна через `/track sol ...` и history fallback без live-alert потока.
+2. Перед включением:
+   проверить `SOLANA_HELIUS_*` и `SOLANA_PUBLIC_*` через `npm run smoke:solana`.
+3. Включение:
+   выставить `SOLANA_WATCHER_ENABLED=true`, перезапустить сервис, проверить `GET /health`.
+4. Проверка после включения:
+   смотреть логи `solana watcher`, lag/queue/backoff и наличие fallback-переключений.
+5. Деградация:
+   при проблемах primary используется fallback endpoint; если недоступны оба, Solana поток деградирует, но сервис остается живым и продолжает ETH.
+6. Откат:
+   вернуть `SOLANA_WATCHER_ENABLED=false`, перезапустить сервис, убедиться что `/health` в статусе `ok`.
 
 ## History rate-limit/cache runbook
 
