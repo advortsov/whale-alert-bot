@@ -36,6 +36,21 @@ describe('AlertFilterPolicyService', (): void => {
     expect(decision.usdUnavailable).toBe(true);
   });
 
+  it('uses highest value between threshold and legacy min_amount_usd', (): void => {
+    const service: AlertFilterPolicyService = new AlertFilterPolicyService();
+    const decision = service.evaluateUsdThreshold(
+      {
+        thresholdUsd: 1000,
+        minAmountUsd: 5000,
+      },
+      3000,
+      false,
+    );
+
+    expect(decision.allowed).toBe(false);
+    expect(decision.suppressedReason).toBe('threshold_usd');
+  });
+
   it('blocks swap when type filter is transfer', (): void => {
     const service: AlertFilterPolicyService = new AlertFilterPolicyService();
 

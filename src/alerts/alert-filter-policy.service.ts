@@ -27,9 +27,10 @@ export class AlertFilterPolicyService {
     usdUnavailable: boolean,
   ): ThresholdDecision {
     const thresholdUsd: number = policy.thresholdUsd > 0 ? policy.thresholdUsd : 0;
-    const minAmountUsd: number = policy.minAmountUsd > 0 ? policy.minAmountUsd : 0;
+    const legacyMinAmountUsd: number = policy.minAmountUsd > 0 ? policy.minAmountUsd : 0;
+    const effectiveThresholdUsd: number = Math.max(thresholdUsd, legacyMinAmountUsd);
 
-    if (thresholdUsd <= 0 && minAmountUsd <= 0) {
+    if (effectiveThresholdUsd <= 0) {
       return {
         allowed: true,
         suppressedReason: null,
@@ -47,19 +48,10 @@ export class AlertFilterPolicyService {
       };
     }
 
-    if (thresholdUsd > 0 && usdAmount < thresholdUsd) {
+    if (usdAmount < effectiveThresholdUsd) {
       return {
         allowed: false,
         suppressedReason: 'threshold_usd',
-        usdAmount,
-        usdUnavailable: false,
-      };
-    }
-
-    if (minAmountUsd > 0 && usdAmount < minAmountUsd) {
-      return {
-        allowed: false,
-        suppressedReason: 'min_amount_usd',
         usdAmount,
         usdUnavailable: false,
       };

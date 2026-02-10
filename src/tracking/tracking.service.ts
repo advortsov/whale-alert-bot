@@ -258,7 +258,7 @@ export class TrackingService {
       `🏷 Label: ${labelText}`,
       `📍 Address: ${matchedSubscription.walletAddress}`,
       `🔔 Фильтры: transfer=${allowTransfer ? 'on' : 'off'}, swap=${allowSwap ? 'on' : 'off'} (${filterSource})`,
-      `💵 USD: threshold=${settingsSnapshot.thresholdUsd.toFixed(2)}, min=${settingsSnapshot.minAmountUsd.toFixed(2)}`,
+      `💵 USD filter: >= ${settingsSnapshot.thresholdUsd.toFixed(2)}`,
       `🏦 CEX flow: ${settingsSnapshot.cexFlowMode}`,
       `🧠 Smart: type=${settingsSnapshot.smartFilterType}, include_dex=${this.formatDexFilter(settingsSnapshot.includeDexes)}, exclude_dex=${this.formatDexFilter(settingsSnapshot.excludeDexes)}`,
       `🌙 Quiet: ${quietText} (${settingsSnapshot.timezone})`,
@@ -356,7 +356,7 @@ export class TrackingService {
     return [
       'Текущие фильтры алертов:',
       `- threshold usd: ${settingsSnapshot.thresholdUsd.toFixed(2)}`,
-      `- min amount usd: ${settingsSnapshot.minAmountUsd.toFixed(2)}`,
+      '- /filter min_amount_usd: legacy alias -> /threshold',
       `- cex flow: ${settingsSnapshot.cexFlowMode}`,
       `- type: ${settingsSnapshot.smartFilterType}`,
       `- include dex: ${this.formatDexFilter(settingsSnapshot.includeDexes)}`,
@@ -368,7 +368,7 @@ export class TrackingService {
       '',
       'Команды:',
       '/threshold <amount|off>',
-      '/filter min_amount_usd <amount|off>',
+      '/filter min_amount_usd <amount|off> (legacy alias)',
       '/filter cex <off|in|out|all>',
       '/filter type <all|buy|sell|transfer>',
       '/filter include_dex <dex|off>',
@@ -406,6 +406,7 @@ export class TrackingService {
         ChainKey.ETHEREUM_MAINNET,
         {
           thresholdUsd,
+          minAmountUsd: thresholdUsd,
         },
       );
     const settingsSnapshot: UserAlertSettingsSnapshot = this.mapSettings(updatedSettings);
@@ -414,19 +415,8 @@ export class TrackingService {
   }
 
   public async setMinAmountUsd(userRef: TelegramUserRef, rawValue: string): Promise<string> {
-    const minAmountUsd: number = this.parseUsdThresholdValue(rawValue);
-    const user = await this.usersRepository.findOrCreate(userRef.telegramId, userRef.username);
-    const updatedSettings: UserAlertSettingsRow =
-      await this.userAlertSettingsRepository.updateByUserAndChain(
-        user.id,
-        ChainKey.ETHEREUM_MAINNET,
-        {
-          minAmountUsd,
-        },
-      );
-    const settingsSnapshot: UserAlertSettingsSnapshot = this.mapSettings(updatedSettings);
-
-    return `Минимальная сумма USD обновлена: ${settingsSnapshot.minAmountUsd.toFixed(2)}.`;
+    const thresholdMessage: string = await this.setThresholdUsd(userRef, rawValue);
+    return `${thresholdMessage}\nКоманда /filter min_amount_usd помечена как legacy alias для /threshold.`;
   }
 
   public async setCexFlowFilter(userRef: TelegramUserRef, rawValue: string): Promise<string> {
@@ -630,7 +620,7 @@ export class TrackingService {
     return [
       'Пользовательский статус:',
       `- threshold usd: ${settingsSnapshot.thresholdUsd.toFixed(2)}`,
-      `- min amount usd: ${settingsSnapshot.minAmountUsd.toFixed(2)}`,
+      '- /filter min_amount_usd: legacy alias -> /threshold',
       `- cex flow: ${settingsSnapshot.cexFlowMode}`,
       `- type: ${settingsSnapshot.smartFilterType}`,
       `- include dex: ${this.formatDexFilter(settingsSnapshot.includeDexes)}`,
@@ -1234,8 +1224,11 @@ export class TrackingService {
   }
 
   private mapSettings(row: UserAlertSettingsRow): UserAlertSettingsSnapshot {
-    const thresholdUsd: number = Number.parseFloat(String(row.threshold_usd));
-    const minAmountUsd: number = Number.parseFloat(String(row.min_amount_usd));
+    const thresholdUsdRaw: number = Number.parseFloat(String(row.threshold_usd));
+    const minAmountUsdRaw: number = Number.parseFloat(String(row.min_amount_usd));
+    const normalizedThresholdUsd: number = Number.isNaN(thresholdUsdRaw) ? 0 : thresholdUsdRaw;
+    const normalizedMinAmountUsd: number = Number.isNaN(minAmountUsdRaw) ? 0 : minAmountUsdRaw;
+    const effectiveThresholdUsd: number = Math.max(normalizedThresholdUsd, normalizedMinAmountUsd);
     const smartFilterType: AlertSmartFilterType = this.parseStoredSmartFilterType(
       row.smart_filter_type,
     );
@@ -1244,8 +1237,8 @@ export class TrackingService {
     const cexFlowMode: AlertCexFlowMode = this.parseStoredCexFlowMode(row.cex_flow_mode);
 
     return {
-      thresholdUsd: Number.isNaN(thresholdUsd) ? 0 : thresholdUsd,
-      minAmountUsd: Number.isNaN(minAmountUsd) ? 0 : minAmountUsd,
+      thresholdUsd: effectiveThresholdUsd,
+      minAmountUsd: effectiveThresholdUsd,
       cexFlowMode,
       smartFilterType,
       includeDexes,

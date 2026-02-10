@@ -861,7 +861,7 @@ export class TelegramUpdate {
     if (!keyArg || !valueArg) {
       return [
         'Форматы:',
-        '/filter min_amount_usd <amount|off>',
+        '/filter min_amount_usd <amount|off> (legacy alias -> /threshold)',
         '/filter cex <off|in|out|all>',
         '/filter type <all|buy|sell|transfer>',
         '/filter include_dex <dex|off>',
@@ -891,7 +891,7 @@ export class TelegramUpdate {
       return this.trackingService.setExcludeDexFilter(userRef, valueArg);
     }
 
-    return 'Поддерживается: min_amount_usd, cex, type, include_dex, exclude_dex.';
+    return 'Поддерживается: cex, type, include_dex, exclude_dex, min_amount_usd (legacy alias -> /threshold).';
   }
 
   private async executeThresholdCommand(
@@ -1108,7 +1108,7 @@ export class TelegramUpdate {
       '/history <address|#id> [limit]',
       '/status',
       '/threshold <amount|off>',
-      '/filter min_amount_usd <amount|off>',
+      '/filter min_amount_usd <amount|off> (legacy alias -> /threshold)',
       '/filter cex <off|in|out|all>',
       '/filter type <all|buy|sell|transfer>',
       '/filter include_dex <dex|off>',
@@ -1134,8 +1134,8 @@ export class TelegramUpdate {
       '/untrack <address|id> - удалить адрес',
       '/history <address|#id> [limit] - последние транзакции',
       '/status - runtime статус watcher и quota',
-      '/threshold <amount|off> - порог по USD',
-      '/filter min_amount_usd <amount|off> - минимальная сумма в USD',
+      '/threshold <amount|off> - единый USD порог алерта',
+      '/filter min_amount_usd <amount|off> - legacy alias для /threshold',
       '/filter cex <off|in|out|all> - фильтр потоков на CEX',
       '/filter type <all|buy|sell|transfer> - фильтр типа сделки',
       '/filter include_dex <dex|off> - оставить только выбранные DEX',

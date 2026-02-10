@@ -13,21 +13,25 @@ Telegram-бот на `NestJS + TypeScript` для отслеживания ак�
 
 ## Команды бота
 
-- `/track <eth|sol|tron> <address> [label]`
-- `/list`
-- `/wallet <#id>`
-- `/untrack <address|id>`
-- `/history <address|#id> [limit] [kind] [direction]`
-- `/status`
-- `/threshold <amount|off>`
-- `/filter min_amount_usd <amount|off>`
-- `/filters`
-- `/walletfilters <#id>`
-- `/wfilter <#id> <transfer|swap> <on|off>`
-- `/quiet <HH:mm-HH:mm|off>`
-- `/tz <Area/City>`
-- `/mute <minutes|off>`
-- `/help`
+- `/track <eth|sol|tron> <address> [label]` - добавить кошелек в отслеживание.
+- `/list` - список отслеживаемых кошельков c `#id`.
+- `/wallet <#id>` - карточка кошелька с кнопками действий.
+- `/untrack <address|id>` - удалить кошелек из отслеживания.
+- `/history <address|#id> [limit] [kind] [direction]` - история по кошельку (`kind=all|eth|erc20`, `direction=all|in|out`).
+- `/status` - статус рантайма, лимитов и версии приложения.
+- `/threshold <amount|off>` - единый USD-порог для алертов.
+- `/filter min_amount_usd <amount|off>` - legacy alias для `/threshold` (отдельной логики больше нет).
+- `/filter cex <off|in|out|all>` - фильтр переводов относительно CEX.
+- `/filter type <all|buy|sell|transfer>` - фильтр типа событий.
+- `/filter include_dex <dex|off>` - оставить только выбранные DEX.
+- `/filter exclude_dex <dex|off>` - исключить DEX из алертов.
+- `/filters` - показать текущие фильтры и подсказки по командам.
+- `/walletfilters <#id>` - фильтры конкретного кошелька.
+- `/wfilter <#id> <transfer|swap> <on|off>` - включить/выключить transfer/swap для кошелька.
+- `/quiet <HH:mm-HH:mm|off>` - тихие часы в пользовательской таймзоне.
+- `/tz <Area/City>` - выставить таймзону для quiet hours.
+- `/mute <minutes|off>` - временно выключить все алерты.
+- `/help` - полная справка с примерами.
 
 ## Быстрый старт
 
@@ -156,6 +160,10 @@ Fail-fast правила:
 - если `CHAIN_WATCHER_ENABLED=true`, то `ETH_ALCHEMY_WSS_URL` и `ETH_INFURA_WSS_URL` обязательны;
 - если `SOLANA_WATCHER_ENABLED=true`, то обязательны все: `SOLANA_HELIUS_HTTP_URL`, `SOLANA_HELIUS_WSS_URL`, `SOLANA_PUBLIC_HTTP_URL`, `SOLANA_PUBLIC_WSS_URL`.
 - если `TRON_WATCHER_ENABLED=true`, то обязательны `TRON_PRIMARY_HTTP_URL` и `TRON_FALLBACK_HTTP_URL`.
+
+Важно по данным в БД:
+- события в `wallet_events`/`processed_events` появляются только для сетей, где watcher включен (`*_WATCHER_ENABLED=true`);
+- для сети без tracked-кошельков событий тоже не будет (нечего матчить).
 
 ## Workflow внешних API
 

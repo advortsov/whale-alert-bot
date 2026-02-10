@@ -547,12 +547,13 @@ describe('TrackingService', (): void => {
       ChainKey.ETHEREUM_MAINNET,
       {
         thresholdUsd: 50000,
+        minAmountUsd: 50000,
       },
     );
     expect(message).toContain('50000.00');
   });
 
-  it('updates minimum usd filter via /filter semantics', async (): Promise<void> => {
+  it('updates minimum usd filter as legacy alias for threshold', async (): Promise<void> => {
     const context: TestContext = createTestContext();
 
     const message: string = await context.service.setMinAmountUsd(context.userRef, '1000');
@@ -561,10 +562,12 @@ describe('TrackingService', (): void => {
       7,
       ChainKey.ETHEREUM_MAINNET,
       {
+        thresholdUsd: 1000,
         minAmountUsd: 1000,
       },
     );
-    expect(message).toContain('1000.00');
+    expect(message).toContain('Порог USD обновлен');
+    expect(message).toContain('legacy alias');
   });
 
   it('updates cex flow filter', async (): Promise<void> => {
