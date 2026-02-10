@@ -21,6 +21,7 @@ type TrackingServiceStub = {
   readonly getUserAlertFilters: ReturnType<typeof vi.fn>;
   readonly setThresholdUsd: ReturnType<typeof vi.fn>;
   readonly setMinAmountUsd: ReturnType<typeof vi.fn>;
+  readonly setCexFlowFilter: ReturnType<typeof vi.fn>;
   readonly setSmartFilterType: ReturnType<typeof vi.fn>;
   readonly setIncludeDexFilter: ReturnType<typeof vi.fn>;
   readonly setExcludeDexFilter: ReturnType<typeof vi.fn>;
@@ -54,6 +55,7 @@ const createTrackingServiceStub = (): TrackingServiceStub => ({
   getUserAlertFilters: vi.fn().mockResolvedValue('filters'),
   setThresholdUsd: vi.fn().mockResolvedValue('threshold'),
   setMinAmountUsd: vi.fn().mockResolvedValue('min_amount_usd'),
+  setCexFlowFilter: vi.fn().mockResolvedValue('cex'),
   setSmartFilterType: vi.fn().mockResolvedValue('smart_type'),
   setIncludeDexFilter: vi.fn().mockResolvedValue('include_dex'),
   setExcludeDexFilter: vi.fn().mockResolvedValue('exclude_dex'),
@@ -167,6 +169,31 @@ describe('LocalBotHarness', (): void => {
       parse_mode: 'HTML',
     });
     expect(result.replies[0]?.text).toContain('История');
+  });
+
+  it('handles /filter cex command and routes to tracking service', async (): Promise<void> => {
+    const trackingServiceStub: TrackingServiceStub = createTrackingServiceStub();
+    const runtimeStatusServiceStub: RuntimeStatusServiceStub = createRuntimeStatusServiceStub();
+    const harness: LocalBotHarness = new LocalBotHarness({
+      trackingService: trackingServiceStub as unknown as TrackingService,
+      runtimeStatusService: runtimeStatusServiceStub as unknown as RuntimeStatusService,
+    });
+
+    await harness.sendText({
+      user: {
+        telegramId: '42',
+        username: 'tester',
+      },
+      text: '/filter cex out',
+    });
+
+    expect(trackingServiceStub.setCexFlowFilter).toHaveBeenCalledWith(
+      {
+        telegramId: '42',
+        username: 'tester',
+      },
+      'out',
+    );
   });
 
   it('returns wallet card keyboard with tap-only actions', async (): Promise<void> => {

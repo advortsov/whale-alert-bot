@@ -20,6 +20,7 @@ export type AppConfig = {
   readonly ethAlchemyWssUrl: string | null;
   readonly ethInfuraWssUrl: string | null;
   readonly uniswapSwapAllowlist: readonly string[];
+  readonly ethCexAddressAllowlist: readonly string[];
   readonly etherscanTxBaseUrl: string;
   readonly etherscanApiBaseUrl: string;
   readonly etherscanApiKey: string | null;

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { AlertFilterPolicyService } from './alert-filter-policy.service';
 import { ClassifiedEventType, EventDirection } from '../chain/chain.types';
+import { AlertCexFlowMode } from '../features/alerts/cex-flow.interfaces';
 import { AlertSmartFilterType } from '../features/alerts/smart-filter.interfaces';
 
 describe('AlertFilterPolicyService', (): void => {
@@ -113,5 +114,41 @@ describe('AlertFilterPolicyService', (): void => {
 
     expect(decision.allowed).toBe(false);
     expect(decision.suppressedReason).toBe('dex_exclude');
+  });
+
+  it('blocks non-transfer event when cex flow filter is enabled', (): void => {
+    const service: AlertFilterPolicyService = new AlertFilterPolicyService();
+
+    const decision = service.evaluateCexFlow(
+      {
+        mode: AlertCexFlowMode.OUT,
+      },
+      {
+        eventType: ClassifiedEventType.SWAP,
+        direction: EventDirection.OUT,
+        counterpartyTag: 'binance',
+      },
+    );
+
+    expect(decision.allowed).toBe(false);
+    expect(decision.suppressedReason).toBe('cex_transfer_only');
+  });
+
+  it('allows transfer when cex flow is out and counterparty is known cex', (): void => {
+    const service: AlertFilterPolicyService = new AlertFilterPolicyService();
+
+    const decision = service.evaluateCexFlow(
+      {
+        mode: AlertCexFlowMode.OUT,
+      },
+      {
+        eventType: ClassifiedEventType.TRANSFER,
+        direction: EventDirection.OUT,
+        counterpartyTag: 'binance',
+      },
+    );
+
+    expect(decision.allowed).toBe(true);
+    expect(decision.suppressedReason).toBeNull();
   });
 });

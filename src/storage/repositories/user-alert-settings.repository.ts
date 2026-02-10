@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import type { ChainKey } from '../../core/chains/chain-key.interfaces';
+import { AlertCexFlowMode } from '../../features/alerts/cex-flow.interfaces';
 import { AlertSmartFilterType } from '../../features/alerts/smart-filter.interfaces';
 import { DatabaseService } from '../database.service';
 import type { NewUserAlertSettingsRow, UserAlertSettingsRow } from '../database.types';
@@ -65,6 +66,7 @@ export class UserAlertSettingsRepository {
     const updatePatch: {
       threshold_usd?: number;
       min_amount_usd?: number;
+      cex_flow_mode?: string;
       smart_filter_type?: string;
       include_dexes?: string[];
       exclude_dexes?: string[];
@@ -82,6 +84,10 @@ export class UserAlertSettingsRepository {
 
     if (patch.minAmountUsd !== undefined) {
       updatePatch.min_amount_usd = patch.minAmountUsd;
+    }
+
+    if (patch.cexFlowMode !== undefined) {
+      updatePatch.cex_flow_mode = patch.cexFlowMode;
     }
 
     if (patch.smartFilterType !== undefined) {
@@ -124,6 +130,7 @@ export class UserAlertSettingsRepository {
       chain_key: chainKey,
       threshold_usd: 0,
       min_amount_usd: 0,
+      cex_flow_mode: AlertCexFlowMode.OFF,
       smart_filter_type: AlertSmartFilterType.ALL,
       include_dexes: [],
       exclude_dexes: [],

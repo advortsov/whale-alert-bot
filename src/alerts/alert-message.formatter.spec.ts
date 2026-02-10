@@ -29,6 +29,7 @@ describe('AlertMessageFormatter', (): void => {
       tokenDecimals: 6,
       tokenAmountRaw: '1000',
       valueFormatted: '0.001000',
+      counterpartyAddress: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
       dex: null,
       pair: null,
     };

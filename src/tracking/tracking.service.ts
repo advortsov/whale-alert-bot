@@ -24,6 +24,7 @@ import { AppConfigService } from '../config/app-config.service';
 import { ChainKey } from '../core/chains/chain-key.interfaces';
 import { HISTORY_EXPLORER_ADAPTER } from '../core/ports/explorers/explorer-port.tokens';
 import type { IHistoryExplorerAdapter } from '../core/ports/explorers/history-explorer.interfaces';
+import { AlertCexFlowMode } from '../features/alerts/cex-flow.interfaces';
 import { normalizeDexKey } from '../features/alerts/dex-normalizer.util';
 import { AlertSmartFilterType } from '../features/alerts/smart-filter.interfaces';
 import type { HistoryItemDto, HistoryPageDto } from '../features/tracking/dto/history-item.dto';
@@ -256,6 +257,7 @@ export class TrackingService {
       `📍 Address: ${matchedSubscription.walletAddress}`,
       `🔔 Фильтры: transfer=${allowTransfer ? 'on' : 'off'}, swap=${allowSwap ? 'on' : 'off'} (${filterSource})`,
       `💵 USD: threshold=${settingsSnapshot.thresholdUsd.toFixed(2)}, min=${settingsSnapshot.minAmountUsd.toFixed(2)}`,
+      `🏦 CEX flow: ${settingsSnapshot.cexFlowMode}`,
       `🧠 Smart: type=${settingsSnapshot.smartFilterType}, include_dex=${this.formatDexFilter(settingsSnapshot.includeDexes)}, exclude_dex=${this.formatDexFilter(settingsSnapshot.excludeDexes)}`,
       `🌙 Quiet: ${quietText} (${settingsSnapshot.timezone})`,
       `🚫 Ignore 24h до: ${muteStatusText}`,
@@ -336,6 +338,7 @@ export class TrackingService {
       'Текущие фильтры алертов:',
       `- threshold usd: ${settingsSnapshot.thresholdUsd.toFixed(2)}`,
       `- min amount usd: ${settingsSnapshot.minAmountUsd.toFixed(2)}`,
+      `- cex flow: ${settingsSnapshot.cexFlowMode}`,
       `- type: ${settingsSnapshot.smartFilterType}`,
       `- include dex: ${this.formatDexFilter(settingsSnapshot.includeDexes)}`,
       `- exclude dex: ${this.formatDexFilter(settingsSnapshot.excludeDexes)}`,
@@ -347,6 +350,7 @@ export class TrackingService {
       'Команды:',
       '/threshold <amount|off>',
       '/filter min_amount_usd <amount|off>',
+      '/filter cex <off|in|out|all>',
       '/filter type <all|buy|sell|transfer>',
       '/filter include_dex <dex|off>',
       '/filter exclude_dex <dex|off>',
@@ -404,6 +408,21 @@ export class TrackingService {
     const settingsSnapshot: UserAlertSettingsSnapshot = this.mapSettings(updatedSettings);
 
     return `Минимальная сумма USD обновлена: ${settingsSnapshot.minAmountUsd.toFixed(2)}.`;
+  }
+
+  public async setCexFlowFilter(userRef: TelegramUserRef, rawValue: string): Promise<string> {
+    const cexFlowMode: AlertCexFlowMode = this.parseCexFlowMode(rawValue);
+    const user = await this.usersRepository.findOrCreate(userRef.telegramId, userRef.username);
+    const updatedSettings: UserAlertSettingsRow =
+      await this.userAlertSettingsRepository.updateByUserAndChain(
+        user.id,
+        ChainKey.ETHEREUM_MAINNET,
+        {
+          cexFlowMode,
+        },
+      );
+    const settingsSnapshot: UserAlertSettingsSnapshot = this.mapSettings(updatedSettings);
+    return `CEX flow фильтр обновлен: ${settingsSnapshot.cexFlowMode}.`;
   }
 
   public async setSmartFilterType(userRef: TelegramUserRef, rawValue: string): Promise<string> {
@@ -593,6 +612,7 @@ export class TrackingService {
       'Пользовательский статус:',
       `- threshold usd: ${settingsSnapshot.thresholdUsd.toFixed(2)}`,
       `- min amount usd: ${settingsSnapshot.minAmountUsd.toFixed(2)}`,
+      `- cex flow: ${settingsSnapshot.cexFlowMode}`,
       `- type: ${settingsSnapshot.smartFilterType}`,
       `- include dex: ${this.formatDexFilter(settingsSnapshot.includeDexes)}`,
       `- exclude dex: ${this.formatDexFilter(settingsSnapshot.excludeDexes)}`,
@@ -1103,10 +1123,12 @@ export class TrackingService {
     );
     const includeDexes: readonly string[] = this.normalizeStoredDexFilter(row.include_dexes);
     const excludeDexes: readonly string[] = this.normalizeStoredDexFilter(row.exclude_dexes);
+    const cexFlowMode: AlertCexFlowMode = this.parseStoredCexFlowMode(row.cex_flow_mode);
 
     return {
       thresholdUsd: Number.isNaN(thresholdUsd) ? 0 : thresholdUsd,
       minAmountUsd: Number.isNaN(minAmountUsd) ? 0 : minAmountUsd,
+      cexFlowMode,
       smartFilterType,
       includeDexes,
       excludeDexes,
@@ -1142,6 +1164,28 @@ export class TrackingService {
     }
 
     return parsedValue;
+  }
+
+  private parseCexFlowMode(rawValue: string): AlertCexFlowMode {
+    const normalizedValue: string = rawValue.trim().toLowerCase();
+
+    if (normalizedValue === 'off') {
+      return AlertCexFlowMode.OFF;
+    }
+
+    if (normalizedValue === 'in') {
+      return AlertCexFlowMode.IN;
+    }
+
+    if (normalizedValue === 'out') {
+      return AlertCexFlowMode.OUT;
+    }
+
+    if (normalizedValue === 'all') {
+      return AlertCexFlowMode.ALL;
+    }
+
+    throw new Error('Неверный cex фильтр. Используй: /filter cex <off|in|out|all>.');
   }
 
   private parseSmartFilterType(rawValue: string): AlertSmartFilterType {
@@ -1220,6 +1264,24 @@ export class TrackingService {
     }
 
     return AlertSmartFilterType.ALL;
+  }
+
+  private parseStoredCexFlowMode(rawValue: string | null | undefined): AlertCexFlowMode {
+    const normalizedValue: string = (rawValue ?? '').trim().toLowerCase();
+
+    if (normalizedValue === 'in') {
+      return AlertCexFlowMode.IN;
+    }
+
+    if (normalizedValue === 'out') {
+      return AlertCexFlowMode.OUT;
+    }
+
+    if (normalizedValue === 'all') {
+      return AlertCexFlowMode.ALL;
+    }
+
+    return AlertCexFlowMode.OFF;
   }
 
   private normalizeStoredDexFilter(

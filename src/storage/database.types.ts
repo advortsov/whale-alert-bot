@@ -71,6 +71,7 @@ export interface UserAlertSettingsTable {
   chain_key: string;
   threshold_usd: number;
   min_amount_usd: number;
+  cex_flow_mode: string;
   smart_filter_type: string;
   include_dexes: string[];
   exclude_dexes: string[];

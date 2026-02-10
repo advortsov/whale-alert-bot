@@ -5,6 +5,7 @@ import type { AlertEnrichmentService } from './alert-enrichment.service';
 import type { AlertFilterPolicyService } from './alert-filter-policy.service';
 import type { AlertMessageFormatter } from './alert-message.formatter';
 import type { AlertSuppressionService } from './alert-suppression.service';
+import type { CexAddressBookService } from './cex-address-book.service';
 import type { QuietHoursService } from './quiet-hours.service';
 import {
   ChainId,
@@ -37,10 +38,15 @@ type AlertSuppressionServiceStub = {
 type AlertFilterPolicyServiceStub = {
   readonly evaluateUsdThreshold: ReturnType<typeof vi.fn>;
   readonly evaluateSemanticFilters: ReturnType<typeof vi.fn>;
+  readonly evaluateCexFlow: ReturnType<typeof vi.fn>;
 };
 
 type QuietHoursServiceStub = {
   readonly evaluate: ReturnType<typeof vi.fn>;
+};
+
+type CexAddressBookServiceStub = {
+  readonly resolveTag: ReturnType<typeof vi.fn>;
 };
 
 type AlertMessageFormatterStub = {
@@ -89,6 +95,7 @@ const buildEvent = (valueFormatted: string): ClassifiedEvent => {
     tokenDecimals: 6,
     tokenAmountRaw: '12345000',
     valueFormatted,
+    counterpartyAddress: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
     dex: null,
     pair: null,
   };
@@ -101,6 +108,7 @@ const createService = (): {
   readonly alertSuppressionServiceStub: AlertSuppressionServiceStub;
   readonly alertFilterPolicyServiceStub: AlertFilterPolicyServiceStub;
   readonly quietHoursServiceStub: QuietHoursServiceStub;
+  readonly cexAddressBookServiceStub: CexAddressBookServiceStub;
   readonly alertMessageFormatterStub: AlertMessageFormatterStub;
   readonly userAlertPreferencesRepositoryStub: UserAlertPreferencesRepositoryStub;
   readonly userAlertSettingsRepositoryStub: UserAlertSettingsRepositoryStub;
@@ -121,9 +129,13 @@ const createService = (): {
   const alertFilterPolicyServiceStub: AlertFilterPolicyServiceStub = {
     evaluateUsdThreshold: vi.fn(),
     evaluateSemanticFilters: vi.fn(),
+    evaluateCexFlow: vi.fn(),
   };
   const quietHoursServiceStub: QuietHoursServiceStub = {
     evaluate: vi.fn(),
+  };
+  const cexAddressBookServiceStub: CexAddressBookServiceStub = {
+    resolveTag: vi.fn(),
   };
   const alertMessageFormatterStub: AlertMessageFormatterStub = {
     format: vi.fn(),
@@ -176,10 +188,15 @@ const createService = (): {
     suppressedReason: null,
     normalizedDex: null,
   });
+  alertFilterPolicyServiceStub.evaluateCexFlow.mockReturnValue({
+    allowed: true,
+    suppressedReason: null,
+  });
   quietHoursServiceStub.evaluate.mockReturnValue({
     suppressed: false,
     currentMinuteOfDay: 100,
   });
+  cexAddressBookServiceStub.resolveTag.mockReturnValue(null);
   alertMessageFormatterStub.format.mockReturnValue('alert');
   userAlertPreferencesRepositoryStub.findOrCreateByUserId.mockResolvedValue({
     id: 1,
@@ -197,6 +214,7 @@ const createService = (): {
     chain_key: ChainKey.ETHEREUM_MAINNET,
     threshold_usd: 0,
     min_amount_usd: 0,
+    cex_flow_mode: 'off',
     smart_filter_type: 'all',
     include_dexes: [],
     exclude_dexes: [],
@@ -221,6 +239,7 @@ const createService = (): {
     alertEnrichmentServiceStub as unknown as AlertEnrichmentService,
     alertSuppressionServiceStub as unknown as AlertSuppressionService,
     alertFilterPolicyServiceStub as unknown as AlertFilterPolicyService,
+    cexAddressBookServiceStub as unknown as CexAddressBookService,
     quietHoursServiceStub as unknown as QuietHoursService,
     alertMessageFormatterStub as unknown as AlertMessageFormatter,
     appConfigServiceStub as unknown as AppConfigService,
@@ -239,6 +258,7 @@ const createService = (): {
     alertSuppressionServiceStub,
     alertFilterPolicyServiceStub,
     quietHoursServiceStub,
+    cexAddressBookServiceStub,
     alertMessageFormatterStub,
     userAlertPreferencesRepositoryStub,
     userAlertSettingsRepositoryStub,
@@ -309,6 +329,7 @@ describe('AlertDispatcherService', (): void => {
       chain_key: ChainKey.ETHEREUM_MAINNET,
       threshold_usd: 1000,
       min_amount_usd: 0,
+      cex_flow_mode: 'off',
       smart_filter_type: 'all',
       include_dexes: [],
       exclude_dexes: [],
@@ -343,6 +364,7 @@ describe('AlertDispatcherService', (): void => {
       chain_key: ChainKey.ETHEREUM_MAINNET,
       threshold_usd: 0,
       min_amount_usd: 0,
+      cex_flow_mode: 'off',
       smart_filter_type: 'buy',
       include_dexes: [],
       exclude_dexes: [],
@@ -377,6 +399,7 @@ describe('AlertDispatcherService', (): void => {
       chain_key: ChainKey.ETHEREUM_MAINNET,
       threshold_usd: 0,
       min_amount_usd: 0,
+      cex_flow_mode: 'off',
       smart_filter_type: 'all',
       include_dexes: [],
       exclude_dexes: ['uniswap'],
@@ -387,6 +410,35 @@ describe('AlertDispatcherService', (): void => {
     });
 
     await context.service.dispatch(swapEvent);
+
+    expect(context.telegramSenderServiceStub.sendText).not.toHaveBeenCalled();
+  });
+
+  it('skips transfer alert when cex flow mode is out and counterparty is not cex', async (): Promise<void> => {
+    const context = createService();
+
+    context.userAlertSettingsRepositoryStub.findOrCreateByUserAndChain.mockResolvedValue({
+      id: 1,
+      user_id: 7,
+      chain_key: ChainKey.ETHEREUM_MAINNET,
+      threshold_usd: 0,
+      min_amount_usd: 0,
+      cex_flow_mode: 'out',
+      smart_filter_type: 'all',
+      include_dexes: [],
+      exclude_dexes: [],
+      quiet_from: null,
+      quiet_to: null,
+      timezone: 'UTC',
+      updated_at: new Date('2026-02-09T00:00:00.000Z'),
+    });
+    context.cexAddressBookServiceStub.resolveTag.mockReturnValue(null);
+    context.alertFilterPolicyServiceStub.evaluateCexFlow.mockReturnValue({
+      allowed: false,
+      suppressedReason: 'cex_not_matched',
+    });
+
+    await context.service.dispatch(buildEvent('12.000000'));
 
     expect(context.telegramSenderServiceStub.sendText).not.toHaveBeenCalled();
   });

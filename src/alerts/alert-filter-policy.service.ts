@@ -5,6 +5,12 @@ import type {
   AlertFilterPolicy,
   ThresholdDecision,
 } from '../features/alerts/alert-filter.interfaces';
+import type {
+  AlertCexFlowContext,
+  AlertCexFlowDecision,
+  AlertCexFlowPolicy,
+} from '../features/alerts/cex-flow.interfaces';
+import { AlertCexFlowMode } from '../features/alerts/cex-flow.interfaces';
 import { normalizeDexKey } from '../features/alerts/dex-normalizer.util';
 import type {
   AlertSemanticEventContext,
@@ -136,6 +142,51 @@ export class AlertFilterPolicyService {
       allowed: true,
       suppressedReason: null,
       normalizedDex,
+    };
+  }
+
+  public evaluateCexFlow(
+    policy: AlertCexFlowPolicy,
+    context: AlertCexFlowContext,
+  ): AlertCexFlowDecision {
+    if (policy.mode === AlertCexFlowMode.OFF) {
+      return {
+        allowed: true,
+        suppressedReason: null,
+      };
+    }
+
+    if (context.eventType !== ClassifiedEventType.TRANSFER) {
+      return {
+        allowed: false,
+        suppressedReason: 'cex_transfer_only',
+      };
+    }
+
+    if (context.counterpartyTag === null) {
+      return {
+        allowed: false,
+        suppressedReason: 'cex_not_matched',
+      };
+    }
+
+    if (policy.mode === AlertCexFlowMode.IN && context.direction !== EventDirection.IN) {
+      return {
+        allowed: false,
+        suppressedReason: 'cex_direction_in',
+      };
+    }
+
+    if (policy.mode === AlertCexFlowMode.OUT && context.direction !== EventDirection.OUT) {
+      return {
+        allowed: false,
+        suppressedReason: 'cex_direction_out',
+      };
+    }
+
+    return {
+      allowed: true,
+      suppressedReason: null,
     };
   }
 }

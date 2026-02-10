@@ -199,6 +199,7 @@ const createTestContext = (): TestContext => {
     chain_key: ChainKey.ETHEREUM_MAINNET,
     threshold_usd: 0,
     min_amount_usd: 0,
+    cex_flow_mode: 'off',
     smart_filter_type: 'all',
     include_dexes: [],
     exclude_dexes: [],
@@ -213,6 +214,7 @@ const createTestContext = (): TestContext => {
     chain_key: ChainKey.ETHEREUM_MAINNET,
     threshold_usd: 50000,
     min_amount_usd: 1000,
+    cex_flow_mode: 'off',
     smart_filter_type: 'all',
     include_dexes: [],
     exclude_dexes: [],
@@ -376,6 +378,21 @@ describe('TrackingService', (): void => {
       },
     );
     expect(message).toContain('1000.00');
+  });
+
+  it('updates cex flow filter', async (): Promise<void> => {
+    const context: TestContext = createTestContext();
+
+    const message: string = await context.service.setCexFlowFilter(context.userRef, 'out');
+
+    expect(context.userAlertSettingsRepositoryStub.updateByUserAndChain).toHaveBeenCalledWith(
+      7,
+      ChainKey.ETHEREUM_MAINNET,
+      {
+        cexFlowMode: 'out',
+      },
+    );
+    expect(message).toContain('CEX flow фильтр обновлен');
   });
 
   it('updates smart type filter', async (): Promise<void> => {

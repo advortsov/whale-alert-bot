@@ -47,6 +47,8 @@ export class EventClassifierService {
         if (isTrackedTransfer) {
           const transferDirection: EventDirection =
             fromAddress === normalizedTrackedAddress ? EventDirection.OUT : EventDirection.IN;
+          const counterpartyAddress: string | null =
+            transferDirection === EventDirection.OUT ? toAddress : fromAddress;
 
           return {
             chainId: ChainId.ETHEREUM_MAINNET,
@@ -61,6 +63,7 @@ export class EventClassifierService {
             tokenDecimals: null,
             tokenAmountRaw: this.tryDecodeUint256(log.data),
             valueFormatted: null,
+            counterpartyAddress,
             dex: null,
             pair: null,
           };
@@ -91,6 +94,7 @@ export class EventClassifierService {
           tokenDecimals: null,
           tokenAmountRaw: null,
           valueFormatted: null,
+          counterpartyAddress: null,
           dex: this.mapDex(topic0),
           pair: null,
         };
@@ -110,6 +114,7 @@ export class EventClassifierService {
       tokenDecimals: null,
       tokenAmountRaw: null,
       valueFormatted: null,
+      counterpartyAddress: null,
       dex: null,
       pair: null,
     };

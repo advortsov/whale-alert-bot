@@ -33,6 +33,7 @@ const envSchema = z.object({
   ETH_ALCHEMY_WSS_URL: z.url().optional(),
   ETH_INFURA_WSS_URL: z.url().optional(),
   UNISWAP_SWAP_ALLOWLIST: z.string().trim().optional(),
+  ETH_CEX_ADDRESS_ALLOWLIST: z.string().trim().optional(),
   ETHERSCAN_TX_BASE_URL: z.url().default('https://etherscan.io/tx/'),
   ETHERSCAN_API_BASE_URL: z.url().default('https://api.etherscan.io/v2/api'),
   ETHERSCAN_API_KEY: z.string().trim().min(1).optional(),
@@ -77,6 +78,7 @@ export class AppConfigService {
       ethAlchemyWssUrl: parsedEnv.ETH_ALCHEMY_WSS_URL ?? null,
       ethInfuraWssUrl: parsedEnv.ETH_INFURA_WSS_URL ?? null,
       uniswapSwapAllowlist: this.parseAllowlist(parsedEnv.UNISWAP_SWAP_ALLOWLIST),
+      ethCexAddressAllowlist: this.parseAllowlist(parsedEnv.ETH_CEX_ADDRESS_ALLOWLIST),
       etherscanTxBaseUrl: parsedEnv.ETHERSCAN_TX_BASE_URL,
       etherscanApiBaseUrl: parsedEnv.ETHERSCAN_API_BASE_URL,
       etherscanApiKey: parsedEnv.ETHERSCAN_API_KEY ?? null,
@@ -160,6 +162,10 @@ export class AppConfigService {
 
   public get uniswapSwapAllowlist(): readonly string[] {
     return this.config.uniswapSwapAllowlist;
+  }
+
+  public get ethCexAddressAllowlist(): readonly string[] {
+    return this.config.ethCexAddressAllowlist;
   }
 
   public get etherscanTxBaseUrl(): string {

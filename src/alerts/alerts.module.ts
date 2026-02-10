@@ -5,6 +5,7 @@ import { AlertEnrichmentService } from './alert-enrichment.service';
 import { AlertFilterPolicyService } from './alert-filter-policy.service';
 import { AlertMessageFormatter } from './alert-message.formatter';
 import { AlertSuppressionService } from './alert-suppression.service';
+import { CexAddressBookService } from './cex-address-book.service';
 import { QuietHoursService } from './quiet-hours.service';
 import { TokenMetadataService } from './token-metadata.service';
 import { TOKEN_METADATA_ADAPTER } from '../core/ports/token-metadata/token-metadata-port.tokens';
@@ -31,6 +32,7 @@ import { TelegramModule } from '../telegram/telegram.module';
     AlertEnrichmentService,
     AlertSuppressionService,
     AlertFilterPolicyService,
+    CexAddressBookService,
     QuietHoursService,
     AlertMessageFormatter,
     AlertDispatcherService,
@@ -40,6 +42,7 @@ import { TelegramModule } from '../telegram/telegram.module';
     AlertEnrichmentService,
     AlertSuppressionService,
     AlertFilterPolicyService,
+    CexAddressBookService,
     QuietHoursService,
     AlertMessageFormatter,
     AlertDispatcherService,

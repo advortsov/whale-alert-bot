@@ -35,6 +35,7 @@ describe('AlertEnrichmentService', (): void => {
       tokenDecimals: null,
       tokenAmountRaw: '12345000',
       valueFormatted: null,
+      counterpartyAddress: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
       dex: null,
       pair: null,
     };

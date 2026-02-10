@@ -25,6 +25,7 @@ const buildTransferEvent = (tokenAmountRaw: string): ClassifiedEvent => {
     tokenDecimals: 6,
     tokenAmountRaw,
     valueFormatted: null,
+    counterpartyAddress: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
     dex: null,
     pair: null,
   };

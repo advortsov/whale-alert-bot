@@ -5,6 +5,7 @@ import { AlertFilterPolicyService } from './alert-filter-policy.service';
 import { AlertMessageFormatter } from './alert-message.formatter';
 import { AlertSuppressionService } from './alert-suppression.service';
 import { type AlertMessageContext } from './alert.interfaces';
+import { CexAddressBookService } from './cex-address-book.service';
 import { QuietHoursService } from './quiet-hours.service';
 import { ClassifiedEventType, type ClassifiedEvent } from '../chain/chain.types';
 import { AppConfigService } from '../config/app-config.service';
@@ -12,6 +13,7 @@ import { ChainKey } from '../core/chains/chain-key.interfaces';
 import { TOKEN_PRICING_PORT } from '../core/ports/token-pricing/token-pricing-port.tokens';
 import type { ITokenPricingPort } from '../core/ports/token-pricing/token-pricing.interfaces';
 import type { AlertFilterPolicy } from '../features/alerts/alert-filter.interfaces';
+import { AlertCexFlowMode, type AlertCexFlowPolicy } from '../features/alerts/cex-flow.interfaces';
 import {
   AlertSmartFilterType,
   type AlertSemanticFilterPolicy,
@@ -45,6 +47,7 @@ export class AlertDispatcherService {
     private readonly alertEnrichmentService: AlertEnrichmentService,
     private readonly alertSuppressionService: AlertSuppressionService,
     private readonly alertFilterPolicyService: AlertFilterPolicyService,
+    private readonly cexAddressBookService: CexAddressBookService,
     private readonly quietHoursService: QuietHoursService,
     private readonly alertMessageFormatter: AlertMessageFormatter,
     private readonly appConfigService: AppConfigService,
@@ -290,6 +293,28 @@ export class AlertDispatcherService {
       };
     }
 
+    const cexPolicy: AlertCexFlowPolicy = this.mapCexFlowPolicy(settings);
+    const counterpartyTag: string | null = this.cexAddressBookService.resolveTag(
+      recipientChainKey,
+      event.counterpartyAddress,
+    );
+    const cexDecision = this.alertFilterPolicyService.evaluateCexFlow(cexPolicy, {
+      eventType: event.eventType,
+      direction: event.direction,
+      counterpartyTag,
+    });
+
+    if (!cexDecision.allowed) {
+      return {
+        skip: true,
+        reason: cexDecision.suppressedReason,
+        messageContext: {
+          usdAmount: thresholdDecision.usdAmount,
+          usdUnavailable: usdWarningEnabled,
+        },
+      };
+    }
+
     return {
       skip: false,
       reason: null,
@@ -316,6 +341,14 @@ export class AlertDispatcherService {
     };
   }
 
+  private mapCexFlowPolicy(settings: {
+    readonly cex_flow_mode?: string | null;
+  }): AlertCexFlowPolicy {
+    return {
+      mode: this.parseCexFlowMode(settings.cex_flow_mode),
+    };
+  }
+
   private parseSmartFilterType(rawValue: string | null | undefined): AlertSmartFilterType {
     if (rawValue === null || rawValue === undefined) {
       return AlertSmartFilterType.ALL;
@@ -336,6 +369,28 @@ export class AlertDispatcherService {
     }
 
     return AlertSmartFilterType.ALL;
+  }
+
+  private parseCexFlowMode(rawValue: string | null | undefined): AlertCexFlowMode {
+    if (rawValue === null || rawValue === undefined) {
+      return AlertCexFlowMode.OFF;
+    }
+
+    const normalizedValue: string = rawValue.trim().toLowerCase();
+
+    if (normalizedValue === 'in') {
+      return AlertCexFlowMode.IN;
+    }
+
+    if (normalizedValue === 'out') {
+      return AlertCexFlowMode.OUT;
+    }
+
+    if (normalizedValue === 'all') {
+      return AlertCexFlowMode.ALL;
+    }
+
+    return AlertCexFlowMode.OFF;
   }
 
   private normalizeDexList(rawList: readonly string[] | null | undefined): readonly string[] {

@@ -865,6 +865,7 @@ export class TelegramUpdate {
       return [
         'Форматы:',
         '/filter min_amount_usd <amount|off>',
+        '/filter cex <off|in|out|all>',
         '/filter type <all|buy|sell|transfer>',
         '/filter include_dex <dex|off>',
         '/filter exclude_dex <dex|off>',
@@ -875,6 +876,10 @@ export class TelegramUpdate {
 
     if (normalizedKey === 'min_amount_usd') {
       return this.trackingService.setMinAmountUsd(userRef, valueArg);
+    }
+
+    if (normalizedKey === 'cex') {
+      return this.trackingService.setCexFlowFilter(userRef, valueArg);
     }
 
     if (normalizedKey === 'type') {
@@ -889,7 +894,7 @@ export class TelegramUpdate {
       return this.trackingService.setExcludeDexFilter(userRef, valueArg);
     }
 
-    return 'Поддерживается: min_amount_usd, type, include_dex, exclude_dex.';
+    return 'Поддерживается: min_amount_usd, cex, type, include_dex, exclude_dex.';
   }
 
   private async executeThresholdCommand(
@@ -1107,6 +1112,7 @@ export class TelegramUpdate {
       '/status',
       '/threshold <amount|off>',
       '/filter min_amount_usd <amount|off>',
+      '/filter cex <off|in|out|all>',
       '/filter type <all|buy|sell|transfer>',
       '/filter include_dex <dex|off>',
       '/filter exclude_dex <dex|off>',
@@ -1133,6 +1139,7 @@ export class TelegramUpdate {
       '/status - runtime статус watcher и quota',
       '/threshold <amount|off> - порог по USD',
       '/filter min_amount_usd <amount|off> - минимальная сумма в USD',
+      '/filter cex <off|in|out|all> - фильтр потоков на CEX',
       '/filter type <all|buy|sell|transfer> - фильтр типа сделки',
       '/filter include_dex <dex|off> - оставить только выбранные DEX',
       '/filter exclude_dex <dex|off> - исключить DEX из алертов',
@@ -1151,6 +1158,7 @@ export class TelegramUpdate {
       '/wfilter #3 transfer off',
       '/threshold 50000',
       '/filter min_amount_usd 100000',
+      '/filter cex out',
       '/filter type buy',
       '/filter include_dex uniswap',
       '/filter exclude_dex off',
