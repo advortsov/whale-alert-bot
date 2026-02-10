@@ -29,6 +29,18 @@ const createRequest = (overrides: Partial<HistoryRequestDto> = {}): HistoryReque
 });
 
 describe('TronGridHistoryAdapter', (): void => {
+  const toRequestUrl = (input: unknown): string => {
+    if (typeof input === 'string') {
+      return input;
+    }
+
+    if (input instanceof URL) {
+      return input.toString();
+    }
+
+    return '';
+  };
+
   afterEach((): void => {
     vi.restoreAllMocks();
   });
@@ -174,6 +186,82 @@ describe('TronGridHistoryAdapter', (): void => {
     expect(result.items[0]?.txHash).toBe('token-tx-out');
     expect(result.items[0]?.assetSymbol).toBe('USDT');
     expect(result.items[0]?.direction).toBe(HistoryDirection.OUT);
+  });
+
+  it('retries TRON history request without order_by when first request returns HTTP 400', async (): Promise<void> => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: false,
+            error: 'bad request',
+          }),
+          {
+            status: 400,
+            headers: {
+              'content-type': 'application/json',
+            },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            data: [
+              {
+                txID: 'native-tx-after-retry',
+                block_timestamp: 1770000000000,
+                ret: [{ contractRet: 'SUCCESS' }],
+                raw_data: {
+                  contract: [
+                    {
+                      type: 'TransferContract',
+                      parameter: {
+                        value: {
+                          owner_address: '412886B63A4A06A134FD7E93B5BE37E5DCC4A36A9D',
+                          to_address: '4174472E7D35395A6B5ADD427EECB7F4B62AD2B071',
+                          amount: '1000000',
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+            meta: {},
+          }),
+          {
+            status: 200,
+            headers: {
+              'content-type': 'application/json',
+            },
+          },
+        ),
+      );
+
+    const adapter: TronGridHistoryAdapter = new TronGridHistoryAdapter(
+      {
+        tronGridApiBaseUrl: 'https://api.trongrid.io',
+        tronGridApiKey: null,
+        tronscanTxBaseUrl: 'https://tronscan.org/#/transaction/',
+      } as unknown as AppConfigService,
+      new TronAddressCodec(),
+    );
+
+    const result = await adapter.loadRecentTransactions(createRequest({ kind: HistoryKind.ETH }));
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const firstCall: readonly unknown[] | undefined = fetchMock.mock.calls[0];
+    const secondCall: readonly unknown[] | undefined = fetchMock.mock.calls[1];
+    const firstInput: unknown = firstCall ? firstCall[0] : undefined;
+    const secondInput: unknown = secondCall ? secondCall[0] : undefined;
+    const firstUrl: string = toRequestUrl(firstInput);
+    const secondUrl: string = toRequestUrl(secondInput);
+    expect(firstUrl).toContain('order_by=block_timestamp%2Cdesc');
+    expect(secondUrl).not.toContain('order_by=');
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]?.txHash).toBe('native-tx-after-retry');
   });
 
   it('throws for unsupported chain key', async (): Promise<void> => {

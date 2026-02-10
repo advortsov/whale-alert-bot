@@ -128,6 +128,31 @@ describe('AppConfigService', (): void => {
     });
   });
 
+  it('uses default chain backoff bounds for exponential throttling', (): void => {
+    withEnv(createBaseEnv(), (): void => {
+      const config: AppConfigService = new AppConfigService();
+
+      expect(config.chainBackoffBaseMs).toBe(1000);
+      expect(config.chainSolanaBackoffBaseMs).toBe(5000);
+      expect(config.chainBackoffMaxMs).toBe(60000);
+    });
+  });
+
+  it('throws when solana backoff base exceeds max', (): void => {
+    withEnv(
+      {
+        ...createBaseEnv(),
+        CHAIN_BACKOFF_MAX_MS: '4000',
+        CHAIN_SOLANA_BACKOFF_BASE_MS: '5000',
+      },
+      (): void => {
+        expect((): AppConfigService => new AppConfigService()).toThrow(
+          'CHAIN_BACKOFF_MAX_MS must be >= CHAIN_SOLANA_BACKOFF_BASE_MS',
+        );
+      },
+    );
+  });
+
   it('resolves app version from env override', (): void => {
     withEnv(
       {

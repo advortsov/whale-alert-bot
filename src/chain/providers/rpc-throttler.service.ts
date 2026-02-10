@@ -1,75 +1,135 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 import { AppConfigService } from '../../config/app-config.service';
+import { ChainKey } from '../../core/chains/chain-key.interfaces';
+
+interface ThrottleState {
+  queueTail: Promise<void>;
+  nextRequestAtMs: number;
+  currentBackoffMs: number;
+}
 
 @Injectable()
 export class RpcThrottlerService {
+  private static readonly DEFAULT_THROTTLE_KEY: string = 'default';
   private readonly logger: Logger = new Logger(RpcThrottlerService.name);
   private readonly minIntervalMs: number;
   private readonly backoffBaseMs: number;
+  private readonly solanaBackoffBaseMs: number;
   private readonly backoffMaxMs: number;
-
-  private queueTail: Promise<void> = Promise.resolve();
-  private nextRequestAtMs: number = 0;
-  private currentBackoffMs: number = 0;
+  private readonly throttleStatesByKey: Map<string, ThrottleState> = new Map<
+    string,
+    ThrottleState
+  >();
 
   public constructor(private readonly appConfigService: AppConfigService) {
     this.minIntervalMs = this.appConfigService.chainRpcMinIntervalMs;
     this.backoffBaseMs = this.appConfigService.chainBackoffBaseMs;
+    this.solanaBackoffBaseMs = this.appConfigService.chainSolanaBackoffBaseMs;
     this.backoffMaxMs = this.appConfigService.chainBackoffMaxMs;
   }
 
   public async schedule<T>(operation: () => Promise<T>): Promise<T> {
-    await this.waitForSlot();
+    return this.scheduleForKey(RpcThrottlerService.DEFAULT_THROTTLE_KEY, operation);
+  }
+
+  public async scheduleForKey<T>(throttleKey: string, operation: () => Promise<T>): Promise<T> {
+    await this.waitForSlot(throttleKey);
     return operation();
   }
 
   public increaseBackoff(reason: string): void {
-    const nextBackoffMs: number =
-      this.currentBackoffMs === 0
-        ? this.backoffBaseMs
-        : Math.min(this.currentBackoffMs * 2, this.backoffMaxMs);
+    this.increaseBackoffForKey(RpcThrottlerService.DEFAULT_THROTTLE_KEY, reason);
+  }
 
-    if (nextBackoffMs === this.currentBackoffMs) {
+  public increaseBackoffForKey(throttleKey: string, reason: string): void {
+    const state: ThrottleState = this.getOrCreateState(throttleKey);
+    const baseBackoffMs: number = this.getBaseBackoffMsForKey(throttleKey);
+    const nextBackoffMs: number =
+      state.currentBackoffMs === 0
+        ? baseBackoffMs
+        : Math.min(state.currentBackoffMs * 2, this.backoffMaxMs);
+
+    if (nextBackoffMs === state.currentBackoffMs) {
       return;
     }
 
-    this.currentBackoffMs = nextBackoffMs;
-    this.logger.warn(`RPC backoff increased to ${this.currentBackoffMs}ms, reason=${reason}`);
+    state.currentBackoffMs = nextBackoffMs;
+    this.logger.warn(
+      `RPC backoff increased to ${state.currentBackoffMs}ms, key=${throttleKey}, reason=${reason}`,
+    );
   }
 
   public resetBackoff(): void {
-    if (this.currentBackoffMs === 0) {
+    this.resetBackoffForKey(RpcThrottlerService.DEFAULT_THROTTLE_KEY);
+  }
+
+  public resetBackoffForKey(throttleKey: string): void {
+    const state: ThrottleState = this.getOrCreateState(throttleKey);
+
+    if (state.currentBackoffMs === 0) {
       return;
     }
 
-    this.logger.log(`RPC backoff reset from ${this.currentBackoffMs}ms to 0ms`);
-    this.currentBackoffMs = 0;
+    this.logger.log(
+      `RPC backoff reset from ${state.currentBackoffMs}ms to 0ms, key=${throttleKey}`,
+    );
+    state.currentBackoffMs = 0;
   }
 
   public getCurrentBackoffMs(): number {
-    return this.currentBackoffMs;
+    return this.getCurrentBackoffMsForKey(RpcThrottlerService.DEFAULT_THROTTLE_KEY);
   }
 
-  private async waitForSlot(): Promise<void> {
-    const deferredSlot = this.createDeferred();
-    const previousSlot: Promise<void> = this.queueTail;
+  public getCurrentBackoffMsForKey(throttleKey: string): number {
+    const state: ThrottleState = this.getOrCreateState(throttleKey);
+    return state.currentBackoffMs;
+  }
 
-    this.queueTail = deferredSlot.promise;
+  private async waitForSlot(throttleKey: string): Promise<void> {
+    const state: ThrottleState = this.getOrCreateState(throttleKey);
+    const deferredSlot = this.createDeferred();
+    const previousSlot: Promise<void> = state.queueTail;
+
+    state.queueTail = deferredSlot.promise;
 
     await previousSlot;
 
     const nowMs: number = Date.now();
-    const waitMs: number = Math.max(this.nextRequestAtMs - nowMs, 0);
+    const waitMs: number = Math.max(state.nextRequestAtMs - nowMs, 0);
 
     if (waitMs > 0) {
       await this.sleep(waitMs);
     }
 
     const startedAtMs: number = Date.now();
-    this.nextRequestAtMs = startedAtMs + this.minIntervalMs + this.currentBackoffMs;
+    state.nextRequestAtMs = startedAtMs + this.minIntervalMs + state.currentBackoffMs;
 
     deferredSlot.resolve();
+  }
+
+  private getOrCreateState(throttleKey: string): ThrottleState {
+    const existingState: ThrottleState | undefined = this.throttleStatesByKey.get(throttleKey);
+
+    if (existingState !== undefined) {
+      return existingState;
+    }
+
+    const createdState: ThrottleState = {
+      queueTail: Promise.resolve(),
+      nextRequestAtMs: 0,
+      currentBackoffMs: 0,
+    };
+    this.throttleStatesByKey.set(throttleKey, createdState);
+    return createdState;
+  }
+
+  private getBaseBackoffMsForKey(throttleKey: string): number {
+    if (throttleKey.includes(`:${ChainKey.SOLANA_MAINNET}`)) {
+      return this.solanaBackoffBaseMs;
+    }
+
+    return this.backoffBaseMs;
   }
 
   private async sleep(waitMs: number): Promise<void> {

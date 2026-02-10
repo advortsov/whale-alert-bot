@@ -29,6 +29,8 @@ type MatchedTransaction = {
 
 @Injectable()
 export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
+  private static readonly LOG_PREFIX: string = '[ETH]';
+
   private readonly logger: Logger = new Logger(ChainStreamService.name);
   private subscriptionHandle: ISubscriptionHandle | null = null;
   private readonly blockQueue: number[] = [];
@@ -52,7 +54,7 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
 
   public async onModuleInit(): Promise<void> {
     if (!this.appConfigService.chainWatcherEnabled) {
-      this.logger.log('Chain watcher is disabled by config.');
+      this.logInfo('Chain watcher is disabled by config.');
       this.publishRuntimeSnapshot();
       return;
     }
@@ -74,7 +76,7 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
 
     this.startHeartbeat();
     this.publishRuntimeSnapshot();
-    this.logger.log('Chain watcher subscribed to new Ethereum blocks.');
+    this.logInfo('Chain watcher subscribed to new Ethereum blocks.');
   }
 
   public async onModuleDestroy(): Promise<void> {
@@ -94,7 +96,7 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
       await this.chainCheckpointsRepository.getLastProcessedBlock(ChainKey.ETHEREUM_MAINNET);
 
     if (checkpointBlockNumber === null) {
-      this.logger.log(
+      this.logInfo(
         `checkpoint not found for chain=${String(ChainId.ETHEREUM_MAINNET)} latest=${latestBlockNumber}`,
       );
       return;
@@ -108,7 +110,7 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
     );
 
     if (finalizedLatestBlock <= checkpointBlockNumber) {
-      this.logger.log(
+      this.logInfo(
         `checkpoint up-to-date checkpoint=${checkpointBlockNumber} latestFinalized=${finalizedLatestBlock}`,
       );
       return;
@@ -120,7 +122,7 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
       finalizedLatestBlock - maxBackfillBlocks + 1,
     );
 
-    this.logger.log(
+    this.logInfo(
       `checkpoint recovery start from=${backfillFromBlock} to=${finalizedLatestBlock} latest=${latestBlockNumber} confirmations=${this.appConfigService.chainReorgConfirmations}`,
     );
 
@@ -148,23 +150,21 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
     this.lastObservedBlockNumber = blockNumber;
 
     if (this.lastProcessedBlockNumber !== null && blockNumber <= this.lastProcessedBlockNumber) {
-      this.logger.debug(
+      this.logDebug(
         `enqueueBlock skip old block blockNumber=${blockNumber} lastProcessed=${this.lastProcessedBlockNumber}`,
       );
       return;
     }
 
     if (this.blockQueue.includes(blockNumber)) {
-      this.logger.debug(`enqueueBlock skip duplicate blockNumber=${blockNumber}`);
+      this.logDebug(`enqueueBlock skip duplicate blockNumber=${blockNumber}`);
       return;
     }
 
     if (this.blockQueue.length >= this.appConfigService.chainBlockQueueMax) {
       const droppedCount: number = this.blockQueue.length;
       this.blockQueue.splice(0, this.blockQueue.length, blockNumber);
-      this.logger.warn(
-        `block queue overflow: dropped=${droppedCount}, retainedLatest=${blockNumber}`,
-      );
+      this.logWarn(`block queue overflow: dropped=${droppedCount}, retainedLatest=${blockNumber}`);
     } else {
       this.blockQueue.push(blockNumber);
     }
@@ -202,7 +202,7 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
           this.publishRuntimeSnapshot();
         } catch (error: unknown) {
           const errorMessage: string = error instanceof Error ? error.message : String(error);
-          this.logger.warn(
+          this.logWarn(
             `processBlockQueue failed blockNumber=${nextBlockNumber} reason=${errorMessage}`,
           );
         }
@@ -217,15 +217,15 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async processBlock(blockNumber: number): Promise<void> {
-    this.logger.debug(`processBlock start blockNumber=${blockNumber}`);
+    this.logDebug(`processBlock start blockNumber=${blockNumber}`);
     const trackedAddresses: readonly string[] =
       await this.subscriptionsRepository.listTrackedAddresses(ChainKey.ETHEREUM_MAINNET);
 
     if (trackedAddresses.length === 0) {
-      this.logger.debug(`processBlock skip no tracked addresses blockNumber=${blockNumber}`);
+      this.logDebug(`processBlock skip no tracked addresses blockNumber=${blockNumber}`);
       return;
     }
-    this.logger.debug(
+    this.logDebug(
       `processBlock tracked addresses count=${trackedAddresses.length} blockNumber=${blockNumber}`,
     );
 
@@ -241,7 +241,7 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
     );
 
     if (!block) {
-      this.logger.warn(`processBlock block not found blockNumber=${blockNumber}`);
+      this.logWarn(`processBlock block not found blockNumber=${blockNumber}`);
       return;
     }
 
@@ -251,7 +251,7 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
       block.timestampSec,
     );
 
-    this.logger.debug(
+    this.logDebug(
       `processBlock loaded blockNumber=${blockNumber} txCount=${block.transactions.length} matchedCount=${matchedTransactions.length}`,
     );
 
@@ -312,7 +312,7 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
             await this.processMatchedTransaction(matchedTransaction);
           } catch (error: unknown) {
             const errorMessage: string = error instanceof Error ? error.message : String(error);
-            this.logger.warn(
+            this.logWarn(
               `processMatchedTransactions failed txHash=${matchedTransaction.txHash} reason=${errorMessage}`,
             );
           }
@@ -322,7 +322,7 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async processMatchedTransaction(matchedTransaction: MatchedTransaction): Promise<void> {
-    this.logger.debug(
+    this.logDebug(
       `processMatchedTransaction start txHash=${matchedTransaction.txHash} address=${matchedTransaction.trackedAddress}`,
     );
 
@@ -342,13 +342,13 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
     const classifiedEvent = this.eventClassifierService.classify(observedTransaction);
 
     if (classifiedEvent.eventType === ClassifiedEventType.UNKNOWN) {
-      this.logger.debug(
+      this.logDebug(
         `processMatchedTransaction classified UNKNOWN txHash=${matchedTransaction.txHash}`,
       );
       return;
     }
 
-    this.logger.log(
+    this.logInfo(
       `processMatchedTransaction classified eventType=${classifiedEvent.eventType} txHash=${matchedTransaction.txHash} address=${matchedTransaction.trackedAddress}`,
     );
 
@@ -361,7 +361,7 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
     });
 
     if (alreadyProcessed) {
-      this.logger.debug(
+      this.logDebug(
         `processMatchedTransaction skip already processed txHash=${matchedTransaction.txHash}`,
       );
       return;
@@ -385,7 +385,7 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
     });
 
     await this.alertDispatcherService.dispatch(classifiedEvent);
-    this.logger.debug(`processMatchedTransaction dispatched txHash=${matchedTransaction.txHash}`);
+    this.logDebug(`processMatchedTransaction dispatched txHash=${matchedTransaction.txHash}`);
   }
 
   private matchTrackedAddress(
@@ -433,8 +433,10 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
         this.lastObservedBlockNumber !== null && this.lastProcessedBlockNumber !== null
           ? this.lastObservedBlockNumber - this.lastProcessedBlockNumber
           : null;
-      const currentBackoffMs: number = this.providerFailoverService.getCurrentBackoffMs();
-      this.logger.log(
+      const currentBackoffMs: number = this.providerFailoverService.getCurrentBackoffMs(
+        ChainKey.ETHEREUM_MAINNET,
+      );
+      this.logInfo(
         `heartbeat observedBlock=${this.lastObservedBlockNumber ?? 'n/a'} processedBlock=${this.lastProcessedBlockNumber ?? 'n/a'} lag=${lag ?? 'n/a'} queueSize=${this.blockQueue.length} confirmations=${this.appConfigService.chainReorgConfirmations} backoffMs=${currentBackoffMs}`,
       );
       this.publishRuntimeSnapshot();
@@ -459,9 +461,21 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
     const primaryHealth = await primaryProvider.healthCheck();
     const fallbackHealth = await fallbackProvider.healthCheck();
 
-    this.logger.log(
+    this.logInfo(
       `startup rpc smoke-check primary=${primaryHealth.ok ? 'ok' : 'fail'} (${primaryHealth.details}), fallback=${fallbackHealth.ok ? 'ok' : 'fail'} (${fallbackHealth.details})`,
     );
+  }
+
+  private logInfo(message: string): void {
+    this.logger.log(`${ChainStreamService.LOG_PREFIX} ${message}`);
+  }
+
+  private logWarn(message: string): void {
+    this.logger.warn(`${ChainStreamService.LOG_PREFIX} ${message}`);
+  }
+
+  private logDebug(message: string): void {
+    this.logger.debug(`${ChainStreamService.LOG_PREFIX} ${message}`);
   }
 
   private publishRuntimeSnapshot(): void {
@@ -475,7 +489,7 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
       processedBlock: this.lastProcessedBlockNumber,
       lag,
       queueSize: this.blockQueue.length,
-      backoffMs: this.providerFailoverService.getCurrentBackoffMs(),
+      backoffMs: this.providerFailoverService.getCurrentBackoffMs(ChainKey.ETHEREUM_MAINNET),
       confirmations: this.appConfigService.chainReorgConfirmations,
       updatedAtIso: new Date().toISOString(),
     });

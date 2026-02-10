@@ -32,12 +32,16 @@ type SolanaMatchedTransaction = {
 @Injectable()
 export class SolanaChainStreamService implements OnModuleInit, OnModuleDestroy {
   private static readonly SPL_TOKEN_PROGRAM: string = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
+  private static readonly LOG_PREFIX: string = '[SOL]';
+  private static readonly DEFAULT_HEARTBEAT_INTERVAL_SEC: number = 60;
 
   private readonly logger: Logger = new Logger(SolanaChainStreamService.name);
   private readonly blockQueue: number[] = [];
   private subscriptionHandle: ISubscriptionHandle | null = null;
   private isProcessingQueue: boolean = false;
+  private lastObservedBlockNumber: number | null = null;
   private lastProcessedBlockNumber: number | null = null;
+  private heartbeatTimer: NodeJS.Timeout | null = null;
 
   public constructor(
     private readonly appConfigService: AppConfigService,
@@ -51,7 +55,7 @@ export class SolanaChainStreamService implements OnModuleInit, OnModuleDestroy {
 
   public async onModuleInit(): Promise<void> {
     if (!this.appConfigService.solanaWatcherEnabled) {
-      this.logger.log('Solana watcher is disabled by config.');
+      this.logInfo('Solana watcher is disabled by config.');
       return;
     }
 
@@ -65,10 +69,13 @@ export class SolanaChainStreamService implements OnModuleInit, OnModuleDestroy {
         }),
     );
 
-    this.logger.log('Solana watcher subscribed to new blocks.');
+    this.startHeartbeat();
+    this.logInfo('Solana watcher subscribed to new blocks.');
   }
 
   public async onModuleDestroy(): Promise<void> {
+    this.stopHeartbeat();
+
     if (this.subscriptionHandle !== null) {
       await this.subscriptionHandle.stop();
       this.subscriptionHandle = null;
@@ -109,6 +116,8 @@ export class SolanaChainStreamService implements OnModuleInit, OnModuleDestroy {
   }
 
   private enqueueBlock(blockNumber: number): void {
+    this.lastObservedBlockNumber = blockNumber;
+
     if (this.lastProcessedBlockNumber !== null && blockNumber <= this.lastProcessedBlockNumber) {
       return;
     }
@@ -120,7 +129,7 @@ export class SolanaChainStreamService implements OnModuleInit, OnModuleDestroy {
     if (this.blockQueue.length >= this.appConfigService.chainBlockQueueMax) {
       const droppedCount: number = this.blockQueue.length;
       this.blockQueue.splice(0, this.blockQueue.length, blockNumber);
-      this.logger.warn(`solana queue overflow dropped=${droppedCount} retained=${blockNumber}`);
+      this.logWarn(`solana queue overflow dropped=${droppedCount} retained=${blockNumber}`);
     } else {
       this.blockQueue.push(blockNumber);
     }
@@ -155,9 +164,7 @@ export class SolanaChainStreamService implements OnModuleInit, OnModuleDestroy {
           );
         } catch (error: unknown) {
           const errorMessage: string = error instanceof Error ? error.message : String(error);
-          this.logger.warn(
-            `solana processBlock failed block=${blockNumber} reason=${errorMessage}`,
-          );
+          this.logWarn(`solana processBlock failed block=${blockNumber} reason=${errorMessage}`);
         }
       }
     } finally {
@@ -194,6 +201,9 @@ export class SolanaChainStreamService implements OnModuleInit, OnModuleDestroy {
         trackedAddressSet,
         blockEnvelope.timestampSec,
       );
+    this.logDebug(
+      `processBlock block=${blockNumber} txCount=${blockEnvelope.transactions.length} matchedCount=${matchedTransactions.length}`,
+    );
 
     for (const matchedTransaction of matchedTransactions) {
       await this.processMatchedTransaction(matchedTransaction);
@@ -251,6 +261,10 @@ export class SolanaChainStreamService implements OnModuleInit, OnModuleDestroy {
   private async processMatchedTransaction(
     matchedTransaction: SolanaMatchedTransaction,
   ): Promise<void> {
+    this.logDebug(
+      `processMatchedTransaction start txHash=${matchedTransaction.txHash} address=${matchedTransaction.trackedAddress}`,
+    );
+
     const processedKey = {
       txHash: matchedTransaction.txHash,
       logIndex: 0,
@@ -281,6 +295,10 @@ export class SolanaChainStreamService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
+    this.logInfo(
+      `processMatchedTransaction classified eventType=${classifiedEvent.eventType} txHash=${matchedTransaction.txHash} address=${matchedTransaction.trackedAddress}`,
+    );
+
     const occurredAt: Date = this.resolveOccurredAt(matchedTransaction.blockTimestampSec);
 
     await this.walletEventsRepository.saveEvent({
@@ -289,6 +307,7 @@ export class SolanaChainStreamService implements OnModuleInit, OnModuleDestroy {
     });
     await this.processedEventsRepository.markProcessed(processedKey);
     await this.alertDispatcherService.dispatch(classifiedEvent);
+    this.logDebug(`processMatchedTransaction dispatched txHash=${matchedTransaction.txHash}`);
   }
 
   private classifyTransaction(
@@ -368,5 +387,52 @@ export class SolanaChainStreamService implements OnModuleInit, OnModuleDestroy {
     }
 
     return new Date(blockTimestampSec * 1000);
+  }
+
+  private logInfo(message: string): void {
+    this.logger.log(`${SolanaChainStreamService.LOG_PREFIX} ${message}`);
+  }
+
+  private logWarn(message: string): void {
+    this.logger.warn(`${SolanaChainStreamService.LOG_PREFIX} ${message}`);
+  }
+
+  private logDebug(message: string): void {
+    this.logger.debug(`${SolanaChainStreamService.LOG_PREFIX} ${message}`);
+  }
+
+  private startHeartbeat(): void {
+    const configuredIntervalSec: number | undefined =
+      this.appConfigService.chainHeartbeatIntervalSec;
+    const intervalSec: number =
+      typeof configuredIntervalSec === 'number' && configuredIntervalSec > 0
+        ? configuredIntervalSec
+        : SolanaChainStreamService.DEFAULT_HEARTBEAT_INTERVAL_SEC;
+    const intervalMs: number = intervalSec * 1000;
+
+    this.heartbeatTimer = setInterval((): void => {
+      const lag: number | null =
+        this.lastObservedBlockNumber !== null && this.lastProcessedBlockNumber !== null
+          ? this.lastObservedBlockNumber - this.lastProcessedBlockNumber
+          : null;
+      const backoffMs: number = this.providerFailoverService.getCurrentBackoffMs(
+        ChainKey.SOLANA_MAINNET,
+      );
+
+      this.logInfo(
+        `heartbeat observedBlock=${this.lastObservedBlockNumber ?? 'n/a'} processedBlock=${this.lastProcessedBlockNumber ?? 'n/a'} lag=${lag ?? 'n/a'} queueSize=${this.blockQueue.length} backoffMs=${backoffMs}`,
+      );
+    }, intervalMs);
+
+    this.heartbeatTimer.unref();
+  }
+
+  private stopHeartbeat(): void {
+    if (this.heartbeatTimer === null) {
+      return;
+    }
+
+    clearInterval(this.heartbeatTimer);
+    this.heartbeatTimer = null;
   }
 }

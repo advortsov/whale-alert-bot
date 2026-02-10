@@ -35,6 +35,11 @@ interface TronGridPageLoadResult<TItem> {
   readonly nextFingerprint: string | null;
 }
 
+interface TronGridRequestQueryPolicy {
+  readonly includeOnlyConfirmed: boolean;
+  readonly includeOrderBy: boolean;
+}
+
 @Injectable()
 export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
   private static readonly REQUEST_TIMEOUT_MS: number = 10_000;
@@ -42,6 +47,20 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
   private static readonly MAX_PAGE_REQUESTS: number = 20;
 
   private readonly logger: Logger = new Logger(TronGridHistoryAdapter.name);
+  private static readonly QUERY_POLICIES: readonly TronGridRequestQueryPolicy[] = [
+    {
+      includeOnlyConfirmed: true,
+      includeOrderBy: true,
+    },
+    {
+      includeOnlyConfirmed: true,
+      includeOrderBy: false,
+    },
+    {
+      includeOnlyConfirmed: false,
+      includeOrderBy: false,
+    },
+  ];
 
   public constructor(
     private readonly appConfigService: AppConfigService,
@@ -230,40 +249,86 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
   private async requestPage(
     options: TronGridPageRequestOptions,
   ): Promise<TronGridListResponse<unknown>> {
-    const requestUrl: URL = new URL(options.path, this.appConfigService.tronGridApiBaseUrl);
-    requestUrl.searchParams.set('only_confirmed', 'true');
-    requestUrl.searchParams.set('order_by', 'block_timestamp,desc');
-    requestUrl.searchParams.set('limit', String(options.pageSize));
-
-    if (options.fingerprint !== null) {
-      requestUrl.searchParams.set('fingerprint', options.fingerprint);
-    }
-
     const headers: Record<string, string> = {};
 
     if (this.appConfigService.tronGridApiKey !== null) {
       headers['TRON-PRO-API-KEY'] = this.appConfigService.tronGridApiKey;
     }
 
-    this.logger.debug(`tron history request url=${requestUrl.toString()}`);
+    let lastError: Error | null = null;
 
-    const response: Response = await fetch(requestUrl, {
-      method: 'GET',
-      headers,
-      signal: AbortSignal.timeout(TronGridHistoryAdapter.REQUEST_TIMEOUT_MS),
-    });
+    for (const queryPolicy of TronGridHistoryAdapter.QUERY_POLICIES) {
+      const requestUrl: URL = this.buildRequestUrl(options, queryPolicy);
+      this.logger.debug(`tron history request url=${requestUrl.toString()}`);
 
-    if (!response.ok) {
-      throw new Error(`TRON history HTTP ${response.status}`);
+      const response: Response = await fetch(requestUrl, {
+        method: 'GET',
+        headers,
+        signal: AbortSignal.timeout(TronGridHistoryAdapter.REQUEST_TIMEOUT_MS),
+      });
+
+      if (response.ok) {
+        const payload: unknown = await response.json();
+
+        if (!payload || typeof payload !== 'object') {
+          throw new Error('TRON history response is not an object.');
+        }
+
+        return payload as TronGridListResponse<unknown>;
+      }
+
+      const responseDetails: string = await this.readResponseDetails(response);
+      lastError = new Error(
+        `TRON history HTTP ${response.status}${responseDetails.length > 0 ? `: ${responseDetails}` : ''}`,
+      );
+
+      if (response.status !== 400) {
+        throw lastError;
+      }
+
+      this.logger.warn(
+        `tron history HTTP 400, retry with fallback query policy onlyConfirmed=${String(queryPolicy.includeOnlyConfirmed)} orderBy=${String(queryPolicy.includeOrderBy)}`,
+      );
     }
 
-    const payload: unknown = await response.json();
+    throw lastError ?? new Error('TRON history request failed without response details.');
+  }
 
-    if (!payload || typeof payload !== 'object') {
-      throw new Error('TRON history response is not an object.');
+  private buildRequestUrl(
+    options: TronGridPageRequestOptions,
+    queryPolicy: TronGridRequestQueryPolicy,
+  ): URL {
+    const requestUrl: URL = new URL(options.path, this.appConfigService.tronGridApiBaseUrl);
+    requestUrl.searchParams.set('limit', String(options.pageSize));
+
+    if (queryPolicy.includeOnlyConfirmed) {
+      requestUrl.searchParams.set('only_confirmed', 'true');
     }
 
-    return payload as TronGridListResponse<unknown>;
+    if (queryPolicy.includeOrderBy) {
+      requestUrl.searchParams.set('order_by', 'block_timestamp,desc');
+    }
+
+    if (options.fingerprint !== null) {
+      requestUrl.searchParams.set('fingerprint', options.fingerprint);
+    }
+
+    return requestUrl;
+  }
+
+  private async readResponseDetails(response: Response): Promise<string> {
+    try {
+      const responseText: string = (await response.text()).trim();
+
+      if (responseText.length === 0) {
+        return '';
+      }
+
+      const normalizedResponseText: string = responseText.replace(/\s+/g, ' ');
+      return normalizedResponseText.slice(0, 300);
+    } catch {
+      return '';
+    }
   }
 
   private resolveResponseData(payload: TronGridListResponse<unknown>): readonly unknown[] {

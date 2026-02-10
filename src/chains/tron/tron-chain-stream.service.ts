@@ -27,11 +27,16 @@ type TronMatchedTransaction = {
 
 @Injectable()
 export class TronChainStreamService implements OnModuleInit, OnModuleDestroy {
+  private static readonly LOG_PREFIX: string = '[TRON]';
+  private static readonly DEFAULT_HEARTBEAT_INTERVAL_SEC: number = 60;
+
   private readonly logger: Logger = new Logger(TronChainStreamService.name);
   private readonly blockQueue: number[] = [];
   private subscriptionHandle: ISubscriptionHandle | null = null;
   private isProcessingQueue: boolean = false;
+  private lastObservedBlockNumber: number | null = null;
   private lastProcessedBlockNumber: number | null = null;
+  private heartbeatTimer: NodeJS.Timeout | null = null;
 
   public constructor(
     private readonly appConfigService: AppConfigService,
@@ -45,7 +50,7 @@ export class TronChainStreamService implements OnModuleInit, OnModuleDestroy {
 
   public async onModuleInit(): Promise<void> {
     if (!this.appConfigService.tronWatcherEnabled) {
-      this.logger.log('TRON watcher is disabled by config.');
+      this.logInfo('TRON watcher is disabled by config.');
       return;
     }
 
@@ -59,10 +64,13 @@ export class TronChainStreamService implements OnModuleInit, OnModuleDestroy {
         }),
     );
 
-    this.logger.log('TRON watcher subscribed to new blocks.');
+    this.startHeartbeat();
+    this.logInfo('TRON watcher subscribed to new blocks.');
   }
 
   public async onModuleDestroy(): Promise<void> {
+    this.stopHeartbeat();
+
     if (this.subscriptionHandle !== null) {
       await this.subscriptionHandle.stop();
       this.subscriptionHandle = null;
@@ -103,6 +111,8 @@ export class TronChainStreamService implements OnModuleInit, OnModuleDestroy {
   }
 
   private enqueueBlock(blockNumber: number): void {
+    this.lastObservedBlockNumber = blockNumber;
+
     if (this.lastProcessedBlockNumber !== null && blockNumber <= this.lastProcessedBlockNumber) {
       return;
     }
@@ -114,7 +124,7 @@ export class TronChainStreamService implements OnModuleInit, OnModuleDestroy {
     if (this.blockQueue.length >= this.appConfigService.chainBlockQueueMax) {
       const droppedCount: number = this.blockQueue.length;
       this.blockQueue.splice(0, this.blockQueue.length, blockNumber);
-      this.logger.warn(`tron queue overflow dropped=${droppedCount} retained=${blockNumber}`);
+      this.logWarn(`tron queue overflow dropped=${droppedCount} retained=${blockNumber}`);
     } else {
       this.blockQueue.push(blockNumber);
     }
@@ -149,7 +159,7 @@ export class TronChainStreamService implements OnModuleInit, OnModuleDestroy {
           );
         } catch (error: unknown) {
           const errorMessage: string = error instanceof Error ? error.message : String(error);
-          this.logger.warn(`tron processBlock failed block=${blockNumber} reason=${errorMessage}`);
+          this.logWarn(`tron processBlock failed block=${blockNumber} reason=${errorMessage}`);
         }
       }
     } finally {
@@ -183,6 +193,9 @@ export class TronChainStreamService implements OnModuleInit, OnModuleDestroy {
       blockEnvelope.transactions,
       trackedAddressSet,
       blockEnvelope.timestampSec,
+    );
+    this.logDebug(
+      `processBlock block=${blockNumber} txCount=${blockEnvelope.transactions.length} matchedCount=${matchedTransactions.length}`,
     );
 
     for (const matchedTransaction of matchedTransactions) {
@@ -241,6 +254,10 @@ export class TronChainStreamService implements OnModuleInit, OnModuleDestroy {
   private async processMatchedTransaction(
     matchedTransaction: TronMatchedTransaction,
   ): Promise<void> {
+    this.logDebug(
+      `processMatchedTransaction start txHash=${matchedTransaction.txHash} address=${matchedTransaction.trackedAddress}`,
+    );
+
     const processedKey = {
       txHash: matchedTransaction.txHash,
       logIndex: 0,
@@ -256,6 +273,9 @@ export class TronChainStreamService implements OnModuleInit, OnModuleDestroy {
     }
 
     const classifiedEvent: ClassifiedEvent = this.classifyMatchedTransaction(matchedTransaction);
+    this.logInfo(
+      `processMatchedTransaction classified eventType=${classifiedEvent.eventType} txHash=${matchedTransaction.txHash} address=${matchedTransaction.trackedAddress}`,
+    );
     const occurredAt: Date =
       matchedTransaction.blockTimestampSec !== null
         ? new Date(matchedTransaction.blockTimestampSec * 1000)
@@ -267,6 +287,7 @@ export class TronChainStreamService implements OnModuleInit, OnModuleDestroy {
     });
     await this.processedEventsRepository.markProcessed(processedKey);
     await this.alertDispatcherService.dispatch(classifiedEvent);
+    this.logDebug(`processMatchedTransaction dispatched txHash=${matchedTransaction.txHash}`);
   }
 
   private classifyMatchedTransaction(matchedTransaction: TronMatchedTransaction): ClassifiedEvent {
@@ -296,5 +317,52 @@ export class TronChainStreamService implements OnModuleInit, OnModuleDestroy {
       dex: null,
       pair: null,
     };
+  }
+
+  private logInfo(message: string): void {
+    this.logger.log(`${TronChainStreamService.LOG_PREFIX} ${message}`);
+  }
+
+  private logWarn(message: string): void {
+    this.logger.warn(`${TronChainStreamService.LOG_PREFIX} ${message}`);
+  }
+
+  private logDebug(message: string): void {
+    this.logger.debug(`${TronChainStreamService.LOG_PREFIX} ${message}`);
+  }
+
+  private startHeartbeat(): void {
+    const configuredIntervalSec: number | undefined =
+      this.appConfigService.chainHeartbeatIntervalSec;
+    const intervalSec: number =
+      typeof configuredIntervalSec === 'number' && configuredIntervalSec > 0
+        ? configuredIntervalSec
+        : TronChainStreamService.DEFAULT_HEARTBEAT_INTERVAL_SEC;
+    const intervalMs: number = intervalSec * 1000;
+
+    this.heartbeatTimer = setInterval((): void => {
+      const lag: number | null =
+        this.lastObservedBlockNumber !== null && this.lastProcessedBlockNumber !== null
+          ? this.lastObservedBlockNumber - this.lastProcessedBlockNumber
+          : null;
+      const backoffMs: number = this.providerFailoverService.getCurrentBackoffMs(
+        ChainKey.TRON_MAINNET,
+      );
+
+      this.logInfo(
+        `heartbeat observedBlock=${this.lastObservedBlockNumber ?? 'n/a'} processedBlock=${this.lastProcessedBlockNumber ?? 'n/a'} lag=${lag ?? 'n/a'} queueSize=${this.blockQueue.length} backoffMs=${backoffMs}`,
+      );
+    }, intervalMs);
+
+    this.heartbeatTimer.unref();
+  }
+
+  private stopHeartbeat(): void {
+    if (this.heartbeatTimer === null) {
+      return;
+    }
+
+    clearInterval(this.heartbeatTimer);
+    this.heartbeatTimer = null;
   }
 }

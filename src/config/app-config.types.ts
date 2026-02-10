@@ -14,6 +14,7 @@ export type AppConfig = {
   readonly chainReceiptConcurrency: number;
   readonly chainRpcMinIntervalMs: number;
   readonly chainBackoffBaseMs: number;
+  readonly chainSolanaBackoffBaseMs: number;
   readonly chainBackoffMaxMs: number;
   readonly chainBlockQueueMax: number;
   readonly chainHeartbeatIntervalSec: number;

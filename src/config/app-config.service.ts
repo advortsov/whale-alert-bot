@@ -66,7 +66,8 @@ const envSchema = z.object({
   CHAIN_RECEIPT_CONCURRENCY: z.coerce.number().int().positive().default(2),
   CHAIN_RPC_MIN_INTERVAL_MS: z.coerce.number().int().min(0).default(350),
   CHAIN_BACKOFF_BASE_MS: z.coerce.number().int().positive().default(1000),
-  CHAIN_BACKOFF_MAX_MS: z.coerce.number().int().positive().default(30000),
+  CHAIN_SOLANA_BACKOFF_BASE_MS: z.coerce.number().int().positive().default(5000),
+  CHAIN_BACKOFF_MAX_MS: z.coerce.number().int().positive().default(60000),
   CHAIN_BLOCK_QUEUE_MAX: z.coerce.number().int().positive().default(120),
   CHAIN_HEARTBEAT_INTERVAL_SEC: z.coerce.number().int().positive().default(60),
   CHAIN_REORG_CONFIRMATIONS: z.coerce.number().int().min(0).default(2),
@@ -123,6 +124,7 @@ export class AppConfigService {
       chainReceiptConcurrency: parsedEnv.CHAIN_RECEIPT_CONCURRENCY,
       chainRpcMinIntervalMs: parsedEnv.CHAIN_RPC_MIN_INTERVAL_MS,
       chainBackoffBaseMs: parsedEnv.CHAIN_BACKOFF_BASE_MS,
+      chainSolanaBackoffBaseMs: parsedEnv.CHAIN_SOLANA_BACKOFF_BASE_MS,
       chainBackoffMaxMs: parsedEnv.CHAIN_BACKOFF_MAX_MS,
       chainBlockQueueMax: parsedEnv.CHAIN_BLOCK_QUEUE_MAX,
       chainHeartbeatIntervalSec: parsedEnv.CHAIN_HEARTBEAT_INTERVAL_SEC,
@@ -201,6 +203,10 @@ export class AppConfigService {
 
   public get chainBackoffBaseMs(): number {
     return this.config.chainBackoffBaseMs;
+  }
+
+  public get chainSolanaBackoffBaseMs(): number {
+    return this.config.chainSolanaBackoffBaseMs;
   }
 
   public get chainBackoffMaxMs(): number {
@@ -338,6 +344,10 @@ export class AppConfigService {
   private assertWatcherConfig(parsedEnv: ParsedEnv): void {
     if (parsedEnv.CHAIN_BACKOFF_MAX_MS < parsedEnv.CHAIN_BACKOFF_BASE_MS) {
       throw new Error('CHAIN_BACKOFF_MAX_MS must be >= CHAIN_BACKOFF_BASE_MS');
+    }
+
+    if (parsedEnv.CHAIN_BACKOFF_MAX_MS < parsedEnv.CHAIN_SOLANA_BACKOFF_BASE_MS) {
+      throw new Error('CHAIN_BACKOFF_MAX_MS must be >= CHAIN_SOLANA_BACKOFF_BASE_MS');
     }
 
     if (parsedEnv.PRICE_CACHE_STALE_TTL_SEC < parsedEnv.PRICE_CACHE_FRESH_TTL_SEC) {

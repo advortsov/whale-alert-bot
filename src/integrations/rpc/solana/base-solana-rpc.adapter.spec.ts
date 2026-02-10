@@ -131,4 +131,24 @@ describe('BaseSolanaRpcAdapter', (): void => {
     expect(health.ok).toBe(false);
     expect(health.details).toContain('rpc unavailable');
   });
+
+  it('returns null block when slot was skipped in solana rpc', async (): Promise<void> => {
+    const adapter: SolanaAdapterTestImpl = new SolanaAdapterTestImpl();
+    const fetchMock: ReturnType<typeof vi.fn> = vi.fn().mockResolvedValue(
+      createResponse({
+        jsonrpc: '2.0',
+        id: 1,
+        error: {
+          code: -32007,
+          message: 'Slot 123 was skipped, or missing due to ledger jump to recent snapshot',
+        },
+      }),
+    );
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const blockEnvelope = await adapter.getBlockEnvelope(123);
+
+    expect(blockEnvelope).toBeNull();
+  });
 });

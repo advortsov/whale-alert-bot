@@ -64,6 +64,7 @@ type SolanaGetTransactionResponse = SolanaTransactionResult | null;
 export abstract class BaseSolanaRpcAdapter implements IRpcAdapter {
   private static readonly DEFAULT_TIMEOUT_MS: number = 8000;
   private static readonly BLOCK_POLL_INTERVAL_MS: number = 1000;
+  private static readonly MAX_SLOT_CATCHUP_PER_POLL: number = 8;
 
   private readonly logger: Logger;
 
@@ -103,9 +104,10 @@ export abstract class BaseSolanaRpcAdapter implements IRpcAdapter {
   }
 
   public async getBlockEnvelope(blockNumber: number): Promise<BlockEnvelope | null> {
-    const blockResult: SolanaGetBlockResponse = await this.callRpc<SolanaGetBlockResponse>(
-      'getBlock',
-      [
+    let blockResult: SolanaGetBlockResponse;
+
+    try {
+      blockResult = await this.callRpc<SolanaGetBlockResponse>('getBlock', [
         blockNumber,
         {
           commitment: 'confirmed',
@@ -114,8 +116,16 @@ export abstract class BaseSolanaRpcAdapter implements IRpcAdapter {
           transactionDetails: 'full',
           rewards: false,
         },
-      ],
-    );
+      ]);
+    } catch (error: unknown) {
+      const errorMessage: string = error instanceof Error ? error.message : String(error);
+
+      if (this.isSkippedSlotError(errorMessage)) {
+        return null;
+      }
+
+      throw error;
+    }
 
     if (blockResult === null) {
       return null;
@@ -225,7 +235,12 @@ export abstract class BaseSolanaRpcAdapter implements IRpcAdapter {
         return lastObservedSlot;
       }
 
-      for (let slot: number = lastObservedSlot + 1; slot <= latestSlot; slot += 1) {
+      const startSlot: number = Math.max(
+        lastObservedSlot + 1,
+        latestSlot - BaseSolanaRpcAdapter.MAX_SLOT_CATCHUP_PER_POLL + 1,
+      );
+
+      for (let slot: number = startSlot; slot <= latestSlot; slot += 1) {
         await handler(slot);
       }
 
@@ -235,6 +250,16 @@ export abstract class BaseSolanaRpcAdapter implements IRpcAdapter {
       this.logger.warn(`Slot poll failed: ${errorMessage}`);
       return lastObservedSlot;
     }
+  }
+
+  private isSkippedSlotError(message: string): boolean {
+    const normalizedMessage: string = message.toLowerCase();
+
+    return (
+      normalizedMessage.includes('code=-32007') ||
+      normalizedMessage.includes('slot was skipped') ||
+      normalizedMessage.includes('missing due to ledger jump')
+    );
   }
 
   private async callRpc<TResult>(method: string, params: readonly unknown[]): Promise<TResult> {

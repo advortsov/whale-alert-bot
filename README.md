@@ -92,6 +92,9 @@ npm run db:migrate
 - `ProviderFactory` создает primary/fallback без строковых ролей.
 - `ProviderFailoverService` выполняет fallback при ошибке primary.
 - `RpcThrottlerService` ограничивает темп RPC и включает backoff при rate-limit/timeout.
+- backoff и очередь изолированы по ключу провайдера (`primary:<chain>`, `fallback:<chain>`), чтобы проблемы Solana не замедляли ETH/TRON.
+- при `429` на primary включается cooldown primary на время текущего backoff, в этот период запросы идут сразу в fallback (меньше WARN и меньше лишних 429).
+- для Solana стартовый backoff отдельный: `CHAIN_SOLANA_BACKOFF_BASE_MS=5000`; авто-сброс Solana backoff отключен, чтобы не возвращаться к `429`-шторму.
 - v1 провайдеры: Alchemy (primary), Infura (fallback).
 
 ## Multichain-ready архитектура (Core + Adapters, домены)
@@ -106,6 +109,12 @@ npm run db:migrate
 - `src/integrations/*`: реализации адаптеров по доменам (а не по вендорам).
 - `src/features/*`: бизнес-логика Telegram/Tracking без прямых зависимостей на конкретный API-вендор.
 
+Логирование стримов:
+- Ethereum: префикс `[ETH]`
+- Solana: префикс `[SOL]`
+- TRON: префикс `[TRON]`
+- У каждой сети есть heartbeat-лог с lag/queue/backoff, чтобы быстро видеть состояние воркера.
+
 Технические ограничения этапа:
 
 - production-фокус пока на `ethereum_mainnet`, Solana включается staged-rollout (см. ниже);
@@ -117,6 +126,7 @@ TRON history fallback в текущем этапе:
 - primary путь: локальные `wallet_events` (если события уже есть в БД);
 - fallback путь: TronGrid API (`/transactions` для TRX и `/transactions/trc20` для токенов);
 - объединение TRX + TRC20 в единый список истории с фильтрами `kind`/`direction`;
+- если TronGrid возвращает `HTTP 400`, адаптер автоматически повторяет запрос с более мягкими query-параметрами;
 - ссылки в истории для TRON строятся через `TRONSCAN_TX_BASE_URL`.
 
 ## Параметры watcher (безопасные defaults для free API)
@@ -128,7 +138,8 @@ TRON_WATCHER_ENABLED=false
 CHAIN_RECEIPT_CONCURRENCY=2
 CHAIN_RPC_MIN_INTERVAL_MS=350
 CHAIN_BACKOFF_BASE_MS=1000
-CHAIN_BACKOFF_MAX_MS=30000
+CHAIN_SOLANA_BACKOFF_BASE_MS=5000
+CHAIN_BACKOFF_MAX_MS=60000
 CHAIN_BLOCK_QUEUE_MAX=120
 CHAIN_HEARTBEAT_INTERVAL_SEC=60
 CHAIN_REORG_CONFIRMATIONS=2

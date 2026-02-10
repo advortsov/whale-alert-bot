@@ -7,10 +7,12 @@ const createConfigStub = (
   minIntervalMs: number,
   backoffBaseMs: number,
   backoffMaxMs: number,
+  solanaBackoffBaseMs: number = backoffBaseMs,
 ): AppConfigService =>
   ({
     chainRpcMinIntervalMs: minIntervalMs,
     chainBackoffBaseMs: backoffBaseMs,
+    chainSolanaBackoffBaseMs: solanaBackoffBaseMs,
     chainBackoffMaxMs: backoffMaxMs,
   }) as unknown as AppConfigService;
 
@@ -54,5 +56,29 @@ describe('RpcThrottlerService', (): void => {
 
     throttler.resetBackoff();
     expect(throttler.getCurrentBackoffMs()).toBe(0);
+  });
+
+  it('keeps backoff state isolated per chain key', (): void => {
+    const throttler: RpcThrottlerService = new RpcThrottlerService(createConfigStub(0, 100, 300));
+
+    throttler.increaseBackoffForKey('solana_mainnet', 'rate-limit');
+    throttler.increaseBackoffForKey('solana_mainnet', 'rate-limit');
+    throttler.increaseBackoffForKey('tron_mainnet', 'rate-limit');
+
+    expect(throttler.getCurrentBackoffMsForKey('solana_mainnet')).toBe(200);
+    expect(throttler.getCurrentBackoffMsForKey('tron_mainnet')).toBe(100);
+    expect(throttler.getCurrentBackoffMsForKey('ethereum_mainnet')).toBe(0);
+  });
+
+  it('uses dedicated solana base backoff for solana throttle keys', (): void => {
+    const throttler: RpcThrottlerService = new RpcThrottlerService(
+      createConfigStub(0, 100, 60000, 5000),
+    );
+
+    throttler.increaseBackoffForKey('primary:solana_mainnet', 'rate-limit');
+    throttler.increaseBackoffForKey('primary:ethereum_mainnet', 'rate-limit');
+
+    expect(throttler.getCurrentBackoffMsForKey('primary:solana_mainnet')).toBe(5000);
+    expect(throttler.getCurrentBackoffMsForKey('primary:ethereum_mainnet')).toBe(100);
   });
 });
