@@ -11,6 +11,10 @@ export class SolanaHeliusPrimaryAdapter extends BaseSolanaRpcAdapter implements 
       appConfigService.solanaHeliusHttpUrl,
       appConfigService.solanaHeliusWssUrl,
       'solana-helius-primary',
+      {
+        pollIntervalMs: appConfigService.chainSolanaPollIntervalMs,
+        maxSlotCatchupPerPoll: appConfigService.chainSolanaCatchupBatch,
+      },
     );
   }
 }

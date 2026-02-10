@@ -135,6 +135,12 @@ describe('AppConfigService', (): void => {
       expect(config.chainBackoffBaseMs).toBe(1000);
       expect(config.chainSolanaBackoffBaseMs).toBe(5000);
       expect(config.chainBackoffMaxMs).toBe(60000);
+      expect(config.chainSolanaQueueMax).toBe(120);
+      expect(config.chainTronQueueMax).toBe(120);
+      expect(config.chainSolanaCatchupBatch).toBe(40);
+      expect(config.chainTronCatchupBatch).toBe(40);
+      expect(config.chainSolanaPollIntervalMs).toBe(2000);
+      expect(config.chainTronPollIntervalMs).toBe(2000);
     });
   });
 
@@ -148,6 +154,36 @@ describe('AppConfigService', (): void => {
       (): void => {
         expect((): AppConfigService => new AppConfigService()).toThrow(
           'CHAIN_BACKOFF_MAX_MS must be >= CHAIN_SOLANA_BACKOFF_BASE_MS',
+        );
+      },
+    );
+  });
+
+  it('throws when solana catchup batch exceeds solana queue max', (): void => {
+    withEnv(
+      {
+        ...createBaseEnv(),
+        CHAIN_SOLANA_QUEUE_MAX: '10',
+        CHAIN_SOLANA_CATCHUP_BATCH: '20',
+      },
+      (): void => {
+        expect((): AppConfigService => new AppConfigService()).toThrow(
+          'CHAIN_SOLANA_CATCHUP_BATCH must be <= CHAIN_SOLANA_QUEUE_MAX',
+        );
+      },
+    );
+  });
+
+  it('throws when tron catchup batch exceeds tron queue max', (): void => {
+    withEnv(
+      {
+        ...createBaseEnv(),
+        CHAIN_TRON_QUEUE_MAX: '10',
+        CHAIN_TRON_CATCHUP_BATCH: '20',
+      },
+      (): void => {
+        expect((): AppConfigService => new AppConfigService()).toThrow(
+          'CHAIN_TRON_CATCHUP_BATCH must be <= CHAIN_TRON_QUEUE_MAX',
         );
       },
     );

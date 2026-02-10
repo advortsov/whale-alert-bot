@@ -12,3 +12,7 @@
 - Для Solana авто-сброс primary-backoff отключен, чтобы не провоцировать повторные волны `429`.
 - Дефолтный потолок экспоненциального backoff увеличен до `60s` (`CHAIN_BACKOFF_MAX_MS=60000`).
 - Для TRON history добавлен fallback-ретрай при `HTTP 400` с мягкими query-параметрами.
+- Добавлены per-chain stream limits: `CHAIN_SOLANA_QUEUE_MAX`, `CHAIN_TRON_QUEUE_MAX`, `CHAIN_SOLANA_CATCHUP_BATCH`, `CHAIN_TRON_CATCHUP_BATCH`.
+- Добавлены per-chain poll intervals: `CHAIN_SOLANA_POLL_INTERVAL_MS`, `CHAIN_TRON_POLL_INTERVAL_MS`.
+- В Solana/TRON watcher добавлены bounded catchup и controlled degradation mode (`degradation_mode_enter/exit`) при переполнении очереди.
+- Heartbeat расширен метриками `queueUsedPct`, `catchupDebt`, `degradationMode`.

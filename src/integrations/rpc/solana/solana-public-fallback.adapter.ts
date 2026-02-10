@@ -14,6 +14,10 @@ export class SolanaPublicFallbackAdapter
       appConfigService.solanaPublicHttpUrl,
       appConfigService.solanaPublicWssUrl,
       'solana-public-fallback',
+      {
+        pollIntervalMs: appConfigService.chainSolanaPollIntervalMs,
+        maxSlotCatchupPerPoll: appConfigService.chainSolanaCatchupBatch,
+      },
     );
   }
 }

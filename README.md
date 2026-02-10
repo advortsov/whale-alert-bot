@@ -95,6 +95,7 @@ npm run db:migrate
 - backoff и очередь изолированы по ключу провайдера (`primary:<chain>`, `fallback:<chain>`), чтобы проблемы Solana не замедляли ETH/TRON.
 - при `429` на primary включается cooldown primary на время текущего backoff, в этот период запросы идут сразу в fallback (меньше WARN и меньше лишних 429).
 - для Solana стартовый backoff отдельный: `CHAIN_SOLANA_BACKOFF_BASE_MS=5000`; авто-сброс Solana backoff отключен, чтобы не возвращаться к `429`-шторму.
+- для Solana/TRON добавлен bounded catchup и контролируемая деградация очереди (retain tail window), чтобы не срывать поток при burst.
 - v1 провайдеры: Alchemy (primary), Infura (fallback).
 
 ## Multichain-ready архитектура (Core + Adapters, домены)
@@ -113,7 +114,7 @@ npm run db:migrate
 - Ethereum: префикс `[ETH]`
 - Solana: префикс `[SOL]`
 - TRON: префикс `[TRON]`
-- У каждой сети есть heartbeat-лог с lag/queue/backoff, чтобы быстро видеть состояние воркера.
+- У каждой сети есть heartbeat-лог с lag/queue/backoff, а также `queueUsedPct`, `catchupDebt`, `degradationMode`.
 
 Технические ограничения этапа:
 
@@ -141,6 +142,12 @@ CHAIN_BACKOFF_BASE_MS=1000
 CHAIN_SOLANA_BACKOFF_BASE_MS=5000
 CHAIN_BACKOFF_MAX_MS=60000
 CHAIN_BLOCK_QUEUE_MAX=120
+CHAIN_SOLANA_QUEUE_MAX=120
+CHAIN_TRON_QUEUE_MAX=120
+CHAIN_SOLANA_CATCHUP_BATCH=40
+CHAIN_TRON_CATCHUP_BATCH=40
+CHAIN_SOLANA_POLL_INTERVAL_MS=2000
+CHAIN_TRON_POLL_INTERVAL_MS=2000
 CHAIN_HEARTBEAT_INTERVAL_SEC=60
 CHAIN_REORG_CONFIRMATIONS=2
 SOLANA_HELIUS_HTTP_URL=https://api.mainnet-beta.solana.com

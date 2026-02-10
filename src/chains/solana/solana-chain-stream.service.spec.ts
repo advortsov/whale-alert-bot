@@ -151,6 +151,8 @@ describe('SolanaChainStreamService', (): void => {
     const appConfigService: AppConfigService = {
       solanaWatcherEnabled: true,
       chainBlockQueueMax: 20,
+      chainSolanaQueueMax: 20,
+      chainSolanaCatchupBatch: 10,
     } as unknown as AppConfigService;
 
     const service: SolanaChainStreamService = new SolanaChainStreamService(
@@ -233,6 +235,8 @@ describe('SolanaChainStreamService', (): void => {
     const appConfigService: AppConfigService = {
       solanaWatcherEnabled: true,
       chainBlockQueueMax: 20,
+      chainSolanaQueueMax: 20,
+      chainSolanaCatchupBatch: 10,
     } as unknown as AppConfigService;
 
     const service: SolanaChainStreamService = new SolanaChainStreamService(
@@ -256,6 +260,85 @@ describe('SolanaChainStreamService', (): void => {
 
     expect(saveEventMock).not.toHaveBeenCalled();
     expect(dispatchMock).not.toHaveBeenCalled();
+
+    await service.onModuleDestroy();
+  });
+
+  it('applies bounded catchup during checkpoint recovery for solana', async (): Promise<void> => {
+    const trackedAddress: string = '11111111111111111111111111111111';
+    const providerStub: SolanaProviderStub = new SolanaProviderStub();
+    providerStub.latestBlockNumber = 140;
+
+    for (let blockNumber: number = 131; blockNumber <= 140; blockNumber += 1) {
+      providerStub.setBlock(blockNumber, {
+        number: blockNumber,
+        timestampSec: 1_739_400_000,
+        transactions: [
+          {
+            hash: `sol-tx-${String(blockNumber)}`,
+            from: trackedAddress,
+            to: '22222222222222222222222222222222',
+            blockTimestampSec: 1_739_400_000,
+          },
+        ],
+      });
+      providerStub.setReceipt(`sol-tx-${String(blockNumber)}`, {
+        txHash: `sol-tx-${String(blockNumber)}`,
+        logs: [],
+      });
+    }
+
+    const providerFailoverService: ProviderFailoverService = {
+      execute: async <T>(operation: ProviderOperation<T>): Promise<T> =>
+        operation(providerStub as never),
+      executeForChain: async <T>(
+        _chainKey: ChainKey,
+        operation: ProviderOperation<T>,
+      ): Promise<T> => operation(providerStub as never),
+      getCurrentBackoffMs: (): number => 0,
+    } as unknown as ProviderFailoverService;
+    const chainCheckpointsRepository: ChainCheckpointsRepository = {
+      getLastProcessedBlock: async (): Promise<number | null> => 100,
+      saveLastProcessedBlock: vi.fn().mockResolvedValue(undefined),
+    } as unknown as ChainCheckpointsRepository;
+    const subscriptionsRepository: SubscriptionsRepository = {
+      listTrackedAddresses: async (): Promise<readonly string[]> => [trackedAddress],
+    } as unknown as SubscriptionsRepository;
+    const processedEventsRepository: ProcessedEventsRepository = {
+      hasProcessed: async (): Promise<boolean> => false,
+      markProcessed: vi.fn().mockResolvedValue(undefined),
+    } as unknown as ProcessedEventsRepository;
+    const saveEventMock: ReturnType<typeof vi.fn> = vi.fn().mockResolvedValue(undefined);
+    const walletEventsRepository: WalletEventsRepository = {
+      saveEvent: saveEventMock,
+      listRecentByTrackedAddress: async (): Promise<readonly []> => [],
+    } as unknown as WalletEventsRepository;
+    const dispatchMock: ReturnType<typeof vi.fn> = vi.fn().mockResolvedValue(undefined);
+    const alertDispatcherService: AlertDispatcherService = {
+      dispatch: dispatchMock,
+    } as unknown as AlertDispatcherService;
+    const appConfigService: AppConfigService = {
+      solanaWatcherEnabled: true,
+      chainBlockQueueMax: 120,
+      chainSolanaQueueMax: 120,
+      chainSolanaCatchupBatch: 10,
+    } as unknown as AppConfigService;
+
+    const service: SolanaChainStreamService = new SolanaChainStreamService(
+      appConfigService,
+      providerFailoverService,
+      chainCheckpointsRepository,
+      subscriptionsRepository,
+      processedEventsRepository,
+      walletEventsRepository,
+      alertDispatcherService,
+    );
+
+    await service.onModuleInit();
+    await sleep(80);
+
+    expect(saveEventMock).toHaveBeenCalledTimes(10);
+    expect(dispatchMock).toHaveBeenCalledTimes(10);
 
     await service.onModuleDestroy();
   });

@@ -13,6 +13,10 @@ export class TronPublicFallbackAdapter extends BaseTronRpcAdapter implements IFa
       'tron-public-fallback',
       appConfigService.tronGridApiKey,
       tronAddressCodec,
+      {
+        pollIntervalMs: appConfigService.chainTronPollIntervalMs,
+        maxBlockCatchupPerPoll: appConfigService.chainTronCatchupBatch,
+      },
     );
   }
 }

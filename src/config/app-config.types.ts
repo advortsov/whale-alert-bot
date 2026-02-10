@@ -17,6 +17,12 @@ export type AppConfig = {
   readonly chainSolanaBackoffBaseMs: number;
   readonly chainBackoffMaxMs: number;
   readonly chainBlockQueueMax: number;
+  readonly chainSolanaQueueMax: number;
+  readonly chainTronQueueMax: number;
+  readonly chainSolanaCatchupBatch: number;
+  readonly chainTronCatchupBatch: number;
+  readonly chainSolanaPollIntervalMs: number;
+  readonly chainTronPollIntervalMs: number;
   readonly chainHeartbeatIntervalSec: number;
   readonly chainReorgConfirmations: number;
   readonly botToken: string | null;

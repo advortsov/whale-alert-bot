@@ -137,6 +137,8 @@ describe('TronChainStreamService', (): void => {
     const appConfigService: AppConfigService = {
       tronWatcherEnabled: true,
       chainBlockQueueMax: 20,
+      chainTronQueueMax: 20,
+      chainTronCatchupBatch: 10,
     } as unknown as AppConfigService;
 
     const service: TronChainStreamService = new TronChainStreamService(
@@ -219,6 +221,8 @@ describe('TronChainStreamService', (): void => {
     const appConfigService: AppConfigService = {
       tronWatcherEnabled: true,
       chainBlockQueueMax: 20,
+      chainTronQueueMax: 20,
+      chainTronCatchupBatch: 10,
     } as unknown as AppConfigService;
 
     const service: TronChainStreamService = new TronChainStreamService(
@@ -242,6 +246,81 @@ describe('TronChainStreamService', (): void => {
 
     expect(saveEventMock).not.toHaveBeenCalled();
     expect(dispatchMock).not.toHaveBeenCalled();
+
+    await service.onModuleDestroy();
+  });
+
+  it('applies bounded catchup during checkpoint recovery for tron', async (): Promise<void> => {
+    const trackedAddress: string = 'TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7';
+    const providerStub: TronProviderStub = new TronProviderStub();
+    providerStub.latestBlockNumber = 140;
+
+    for (let blockNumber: number = 131; blockNumber <= 140; blockNumber += 1) {
+      providerStub.setBlock(blockNumber, {
+        number: blockNumber,
+        timestampSec: 1_739_500_000,
+        transactions: [
+          {
+            hash: `tron-tx-${String(blockNumber)}`,
+            from: trackedAddress,
+            to: 'TBGttECXLudhozoRi6j6zk7jjwuHp8ucLL',
+            blockTimestampSec: 1_739_500_000,
+          },
+        ],
+      });
+    }
+
+    const providerFailoverService: ProviderFailoverService = {
+      execute: async <T>(operation: ProviderOperation<T>): Promise<T> =>
+        operation(providerStub as never),
+      executeForChain: async <T>(
+        _chainKey: ChainKey,
+        operation: ProviderOperation<T>,
+      ): Promise<T> => operation(providerStub as never),
+      getCurrentBackoffMs: (): number => 0,
+    } as unknown as ProviderFailoverService;
+    const chainCheckpointsRepository: ChainCheckpointsRepository = {
+      getLastProcessedBlock: async (): Promise<number | null> => 100,
+      saveLastProcessedBlock: vi.fn().mockResolvedValue(undefined),
+    } as unknown as ChainCheckpointsRepository;
+    const subscriptionsRepository: SubscriptionsRepository = {
+      listTrackedAddresses: async (): Promise<readonly string[]> => [trackedAddress],
+    } as unknown as SubscriptionsRepository;
+    const processedEventsRepository: ProcessedEventsRepository = {
+      hasProcessed: async (): Promise<boolean> => false,
+      markProcessed: vi.fn().mockResolvedValue(undefined),
+    } as unknown as ProcessedEventsRepository;
+    const saveEventMock: ReturnType<typeof vi.fn> = vi.fn().mockResolvedValue(undefined);
+    const walletEventsRepository: WalletEventsRepository = {
+      saveEvent: saveEventMock,
+      listRecentByTrackedAddress: async (): Promise<readonly []> => [],
+    } as unknown as WalletEventsRepository;
+    const dispatchMock: ReturnType<typeof vi.fn> = vi.fn().mockResolvedValue(undefined);
+    const alertDispatcherService: AlertDispatcherService = {
+      dispatch: dispatchMock,
+    } as unknown as AlertDispatcherService;
+    const appConfigService: AppConfigService = {
+      tronWatcherEnabled: true,
+      chainBlockQueueMax: 120,
+      chainTronQueueMax: 120,
+      chainTronCatchupBatch: 10,
+    } as unknown as AppConfigService;
+
+    const service: TronChainStreamService = new TronChainStreamService(
+      appConfigService,
+      providerFailoverService,
+      chainCheckpointsRepository,
+      subscriptionsRepository,
+      processedEventsRepository,
+      walletEventsRepository,
+      alertDispatcherService,
+    );
+
+    await service.onModuleInit();
+    await sleep(80);
+
+    expect(saveEventMock).toHaveBeenCalledTimes(10);
+    expect(dispatchMock).toHaveBeenCalledTimes(10);
 
     await service.onModuleDestroy();
   });

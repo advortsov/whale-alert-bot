@@ -60,19 +60,35 @@ type TronGetTransactionInfoResponse = {
 };
 
 const DEFAULT_TIMEOUT_MS: number = 8000;
-const BLOCK_POLL_INTERVAL_MS: number = 1500;
+const DEFAULT_BLOCK_POLL_INTERVAL_MS: number = 1500;
+const DEFAULT_MAX_BLOCK_CATCHUP_PER_POLL: number = 8;
+const DEFAULT_POLL_JITTER_MS: number = 300;
 const HEX_40_SYMBOL_PATTERN: RegExp = /^[0-9a-fA-F]{40}$/;
+
+type TronStreamOptions = {
+  readonly pollIntervalMs: number;
+  readonly maxBlockCatchupPerPoll: number;
+  readonly pollJitterMs: number;
+};
 
 export abstract class BaseTronRpcAdapter implements IRpcAdapter {
   private readonly logger: Logger;
+  private readonly streamOptions: TronStreamOptions;
 
   protected constructor(
     private readonly httpUrl: string | null,
     private readonly providerName: string,
     private readonly tronApiKey: string | null,
     private readonly tronAddressCodec: TronAddressCodec,
+    streamOptions?: Partial<TronStreamOptions>,
   ) {
     this.logger = new Logger(providerName);
+    this.streamOptions = {
+      pollIntervalMs: streamOptions?.pollIntervalMs ?? DEFAULT_BLOCK_POLL_INTERVAL_MS,
+      maxBlockCatchupPerPoll:
+        streamOptions?.maxBlockCatchupPerPoll ?? DEFAULT_MAX_BLOCK_CATCHUP_PER_POLL,
+      pollJitterMs: streamOptions?.pollJitterMs ?? DEFAULT_POLL_JITTER_MS,
+    };
   }
 
   public getName(): string {
@@ -81,17 +97,45 @@ export abstract class BaseTronRpcAdapter implements IRpcAdapter {
 
   public async subscribeBlocks(handler: BlockHandler): Promise<ISubscriptionHandle> {
     let lastObservedBlock: number | null = null;
-    const intervalHandle: NodeJS.Timeout = setInterval((): void => {
-      void this.pollNewBlocks(handler, lastObservedBlock).then(
-        (nextObservedBlock: number | null): void => {
-          lastObservedBlock = nextObservedBlock;
-        },
-      );
-    }, BLOCK_POLL_INTERVAL_MS);
+    let stopped: boolean = false;
+    let timeoutHandle: NodeJS.Timeout | null = null;
+
+    const scheduleNextTick = (): void => {
+      if (stopped) {
+        return;
+      }
+
+      timeoutHandle = setTimeout((): void => {
+        void pollTick();
+      }, this.streamOptions.pollIntervalMs);
+      timeoutHandle.unref();
+    };
+
+    const pollTick = async (): Promise<void> => {
+      if (stopped) {
+        return;
+      }
+
+      const jitterMs: number = this.resolveJitterMs();
+
+      if (jitterMs > 0) {
+        await this.sleep(jitterMs);
+      }
+
+      lastObservedBlock = await this.pollNewBlocks(handler, lastObservedBlock);
+      scheduleNextTick();
+    };
+
+    scheduleNextTick();
 
     return {
       stop: async (): Promise<void> => {
-        clearInterval(intervalHandle);
+        stopped = true;
+
+        if (timeoutHandle !== null) {
+          clearTimeout(timeoutHandle);
+          timeoutHandle = null;
+        }
       },
     };
   }
@@ -229,8 +273,13 @@ export abstract class BaseTronRpcAdapter implements IRpcAdapter {
         return lastObservedBlock;
       }
 
+      const startBlockNumber: number = Math.max(
+        lastObservedBlock + 1,
+        latestBlockNumber - this.streamOptions.maxBlockCatchupPerPoll + 1,
+      );
+
       for (
-        let blockNumber: number = lastObservedBlock + 1;
+        let blockNumber: number = startBlockNumber;
         blockNumber <= latestBlockNumber;
         blockNumber += 1
       ) {
@@ -351,5 +400,21 @@ export abstract class BaseTronRpcAdapter implements IRpcAdapter {
 
   private isObject(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null;
+  }
+
+  private resolveJitterMs(): number {
+    if (this.streamOptions.pollJitterMs <= 0) {
+      return 0;
+    }
+
+    return Math.floor(Math.random() * (this.streamOptions.pollJitterMs + 1));
+  }
+
+  private async sleep(waitMs: number): Promise<void> {
+    await new Promise<void>((resolve: () => void): void => {
+      setTimeout((): void => {
+        resolve();
+      }, waitMs);
+    });
   }
 }

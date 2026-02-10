@@ -13,6 +13,10 @@ export class TronGridPrimaryAdapter extends BaseTronRpcAdapter implements IPrima
       'tron-grid-primary',
       appConfigService.tronGridApiKey,
       tronAddressCodec,
+      {
+        pollIntervalMs: appConfigService.chainTronPollIntervalMs,
+        maxBlockCatchupPerPoll: appConfigService.chainTronCatchupBatch,
+      },
     );
   }
 }

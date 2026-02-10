@@ -61,19 +61,36 @@ type SolanaGetBlockResponse = SolanaBlockResult | null;
 
 type SolanaGetTransactionResponse = SolanaTransactionResult | null;
 
+type SolanaStreamOptions = {
+  readonly pollIntervalMs: number;
+  readonly maxSlotCatchupPerPoll: number;
+  readonly pollJitterMs: number;
+};
+
 export abstract class BaseSolanaRpcAdapter implements IRpcAdapter {
   private static readonly DEFAULT_TIMEOUT_MS: number = 8000;
-  private static readonly BLOCK_POLL_INTERVAL_MS: number = 1000;
-  private static readonly MAX_SLOT_CATCHUP_PER_POLL: number = 8;
+  private static readonly DEFAULT_POLL_INTERVAL_MS: number = 1000;
+  private static readonly DEFAULT_MAX_SLOT_CATCHUP_PER_POLL: number = 8;
+  private static readonly DEFAULT_POLL_JITTER_MS: number = 300;
 
   private readonly logger: Logger;
+  private readonly streamOptions: SolanaStreamOptions;
 
   protected constructor(
     private readonly httpUrl: string | null,
     private readonly wsUrl: string | null,
     private readonly providerName: string,
+    streamOptions?: Partial<SolanaStreamOptions>,
   ) {
     this.logger = new Logger(providerName);
+    this.streamOptions = {
+      pollIntervalMs:
+        streamOptions?.pollIntervalMs ?? BaseSolanaRpcAdapter.DEFAULT_POLL_INTERVAL_MS,
+      maxSlotCatchupPerPoll:
+        streamOptions?.maxSlotCatchupPerPoll ??
+        BaseSolanaRpcAdapter.DEFAULT_MAX_SLOT_CATCHUP_PER_POLL,
+      pollJitterMs: streamOptions?.pollJitterMs ?? BaseSolanaRpcAdapter.DEFAULT_POLL_JITTER_MS,
+    };
   }
 
   public getName(): string {
@@ -86,15 +103,45 @@ export abstract class BaseSolanaRpcAdapter implements IRpcAdapter {
     }
 
     let lastObservedSlot: number | null = null;
-    const intervalHandle: NodeJS.Timeout = setInterval((): void => {
-      void this.pollNewSlots(handler, lastObservedSlot).then((updatedSlot: number | null): void => {
-        lastObservedSlot = updatedSlot;
-      });
-    }, BaseSolanaRpcAdapter.BLOCK_POLL_INTERVAL_MS);
+    let stopped: boolean = false;
+    let timeoutHandle: NodeJS.Timeout | null = null;
+
+    const scheduleNextTick = (): void => {
+      if (stopped) {
+        return;
+      }
+
+      timeoutHandle = setTimeout((): void => {
+        void pollTick();
+      }, this.streamOptions.pollIntervalMs);
+      timeoutHandle.unref();
+    };
+
+    const pollTick = async (): Promise<void> => {
+      if (stopped) {
+        return;
+      }
+
+      const jitterMs: number = this.resolveJitterMs();
+
+      if (jitterMs > 0) {
+        await this.sleep(jitterMs);
+      }
+
+      lastObservedSlot = await this.pollNewSlots(handler, lastObservedSlot);
+      scheduleNextTick();
+    };
+
+    scheduleNextTick();
 
     return {
       stop: async (): Promise<void> => {
-        clearInterval(intervalHandle);
+        stopped = true;
+
+        if (timeoutHandle !== null) {
+          clearTimeout(timeoutHandle);
+          timeoutHandle = null;
+        }
       },
     };
   }
@@ -237,7 +284,7 @@ export abstract class BaseSolanaRpcAdapter implements IRpcAdapter {
 
       const startSlot: number = Math.max(
         lastObservedSlot + 1,
-        latestSlot - BaseSolanaRpcAdapter.MAX_SLOT_CATCHUP_PER_POLL + 1,
+        latestSlot - this.streamOptions.maxSlotCatchupPerPoll + 1,
       );
 
       for (let slot: number = startSlot; slot <= latestSlot; slot += 1) {
@@ -307,6 +354,22 @@ export abstract class BaseSolanaRpcAdapter implements IRpcAdapter {
     } finally {
       clearTimeout(timeoutHandle);
     }
+  }
+
+  private resolveJitterMs(): number {
+    if (this.streamOptions.pollJitterMs <= 0) {
+      return 0;
+    }
+
+    return Math.floor(Math.random() * (this.streamOptions.pollJitterMs + 1));
+  }
+
+  private async sleep(waitMs: number): Promise<void> {
+    await new Promise<void>((resolve: () => void): void => {
+      setTimeout((): void => {
+        resolve();
+      }, waitMs);
+    });
   }
 
   private extractTransactionHash(

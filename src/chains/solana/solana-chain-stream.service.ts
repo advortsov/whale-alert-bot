@@ -16,6 +16,7 @@ import type {
   TransactionEnvelope,
 } from '../../core/ports/rpc/block-stream.interfaces';
 import type { ISubscriptionHandle } from '../../core/ports/rpc/rpc-adapter.interfaces';
+import { QueueOverflowPolicy } from '../../core/ports/rpc/stream-policy.interfaces';
 import { ChainCheckpointsRepository } from '../../storage/repositories/chain-checkpoints.repository';
 import { ProcessedEventsRepository } from '../../storage/repositories/processed-events.repository';
 import { SubscriptionsRepository } from '../../storage/repositories/subscriptions.repository';
@@ -42,6 +43,7 @@ export class SolanaChainStreamService implements OnModuleInit, OnModuleDestroy {
   private lastObservedBlockNumber: number | null = null;
   private lastProcessedBlockNumber: number | null = null;
   private heartbeatTimer: NodeJS.Timeout | null = null;
+  private isDegradationMode: boolean = false;
 
   public constructor(
     private readonly appConfigService: AppConfigService,
@@ -100,7 +102,16 @@ export class SolanaChainStreamService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    const maxBackfillBlocks: number = this.appConfigService.chainBlockQueueMax;
+    const maxBackfillBlocks: number = this.getCatchupBatch();
+    const missedBlocks: number = latestBlockNumber - checkpointBlockNumber;
+
+    if (missedBlocks > maxBackfillBlocks) {
+      const skippedBlocks: number = missedBlocks - maxBackfillBlocks;
+      this.logWarn(
+        `bounded catchup activated checkpoint=${checkpointBlockNumber} latest=${latestBlockNumber} batch=${maxBackfillBlocks} skipped=${skippedBlocks}`,
+      );
+    }
+
     const backfillFromBlock: number = Math.max(
       checkpointBlockNumber + 1,
       latestBlockNumber - maxBackfillBlocks + 1,
@@ -126,10 +137,10 @@ export class SolanaChainStreamService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    if (this.blockQueue.length >= this.appConfigService.chainBlockQueueMax) {
-      const droppedCount: number = this.blockQueue.length;
-      this.blockQueue.splice(0, this.blockQueue.length, blockNumber);
-      this.logWarn(`solana queue overflow dropped=${droppedCount} retained=${blockNumber}`);
+    const queueMax: number = this.getQueueMax();
+
+    if (this.blockQueue.length >= queueMax) {
+      this.applyQueueOverflowPolicy(blockNumber);
     } else {
       this.blockQueue.push(blockNumber);
     }
@@ -137,6 +148,8 @@ export class SolanaChainStreamService implements OnModuleInit, OnModuleDestroy {
     if (!this.isProcessingQueue) {
       void this.processQueue();
     }
+
+    this.tryExitDegradationMode();
   }
 
   private async processQueue(): Promise<void> {
@@ -162,6 +175,7 @@ export class SolanaChainStreamService implements OnModuleInit, OnModuleDestroy {
             ChainId.SOLANA_MAINNET,
             blockNumber,
           );
+          this.tryExitDegradationMode();
         } catch (error: unknown) {
           const errorMessage: string = error instanceof Error ? error.message : String(error);
           this.logWarn(`solana processBlock failed block=${blockNumber} reason=${errorMessage}`);
@@ -418,9 +432,12 @@ export class SolanaChainStreamService implements OnModuleInit, OnModuleDestroy {
       const backoffMs: number = this.providerFailoverService.getCurrentBackoffMs(
         ChainKey.SOLANA_MAINNET,
       );
+      const queueMax: number = this.getQueueMax();
+      const queueUsedPercent: number = Math.round((this.blockQueue.length / queueMax) * 100);
+      const catchupDebt: number = this.resolveCatchupDebt(lag);
 
       this.logInfo(
-        `heartbeat observedBlock=${this.lastObservedBlockNumber ?? 'n/a'} processedBlock=${this.lastProcessedBlockNumber ?? 'n/a'} lag=${lag ?? 'n/a'} queueSize=${this.blockQueue.length} backoffMs=${backoffMs}`,
+        `heartbeat observedBlock=${this.lastObservedBlockNumber ?? 'n/a'} processedBlock=${this.lastProcessedBlockNumber ?? 'n/a'} lag=${lag ?? 'n/a'} queueSize=${this.blockQueue.length}/${queueMax} queueUsedPct=${queueUsedPercent} catchupDebt=${catchupDebt} degradationMode=${this.isDegradationMode ? 'on' : 'off'} backoffMs=${backoffMs}`,
       );
     }, intervalMs);
 
@@ -434,5 +451,74 @@ export class SolanaChainStreamService implements OnModuleInit, OnModuleDestroy {
 
     clearInterval(this.heartbeatTimer);
     this.heartbeatTimer = null;
+  }
+
+  private getQueueMax(): number {
+    return this.appConfigService.chainSolanaQueueMax;
+  }
+
+  private getCatchupBatch(): number {
+    return this.appConfigService.chainSolanaCatchupBatch;
+  }
+
+  private applyQueueOverflowPolicy(blockNumber: number): void {
+    const queueMax: number = this.getQueueMax();
+    const retainedWindowSize: number = Math.max(Math.floor(queueMax * 0.3), 10);
+    const combinedQueue: number[] = [...this.blockQueue, blockNumber];
+    const retainedQueue: number[] = combinedQueue.slice(-retainedWindowSize);
+    const droppedCount: number = combinedQueue.length - retainedQueue.length;
+    const droppedFrom: number = combinedQueue[0] ?? blockNumber;
+    const droppedTo: number = combinedQueue[droppedCount - 1] ?? blockNumber;
+
+    this.blockQueue.splice(0, this.blockQueue.length, ...retainedQueue);
+
+    if (!this.isDegradationMode) {
+      this.isDegradationMode = true;
+      this.logWarn(
+        `degradation_mode_enter chain=${ChainKey.SOLANA_MAINNET} policy=${QueueOverflowPolicy.KEEP_TAIL_WINDOW} droppedRange=${droppedFrom}..${droppedTo} retainedRange=${retainedQueue[0] ?? blockNumber}..${retainedQueue[retainedQueue.length - 1] ?? blockNumber}`,
+      );
+    }
+
+    this.logWarn(
+      `solana queue overflow dropped=${droppedCount} retainedWindow=${retainedWindowSize} latest=${blockNumber}`,
+    );
+  }
+
+  private tryExitDegradationMode(): void {
+    if (!this.isDegradationMode) {
+      return;
+    }
+
+    const queueMax: number = this.getQueueMax();
+    const queueUsageRatio: number = this.blockQueue.length / queueMax;
+
+    if (queueUsageRatio > 0.25) {
+      return;
+    }
+
+    const lag: number | null = this.resolveLag();
+
+    if (lag !== null && lag > Math.floor(queueMax * 0.5)) {
+      return;
+    }
+
+    this.isDegradationMode = false;
+    this.logInfo(`degradation_mode_exit chain=${ChainKey.SOLANA_MAINNET}`);
+  }
+
+  private resolveLag(): number | null {
+    if (this.lastObservedBlockNumber === null || this.lastProcessedBlockNumber === null) {
+      return null;
+    }
+
+    return this.lastObservedBlockNumber - this.lastProcessedBlockNumber;
+  }
+
+  private resolveCatchupDebt(lag: number | null): number {
+    if (lag === null) {
+      return 0;
+    }
+
+    return Math.max(lag - this.blockQueue.length, 0);
   }
 }

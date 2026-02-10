@@ -69,6 +69,12 @@ const envSchema = z.object({
   CHAIN_SOLANA_BACKOFF_BASE_MS: z.coerce.number().int().positive().default(5000),
   CHAIN_BACKOFF_MAX_MS: z.coerce.number().int().positive().default(60000),
   CHAIN_BLOCK_QUEUE_MAX: z.coerce.number().int().positive().default(120),
+  CHAIN_SOLANA_QUEUE_MAX: z.coerce.number().int().positive().default(120),
+  CHAIN_TRON_QUEUE_MAX: z.coerce.number().int().positive().default(120),
+  CHAIN_SOLANA_CATCHUP_BATCH: z.coerce.number().int().positive().default(40),
+  CHAIN_TRON_CATCHUP_BATCH: z.coerce.number().int().positive().default(40),
+  CHAIN_SOLANA_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(2000),
+  CHAIN_TRON_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(2000),
   CHAIN_HEARTBEAT_INTERVAL_SEC: z.coerce.number().int().positive().default(60),
   CHAIN_REORG_CONFIRMATIONS: z.coerce.number().int().min(0).default(2),
   BOT_TOKEN: optionalNonEmptyStringSchema,
@@ -127,6 +133,12 @@ export class AppConfigService {
       chainSolanaBackoffBaseMs: parsedEnv.CHAIN_SOLANA_BACKOFF_BASE_MS,
       chainBackoffMaxMs: parsedEnv.CHAIN_BACKOFF_MAX_MS,
       chainBlockQueueMax: parsedEnv.CHAIN_BLOCK_QUEUE_MAX,
+      chainSolanaQueueMax: parsedEnv.CHAIN_SOLANA_QUEUE_MAX,
+      chainTronQueueMax: parsedEnv.CHAIN_TRON_QUEUE_MAX,
+      chainSolanaCatchupBatch: parsedEnv.CHAIN_SOLANA_CATCHUP_BATCH,
+      chainTronCatchupBatch: parsedEnv.CHAIN_TRON_CATCHUP_BATCH,
+      chainSolanaPollIntervalMs: parsedEnv.CHAIN_SOLANA_POLL_INTERVAL_MS,
+      chainTronPollIntervalMs: parsedEnv.CHAIN_TRON_POLL_INTERVAL_MS,
       chainHeartbeatIntervalSec: parsedEnv.CHAIN_HEARTBEAT_INTERVAL_SEC,
       chainReorgConfirmations: parsedEnv.CHAIN_REORG_CONFIRMATIONS,
       botToken: parsedEnv.BOT_TOKEN ?? null,
@@ -215,6 +227,30 @@ export class AppConfigService {
 
   public get chainBlockQueueMax(): number {
     return this.config.chainBlockQueueMax;
+  }
+
+  public get chainSolanaQueueMax(): number {
+    return this.config.chainSolanaQueueMax;
+  }
+
+  public get chainTronQueueMax(): number {
+    return this.config.chainTronQueueMax;
+  }
+
+  public get chainSolanaCatchupBatch(): number {
+    return this.config.chainSolanaCatchupBatch;
+  }
+
+  public get chainTronCatchupBatch(): number {
+    return this.config.chainTronCatchupBatch;
+  }
+
+  public get chainSolanaPollIntervalMs(): number {
+    return this.config.chainSolanaPollIntervalMs;
+  }
+
+  public get chainTronPollIntervalMs(): number {
+    return this.config.chainTronPollIntervalMs;
   }
 
   public get chainHeartbeatIntervalSec(): number {
@@ -348,6 +384,14 @@ export class AppConfigService {
 
     if (parsedEnv.CHAIN_BACKOFF_MAX_MS < parsedEnv.CHAIN_SOLANA_BACKOFF_BASE_MS) {
       throw new Error('CHAIN_BACKOFF_MAX_MS must be >= CHAIN_SOLANA_BACKOFF_BASE_MS');
+    }
+
+    if (parsedEnv.CHAIN_SOLANA_CATCHUP_BATCH > parsedEnv.CHAIN_SOLANA_QUEUE_MAX) {
+      throw new Error('CHAIN_SOLANA_CATCHUP_BATCH must be <= CHAIN_SOLANA_QUEUE_MAX');
+    }
+
+    if (parsedEnv.CHAIN_TRON_CATCHUP_BATCH > parsedEnv.CHAIN_TRON_QUEUE_MAX) {
+      throw new Error('CHAIN_TRON_CATCHUP_BATCH must be <= CHAIN_TRON_QUEUE_MAX');
     }
 
     if (parsedEnv.PRICE_CACHE_STALE_TTL_SEC < parsedEnv.PRICE_CACHE_FRESH_TTL_SEC) {
