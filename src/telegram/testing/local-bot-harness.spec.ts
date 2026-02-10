@@ -155,6 +155,33 @@ describe('LocalBotHarness', (): void => {
     );
   });
 
+  it('routes multiline /track sol when address and label are on separate lines', async (): Promise<void> => {
+    const trackingServiceStub: TrackingServiceStub = createTrackingServiceStub();
+    const runtimeStatusServiceStub: RuntimeStatusServiceStub = createRuntimeStatusServiceStub();
+    const harness: LocalBotHarness = new LocalBotHarness({
+      trackingService: trackingServiceStub as unknown as TrackingService,
+      runtimeStatusService: runtimeStatusServiceStub as unknown as RuntimeStatusService,
+    });
+
+    await harness.sendText({
+      user: {
+        telegramId: '42',
+        username: 'tester',
+      },
+      text: ['/track sol', 'GK3mWh4hdBokYhQ1tY4eVThdSvJvEkwL9wfadTmX6w5h', 'sol1'].join('\n'),
+    });
+
+    expect(trackingServiceStub.trackAddress).toHaveBeenCalledWith(
+      {
+        telegramId: '42',
+        username: 'tester',
+      },
+      'GK3mWh4hdBokYhQ1tY4eVThdSvJvEkwL9wfadTmX6w5h',
+      'sol1',
+      ChainKey.SOLANA_MAINNET,
+    );
+  });
+
   it('routes /track tron with explicit chain key', async (): Promise<void> => {
     const trackingServiceStub: TrackingServiceStub = createTrackingServiceStub();
     const runtimeStatusServiceStub: RuntimeStatusServiceStub = createRuntimeStatusServiceStub();

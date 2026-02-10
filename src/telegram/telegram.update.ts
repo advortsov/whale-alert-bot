@@ -1373,24 +1373,36 @@ export class TelegramUpdate {
       const commandLineNumber: number = lineIndex + 1;
       let args: readonly string[] = parts.slice(1);
 
-      if (
-        command === SupportedTelegramCommand.TRACK &&
-        args.length === 2 &&
-        this.resolveTrackChainAlias(args[0] ?? '') !== null
-      ) {
-        const nextLine: string | undefined = lines[lineIndex + 1];
-        const nextTrimmedLine: string = nextLine?.trim() ?? '';
+      if (command === SupportedTelegramCommand.TRACK) {
         const currentChainArg: string | undefined = args[0];
-        const currentAddressArg: string | undefined = args[1];
+        const chainAlias: ChainKey | null =
+          typeof currentChainArg === 'string' ? this.resolveTrackChainAlias(currentChainArg) : null;
 
-        if (
-          currentChainArg &&
-          currentAddressArg &&
-          nextTrimmedLine.length > 0 &&
-          !nextTrimmedLine.startsWith('/')
-        ) {
-          args = [currentChainArg, currentAddressArg, nextTrimmedLine];
-          lineIndex += 1;
+        if (chainAlias !== null && typeof currentChainArg === 'string') {
+          if (args.length === 1) {
+            const nextLine: string | undefined = lines[lineIndex + 1];
+            const nextTrimmedLine: string = nextLine?.trim() ?? '';
+
+            if (nextTrimmedLine.length > 0 && !nextTrimmedLine.startsWith('/')) {
+              args = [currentChainArg, nextTrimmedLine];
+              lineIndex += 1;
+            }
+          }
+
+          if (args.length === 2) {
+            const currentAddressArg: string | undefined = args[1];
+            const nextLine: string | undefined = lines[lineIndex + 1];
+            const nextTrimmedLine: string = nextLine?.trim() ?? '';
+
+            if (
+              typeof currentAddressArg === 'string' &&
+              nextTrimmedLine.length > 0 &&
+              !nextTrimmedLine.startsWith('/')
+            ) {
+              args = [currentChainArg, currentAddressArg, nextTrimmedLine];
+              lineIndex += 1;
+            }
+          }
         }
       }
 

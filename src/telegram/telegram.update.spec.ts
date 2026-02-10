@@ -82,6 +82,23 @@ describe('TelegramUpdate', (): void => {
     });
   });
 
+  it('parses multiline /track sol command with address and label on next lines', (): void => {
+    const trackingServiceStub: TrackingService = {} as TrackingService;
+    const update: TelegramUpdate = createUpdate(trackingServiceStub);
+    const privateApi: TelegramUpdatePrivateApi = update as unknown as TelegramUpdatePrivateApi;
+
+    const parsed: readonly ParsedMessageCommandView[] = privateApi.parseMessageCommands(
+      ['/track sol', 'GK3mWh4hdBokYhQ1tY4eVThdSvJvEkwL9wfadTmX6w5h', 'sol1'].join('\n'),
+    );
+
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0]).toMatchObject({
+      command: 'track',
+      args: ['sol', 'GK3mWh4hdBokYhQ1tY4eVThdSvJvEkwL9wfadTmX6w5h', 'sol1'],
+      lineNumber: 1,
+    });
+  });
+
   it('parses tron alias in /track command', (): void => {
     const trackingServiceStub: TrackingService = {} as TrackingService;
     const update: TelegramUpdate = createUpdate(trackingServiceStub);
