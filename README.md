@@ -1,6 +1,6 @@
 # Whale Alert Bot
 
-Telegram-бот на `NestJS + TypeScript` для отслеживания активности китов в Ethereum и Solana.
+Telegram-бот на `NestJS + TypeScript` для отслеживания активности китов в Ethereum, Solana и TRON.
 
 ## Стек
 
@@ -92,8 +92,8 @@ npm run db:migrate
 
 ## Multichain-ready архитектура (Core + Adapters, домены)
 
-Текущий runtime поддерживает Ethereum + Solana, а контракты уже подготовлены к подключению TRON и других сетей через порты и `chain_key`.
-Для `tron_mainnet` сейчас включен contracts-only режим: добавление/хранение адресов доступно, live watcher и history fallback пока не включены.
+Текущий runtime поддерживает Ethereum + Solana, а для TRON доступен history fallback через TronGrid.
+Live watcher для `tron_mainnet` пока не включен, но контракты и данные уже chain-aware.
 
 - `src/core/chains`: ключи сетей и базовые chain-контракты (`ChainKey`).
 - `src/core/ports/rpc`: доменный порт RPC/block stream.
@@ -105,8 +105,15 @@ npm run db:migrate
 Технические ограничения этапа:
 
 - production-фокус пока на `ethereum_mainnet`, Solana включается staged-rollout (см. ниже);
-- `tron_mainnet` пока только в контрактах/enum без runtime watcher;
+- для `tron_mainnet` доступны `/track`, `/list`, `/wallet`, `/history`, но live watcher пока выключен;
 - все chain-specific данные в БД помечаются `chain_key`.
+
+TRON history fallback в текущем этапе:
+
+- primary путь: локальные `wallet_events` (если события уже есть в БД);
+- fallback путь: TronGrid API (`/transactions` для TRX и `/transactions/trc20` для токенов);
+- объединение TRX + TRC20 в единый список истории с фильтрами `kind`/`direction`;
+- ссылки в истории для TRON строятся через `TRONSCAN_TX_BASE_URL`.
 
 ## Параметры watcher (безопасные defaults для free API)
 
@@ -126,6 +133,9 @@ SOLANA_PUBLIC_HTTP_URL=https://solana-rpc.publicnode.com
 SOLANA_PUBLIC_WSS_URL=wss://solana-rpc.publicnode.com
 ETHERSCAN_API_BASE_URL=https://api.etherscan.io/v2/api
 ETHERSCAN_API_KEY=your_free_key
+TRON_GRID_API_BASE_URL=https://api.trongrid.io
+TRON_GRID_API_KEY=
+TRONSCAN_TX_BASE_URL=https://tronscan.org/#/transaction/
 COINGECKO_API_BASE_URL=https://api.coingecko.com/api/v3
 COINGECKO_TIMEOUT_MS=8000
 PRICE_CACHE_MAX_ENTRIES=1000
@@ -195,6 +205,13 @@ npm run smoke:solana
 - `getLatestBlockhash`
 - `getSignaturesForAddress`
 - WS `slotSubscribe` для primary/fallback.
+
+TronGrid history endpoint:
+
+```bash
+curl "https://api.trongrid.io/v1/accounts/TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7/transactions?only_confirmed=true&order_by=block_timestamp,desc&limit=3"
+curl "https://api.trongrid.io/v1/accounts/TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7/transactions/trc20?limit=3"
+```
 
 ## Docker
 

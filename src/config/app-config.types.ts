@@ -30,6 +30,9 @@ export type AppConfig = {
   readonly etherscanTxBaseUrl: string;
   readonly etherscanApiBaseUrl: string;
   readonly etherscanApiKey: string | null;
+  readonly tronGridApiBaseUrl: string;
+  readonly tronGridApiKey: string | null;
+  readonly tronscanTxBaseUrl: string;
   readonly coingeckoApiBaseUrl: string;
   readonly coingeckoTimeoutMs: number;
   readonly priceCacheMaxEntries: number;

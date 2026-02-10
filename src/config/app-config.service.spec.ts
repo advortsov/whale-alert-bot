@@ -111,4 +111,28 @@ describe('AppConfigService', (): void => {
       },
     );
   });
+
+  it('uses default TRON history endpoint configuration', (): void => {
+    withEnv(createBaseEnv(), (): void => {
+      const config: AppConfigService = new AppConfigService();
+
+      expect(config.tronGridApiBaseUrl).toBe('https://api.trongrid.io');
+      expect(config.tronGridApiKey).toBeNull();
+      expect(config.tronscanTxBaseUrl).toBe('https://tronscan.org/#/transaction/');
+    });
+  });
+
+  it('treats empty TRON grid api key as null', (): void => {
+    withEnv(
+      {
+        ...createBaseEnv(),
+        TRON_GRID_API_KEY: '',
+      },
+      (): void => {
+        const config: AppConfigService = new AppConfigService();
+
+        expect(config.tronGridApiKey).toBeNull();
+      },
+    );
+  });
 });

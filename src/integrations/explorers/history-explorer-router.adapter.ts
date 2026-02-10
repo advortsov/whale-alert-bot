@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import { EtherscanHistoryAdapter } from './etherscan/etherscan-history.adapter';
 import { SolanaRpcHistoryAdapter } from './solana/solana-rpc-history.adapter';
+import { TronGridHistoryAdapter } from './tron/tron-grid-history.adapter';
 import { ChainKey } from '../../core/chains/chain-key.interfaces';
 import type { IHistoryExplorerAdapter } from '../../core/ports/explorers/history-explorer.interfaces';
 import type { HistoryPageDto } from '../../features/tracking/dto/history-item.dto';
@@ -12,6 +13,7 @@ export class HistoryExplorerRouterAdapter implements IHistoryExplorerAdapter {
   public constructor(
     private readonly etherscanHistoryAdapter: EtherscanHistoryAdapter,
     private readonly solanaRpcHistoryAdapter: SolanaRpcHistoryAdapter,
+    private readonly tronGridHistoryAdapter: TronGridHistoryAdapter,
   ) {}
 
   public async loadRecentTransactions(request: HistoryRequestDto): Promise<HistoryPageDto> {
@@ -23,6 +25,6 @@ export class HistoryExplorerRouterAdapter implements IHistoryExplorerAdapter {
       return this.solanaRpcHistoryAdapter.loadRecentTransactions(request);
     }
 
-    throw new Error(`History explorer adapter is not configured for chain ${request.chainKey}.`);
+    return this.tronGridHistoryAdapter.loadRecentTransactions(request);
   }
 }

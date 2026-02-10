@@ -21,10 +21,17 @@ describe('HistoryExplorerRouterAdapter', (): void => {
         nextOffset: null,
       }),
     };
+    const tronHistoryAdapterStub = {
+      loadRecentTransactions: vi.fn().mockResolvedValue({
+        items: [],
+        nextOffset: null,
+      }),
+    };
 
     const adapter: HistoryExplorerRouterAdapter = new HistoryExplorerRouterAdapter(
       etherscanHistoryAdapterStub as never,
       solanaHistoryAdapterStub as never,
+      tronHistoryAdapterStub as never,
     );
 
     const result = await adapter.loadRecentTransactions({
@@ -43,6 +50,7 @@ describe('HistoryExplorerRouterAdapter', (): void => {
     });
     expect(etherscanHistoryAdapterStub.loadRecentTransactions).toHaveBeenCalledTimes(1);
     expect(solanaHistoryAdapterStub.loadRecentTransactions).not.toHaveBeenCalled();
+    expect(tronHistoryAdapterStub.loadRecentTransactions).not.toHaveBeenCalled();
   });
 
   it('routes Solana request to solana history adapter', async (): Promise<void> => {
@@ -58,10 +66,17 @@ describe('HistoryExplorerRouterAdapter', (): void => {
         nextOffset: 10,
       }),
     };
+    const tronHistoryAdapterStub = {
+      loadRecentTransactions: vi.fn().mockResolvedValue({
+        items: [],
+        nextOffset: null,
+      }),
+    };
 
     const adapter: HistoryExplorerRouterAdapter = new HistoryExplorerRouterAdapter(
       etherscanHistoryAdapterStub as never,
       solanaHistoryAdapterStub as never,
+      tronHistoryAdapterStub as never,
     );
 
     const result = await adapter.loadRecentTransactions({
@@ -80,24 +95,51 @@ describe('HistoryExplorerRouterAdapter', (): void => {
     });
     expect(solanaHistoryAdapterStub.loadRecentTransactions).toHaveBeenCalledTimes(1);
     expect(etherscanHistoryAdapterStub.loadRecentTransactions).not.toHaveBeenCalled();
+    expect(tronHistoryAdapterStub.loadRecentTransactions).not.toHaveBeenCalled();
   });
 
-  it('throws for unsupported chains', async (): Promise<void> => {
+  it('routes TRON request to tron history adapter', async (): Promise<void> => {
+    const etherscanHistoryAdapterStub = {
+      loadRecentTransactions: vi.fn().mockResolvedValue({
+        items: [],
+        nextOffset: null,
+      }),
+    };
+    const solanaHistoryAdapterStub = {
+      loadRecentTransactions: vi.fn().mockResolvedValue({
+        items: [],
+        nextOffset: null,
+      }),
+    };
+    const tronHistoryAdapterStub = {
+      loadRecentTransactions: vi.fn().mockResolvedValue({
+        items: [{ txHash: 'tron-tx' }],
+        nextOffset: null,
+      }),
+    };
+
     const adapter: HistoryExplorerRouterAdapter = new HistoryExplorerRouterAdapter(
-      { loadRecentTransactions: vi.fn() } as never,
-      { loadRecentTransactions: vi.fn() } as never,
+      etherscanHistoryAdapterStub as never,
+      solanaHistoryAdapterStub as never,
+      tronHistoryAdapterStub as never,
     );
 
-    await expect(
-      adapter.loadRecentTransactions({
-        chainKey: ChainKey.TRON_MAINNET,
-        address: 'TGzz8gjYiYRqpfmDwnLxfgPuLVNmpCswVp',
-        limit: 10,
-        offset: 0,
-        kind: HistoryKind.ALL,
-        direction: HistoryDirectionFilter.ALL,
-        minAmountUsd: null,
-      }),
-    ).rejects.toThrow('History explorer adapter is not configured for chain tron_mainnet.');
+    const result = await adapter.loadRecentTransactions({
+      chainKey: ChainKey.TRON_MAINNET,
+      address: 'TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7',
+      limit: 10,
+      offset: 0,
+      kind: HistoryKind.ALL,
+      direction: HistoryDirectionFilter.ALL,
+      minAmountUsd: null,
+    });
+
+    expect(result).toEqual({
+      items: [{ txHash: 'tron-tx' }],
+      nextOffset: null,
+    });
+    expect(tronHistoryAdapterStub.loadRecentTransactions).toHaveBeenCalledTimes(1);
+    expect(etherscanHistoryAdapterStub.loadRecentTransactions).not.toHaveBeenCalled();
+    expect(solanaHistoryAdapterStub.loadRecentTransactions).not.toHaveBeenCalled();
   });
 });

@@ -1,6 +1,6 @@
 {
   "name": "whale-alert-bot",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Telegram whale alert bot on NestJS",
   "author": "",
   "private": true,

@@ -42,6 +42,17 @@ const resolvePackageVersion = (): string => {
 };
 
 const DEFAULT_APP_VERSION: string = resolvePackageVersion();
+const optionalNonEmptyStringSchema = z
+  .string()
+  .trim()
+  .optional()
+  .transform((value: string | undefined): string | undefined => {
+    if (typeof value !== 'string') {
+      return undefined;
+    }
+
+    return value.length > 0 ? value : undefined;
+  });
 
 const envSchema = z.object({
   APP_VERSION: z.string().trim().min(1).default(DEFAULT_APP_VERSION),
@@ -58,7 +69,7 @@ const envSchema = z.object({
   CHAIN_BLOCK_QUEUE_MAX: z.coerce.number().int().positive().default(120),
   CHAIN_HEARTBEAT_INTERVAL_SEC: z.coerce.number().int().positive().default(60),
   CHAIN_REORG_CONFIRMATIONS: z.coerce.number().int().min(0).default(2),
-  BOT_TOKEN: z.string().trim().min(1).optional(),
+  BOT_TOKEN: optionalNonEmptyStringSchema,
   DATABASE_URL: z.url(),
   ETH_ALCHEMY_WSS_URL: z.url().optional(),
   ETH_INFURA_WSS_URL: z.url().optional(),
@@ -70,7 +81,10 @@ const envSchema = z.object({
   ETH_CEX_ADDRESS_ALLOWLIST: z.string().trim().optional(),
   ETHERSCAN_TX_BASE_URL: z.url().default('https://etherscan.io/tx/'),
   ETHERSCAN_API_BASE_URL: z.url().default('https://api.etherscan.io/v2/api'),
-  ETHERSCAN_API_KEY: z.string().trim().min(1).optional(),
+  ETHERSCAN_API_KEY: optionalNonEmptyStringSchema,
+  TRON_GRID_API_BASE_URL: z.url().default('https://api.trongrid.io'),
+  TRON_GRID_API_KEY: optionalNonEmptyStringSchema,
+  TRONSCAN_TX_BASE_URL: z.url().default('https://tronscan.org/#/transaction/'),
   COINGECKO_API_BASE_URL: z.url().default('https://api.coingecko.com/api/v3'),
   COINGECKO_TIMEOUT_MS: z.coerce.number().int().positive().default(8000),
   PRICE_CACHE_MAX_ENTRIES: z.coerce.number().int().positive().default(1000),
@@ -122,6 +136,9 @@ export class AppConfigService {
       etherscanTxBaseUrl: parsedEnv.ETHERSCAN_TX_BASE_URL,
       etherscanApiBaseUrl: parsedEnv.ETHERSCAN_API_BASE_URL,
       etherscanApiKey: parsedEnv.ETHERSCAN_API_KEY ?? null,
+      tronGridApiBaseUrl: parsedEnv.TRON_GRID_API_BASE_URL,
+      tronGridApiKey: parsedEnv.TRON_GRID_API_KEY ?? null,
+      tronscanTxBaseUrl: parsedEnv.TRONSCAN_TX_BASE_URL,
       coingeckoApiBaseUrl: parsedEnv.COINGECKO_API_BASE_URL,
       coingeckoTimeoutMs: parsedEnv.COINGECKO_TIMEOUT_MS,
       priceCacheMaxEntries: parsedEnv.PRICE_CACHE_MAX_ENTRIES,
@@ -242,6 +259,18 @@ export class AppConfigService {
 
   public get etherscanApiKey(): string | null {
     return this.config.etherscanApiKey;
+  }
+
+  public get tronGridApiBaseUrl(): string {
+    return this.config.tronGridApiBaseUrl;
+  }
+
+  public get tronGridApiKey(): string | null {
+    return this.config.tronGridApiKey;
+  }
+
+  public get tronscanTxBaseUrl(): string {
+    return this.config.tronscanTxBaseUrl;
   }
 
   public get coingeckoApiBaseUrl(): string {

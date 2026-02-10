@@ -1099,7 +1099,7 @@ export class TelegramUpdate {
       'Что умею:',
       '1. Добавлять адреса в отслеживание.',
       '2. Показывать список с id для быстрых команд.',
-      '3. Показывать последние транзакции для Ethereum и Solana.',
+      '3. Показывать последние транзакции для Ethereum, Solana и TRON.',
       '',
       'Быстрый старт:',
       '/track <eth|sol|tron> <address> [label]',
@@ -1193,6 +1193,7 @@ export class TelegramUpdate {
       '/history #1 10',
       '/history 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045 5',
       '/history 11111111111111111111111111111111 5',
+      '/history TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7 5',
     ].join('\n');
   }
 
@@ -1204,6 +1205,7 @@ export class TelegramUpdate {
       '/untrack #1',
       '/untrack 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
       '/untrack 11111111111111111111111111111111',
+      '/untrack TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7',
     ].join('\n');
   }
 

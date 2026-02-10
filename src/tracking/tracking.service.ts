@@ -971,7 +971,7 @@ export class TrackingService {
       throw new Error(
         [
           'Неверный адрес.',
-          'Поддерживаются Ethereum и Solana адреса.',
+          'Поддерживаются Ethereum, Solana и TRON адреса.',
           'Можно передать id из /list: /history #3 10',
         ].join('\n'),
       );
@@ -980,7 +980,9 @@ export class TrackingService {
     const firstCandidate = normalizedAddresses[0];
 
     if (!firstCandidate) {
-      throw new Error(['Неверный адрес.', 'Поддерживаются Ethereum и Solana адреса.'].join('\n'));
+      throw new Error(
+        ['Неверный адрес.', 'Поддерживаются Ethereum, Solana и TRON адреса.'].join('\n'),
+      );
     }
 
     return {
@@ -1015,14 +1017,21 @@ export class TrackingService {
   }
 
   private assertHistoryChainIsSupported(chainKey: ChainKey): void {
-    if (chainKey === ChainKey.ETHEREUM_MAINNET || chainKey === ChainKey.SOLANA_MAINNET) {
+    const chainKeyValue: string = chainKey;
+    const supportedHistoryChains: readonly string[] = [
+      ChainKey.ETHEREUM_MAINNET,
+      ChainKey.SOLANA_MAINNET,
+      ChainKey.TRON_MAINNET,
+    ];
+
+    if (supportedHistoryChains.includes(chainKeyValue)) {
       return;
     }
 
     throw new Error(
       [
-        `История для сети ${chainKey} пока недоступна на этом этапе.`,
-        'Сейчас поддерживаются /history только для Ethereum и Solana.',
+        `История для сети ${chainKeyValue} пока недоступна на этом этапе.`,
+        'Сейчас поддерживаются /history для Ethereum, Solana и TRON.',
       ].join('\n'),
     );
   }
@@ -1686,6 +1695,10 @@ export class TrackingService {
       return `https://solscan.io/tx/${txHash}`;
     }
 
+    if (chainKey === ChainKey.TRON_MAINNET) {
+      return `${this.appConfigService.tronscanTxBaseUrl}${txHash}`;
+    }
+
     return `${this.appConfigService.etherscanTxBaseUrl}${txHash}`;
   }
 
@@ -1699,6 +1712,10 @@ export class TrackingService {
 
     if (rawChainKey === ChainKey.SOLANA_MAINNET) {
       return ChainKey.SOLANA_MAINNET;
+    }
+
+    if (rawChainKey === ChainKey.TRON_MAINNET) {
+      return ChainKey.TRON_MAINNET;
     }
 
     return fallbackChainKey;

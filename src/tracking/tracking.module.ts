@@ -13,6 +13,7 @@ import { TronAddressCodec } from '../integrations/address/tron/tron-address.code
 import { EtherscanHistoryAdapter } from '../integrations/explorers/etherscan/etherscan-history.adapter';
 import { HistoryExplorerRouterAdapter } from '../integrations/explorers/history-explorer-router.adapter';
 import { SolanaRpcHistoryAdapter } from '../integrations/explorers/solana/solana-rpc-history.adapter';
+import { TronGridHistoryAdapter } from '../integrations/explorers/tron/tron-grid-history.adapter';
 import { StorageModule } from '../storage/storage.module';
 
 @Module({
@@ -28,6 +29,7 @@ import { StorageModule } from '../storage/storage.module';
     },
     EtherscanHistoryAdapter,
     SolanaRpcHistoryAdapter,
+    TronGridHistoryAdapter,
     HistoryExplorerRouterAdapter,
     EtherscanHistoryService,
     {

@@ -50,6 +50,7 @@ type AddressCodecRegistryStub = {
 
 type AppConfigServiceStub = {
   readonly etherscanTxBaseUrl: string;
+  readonly tronscanTxBaseUrl: string;
 };
 
 type HistoryCacheServiceStub = {
@@ -162,6 +163,7 @@ const createTestContext = (): TestContext => {
   };
   const appConfigServiceStub: AppConfigServiceStub = {
     etherscanTxBaseUrl: 'https://etherscan.io/tx/',
+    tronscanTxBaseUrl: 'https://tronscan.org/#/transaction/',
   };
 
   const ethereumAddressCodecStub: IAddressCodec = {
@@ -485,6 +487,53 @@ describe('TrackingService', (): void => {
     expect(context.historyExplorerAdapterStub.loadRecentTransactions).not.toHaveBeenCalled();
     expect(message).toContain(
       '<a href="https://solscan.io/tx/5M9v4f2wVtQHSPvKzB9nAfD8x7M3s4cKz7w6x5Y4q3h2j1k">Tx #1</a>',
+    );
+  });
+
+  it('builds Tronscan links for local TRON history entries', async (): Promise<void> => {
+    const context: TestContext = createTestContext();
+    context.historyCacheServiceStub.getFresh.mockReturnValue(null);
+    context.subscriptionsRepositoryStub.listByUserId.mockResolvedValue([
+      {
+        subscriptionId: 1,
+        walletId: 17,
+        chainKey: ChainKey.TRON_MAINNET,
+        walletAddress: 'TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7',
+        walletLabel: 'treasury',
+        createdAt: new Date('2026-02-01T00:00:00.000Z'),
+      },
+    ]);
+    context.walletEventsRepositoryStub.listRecentByTrackedAddress.mockResolvedValue([
+      {
+        chainId: 728126428,
+        chainKey: ChainKey.TRON_MAINNET,
+        txHash: '8c57a52f4d5aa91d20976c1b3ace6f1e62822fb4bae599c4bb1f11f6dc2d543c',
+        logIndex: 0,
+        trackedAddress: 'TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7',
+        eventType: 'TRANSFER',
+        direction: 'IN',
+        contractAddress: null,
+        tokenAddress: null,
+        tokenSymbol: 'TRX',
+        tokenDecimals: 6,
+        tokenAmountRaw: '1200000',
+        valueFormatted: '1.2',
+        dex: null,
+        pair: null,
+        occurredAt: new Date('2026-02-10T11:00:00.000Z'),
+      },
+    ]);
+
+    const message: string = await context.service.getAddressHistoryWithPolicy(
+      context.userRef,
+      '#17',
+      '5',
+      HistoryRequestSource.COMMAND,
+    );
+
+    expect(context.historyExplorerAdapterStub.loadRecentTransactions).not.toHaveBeenCalled();
+    expect(message).toContain(
+      '<a href="https://tronscan.org/#/transaction/8c57a52f4d5aa91d20976c1b3ace6f1e62822fb4bae599c4bb1f11f6dc2d543c">Tx #1</a>',
     );
   });
 
