@@ -47,11 +47,6 @@ export type UpdateMeta = {
   readonly messageId: number | null;
 };
 
-export enum WalletCallbackTargetType {
-  WALLET_ID = 'wallet_id',
-  ADDRESS = 'address',
-}
-
 export enum WalletCallbackAction {
   MENU = 'menu',
   HISTORY = 'history',
@@ -68,9 +63,7 @@ export enum WalletCallbackFilterTarget {
 
 export type WalletCallbackTarget = {
   readonly action: WalletCallbackAction;
-  readonly targetType: WalletCallbackTargetType;
   readonly walletId: number | null;
-  readonly walletAddress: string | null;
   readonly muteMinutes: number | null;
   readonly historyOffset: number | null;
   readonly historyLimit: number | null;

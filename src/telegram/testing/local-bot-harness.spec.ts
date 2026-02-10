@@ -17,6 +17,7 @@ type TrackingServiceStub = {
   readonly listTrackedWalletOptions: ReturnType<typeof vi.fn>;
   readonly untrackAddress: ReturnType<typeof vi.fn>;
   readonly getAddressHistoryWithPolicy: ReturnType<typeof vi.fn>;
+  readonly getAddressHistoryPageWithPolicy: ReturnType<typeof vi.fn>;
   readonly getWalletDetails: ReturnType<typeof vi.fn>;
   readonly getUserStatus: ReturnType<typeof vi.fn>;
   readonly getUserAlertFilters: ReturnType<typeof vi.fn>;
@@ -51,6 +52,15 @@ const createTrackingServiceStub = (): TrackingServiceStub => ({
   listTrackedWalletOptions: vi.fn().mockResolvedValue([]),
   untrackAddress: vi.fn().mockResolvedValue('untrack'),
   getAddressHistoryWithPolicy: vi.fn().mockResolvedValue('history'),
+  getAddressHistoryPageWithPolicy: vi.fn().mockResolvedValue({
+    message: '<b>История</b> callback result',
+    walletId: 16,
+    offset: 0,
+    limit: 10,
+    hasNextPage: false,
+    kind: HistoryKind.ALL,
+    direction: HistoryDirectionFilter.ALL,
+  }),
   getWalletDetails: vi.fn().mockResolvedValue('wallet details'),
   getUserStatus: vi.fn().mockResolvedValue('Пользовательский статус: ok'),
   getUserAlertFilters: vi.fn().mockResolvedValue('filters'),
@@ -169,22 +179,17 @@ describe('LocalBotHarness', (): void => {
 
   it('routes callback history request with source=callback and HTML options', async (): Promise<void> => {
     const trackingServiceStub: TrackingServiceStub = createTrackingServiceStub();
-    trackingServiceStub.getAddressHistoryWithPolicy.mockResolvedValue(
-      '<b>История</b> callback result',
-    );
     const runtimeStatusServiceStub: RuntimeStatusServiceStub = createRuntimeStatusServiceStub();
     const harness: LocalBotHarness = new LocalBotHarness({
       trackingService: trackingServiceStub as unknown as TrackingService,
       runtimeStatusService: runtimeStatusServiceStub as unknown as RuntimeStatusService,
     });
-    const trackedAddress: string = '0x96b0Dc619A86572524c15C1fC9c42DA9A94BCAa0';
-
     const result: HarnessRunResult = await harness.sendCallback({
       user: {
         telegramId: '42',
         username: 'tester',
       },
-      callbackData: `wallet_history_addr:${trackedAddress}`,
+      callbackData: 'wallet_history:16',
     });
 
     expect(result.callbackAnswers).toEqual([
@@ -192,13 +197,14 @@ describe('LocalBotHarness', (): void => {
         text: 'Выполняю действие...',
       },
     ]);
-    expect(trackingServiceStub.getAddressHistoryWithPolicy).toHaveBeenCalledWith(
+    expect(trackingServiceStub.getAddressHistoryPageWithPolicy).toHaveBeenCalledWith(
       {
         telegramId: '42',
         username: 'tester',
       },
-      trackedAddress,
+      '#16',
       '10',
+      '0',
       HistoryRequestSource.CALLBACK,
       HistoryKind.ALL,
       HistoryDirectionFilter.ALL,

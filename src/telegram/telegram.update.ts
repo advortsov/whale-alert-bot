@@ -9,7 +9,6 @@ import {
   SupportedTelegramCommand,
   WalletCallbackAction,
   WalletCallbackFilterTarget,
-  WalletCallbackTargetType,
   type CommandExecutionResult,
   type ParsedMessageCommand,
   type ReplyOptions,
@@ -72,7 +71,6 @@ const TRACK_CHAIN_ALIAS_MAP: Readonly<Record<string, ChainKey>> = {
 };
 
 const WALLET_HISTORY_CALLBACK_PREFIX: string = 'wallet_history:';
-const WALLET_HISTORY_ADDR_CALLBACK_PREFIX: string = 'wallet_history_addr:';
 const WALLET_HISTORY_PAGE_CALLBACK_PREFIX: string = 'wallet_history_page:';
 const WALLET_HISTORY_REFRESH_CALLBACK_PREFIX: string = 'wallet_history_refresh:';
 const WALLET_MENU_CALLBACK_PREFIX: string = 'wallet_menu:';
@@ -566,47 +564,27 @@ export class TelegramUpdate {
     }
 
     if (callbackTarget.action === WalletCallbackAction.HISTORY) {
-      let historyMessage: string;
-      let historyReplyOptions: ReplyOptions = this.buildHistoryReplyOptions();
+      if (callbackTarget.walletId === null) {
+        throw new Error('Callback не содержит id кошелька для истории.');
+      }
 
-      if (
-        callbackTarget.targetType === WalletCallbackTargetType.ADDRESS &&
-        callbackTarget.walletAddress !== null
-      ) {
-        historyMessage = await this.trackingService.getAddressHistoryWithPolicy(
+      const historyOffset: number = callbackTarget.historyOffset ?? 0;
+      const historyLimit: number = callbackTarget.historyLimit ?? CALLBACK_HISTORY_LIMIT;
+      const historyPage: HistoryPageResult =
+        await this.trackingService.getAddressHistoryPageWithPolicy(
           userRef,
-          callbackTarget.walletAddress,
-          String(CALLBACK_HISTORY_LIMIT),
+          `#${callbackTarget.walletId}`,
+          String(historyLimit),
+          String(historyOffset),
           HistoryRequestSource.CALLBACK,
           callbackTarget.historyKind,
           callbackTarget.historyDirection,
         );
-      } else {
-        if (callbackTarget.walletId === null) {
-          throw new Error('Callback не содержит id кошелька для истории.');
-        }
-
-        const historyOffset: number = callbackTarget.historyOffset ?? 0;
-        const historyLimit: number = callbackTarget.historyLimit ?? CALLBACK_HISTORY_LIMIT;
-        const historyPage: HistoryPageResult =
-          await this.trackingService.getAddressHistoryPageWithPolicy(
-            userRef,
-            `#${callbackTarget.walletId}`,
-            String(historyLimit),
-            String(historyOffset),
-            HistoryRequestSource.CALLBACK,
-            callbackTarget.historyKind,
-            callbackTarget.historyDirection,
-          );
-
-        historyMessage = historyPage.message;
-        historyReplyOptions = this.buildHistoryActionInlineKeyboard(historyPage);
-      }
 
       return {
         lineNumber: 1,
-        message: historyMessage,
-        replyOptions: historyReplyOptions,
+        message: historyPage.message,
+        replyOptions: this.buildHistoryActionInlineKeyboard(historyPage),
       };
     }
 
@@ -1115,7 +1093,7 @@ export class TelegramUpdate {
       'Что умею:',
       '1. Добавлять адреса в отслеживание.',
       '2. Показывать список с id для быстрых команд.',
-      '3. Показывать последние транзакции через Etherscan.',
+      '3. Показывать последние транзакции для Ethereum и Solana.',
       '',
       'Быстрый старт:',
       '/track <eth|sol> <address> [label]',
@@ -1206,6 +1184,7 @@ export class TelegramUpdate {
       'Примеры:',
       '/history #1 10',
       '/history 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045 5',
+      '/history 11111111111111111111111111111111 5',
     ].join('\n');
   }
 
@@ -1450,9 +1429,7 @@ export class TelegramUpdate {
 
       return {
         action: WalletCallbackAction.MENU,
-        targetType: WalletCallbackTargetType.WALLET_ID,
         walletId,
-        walletAddress: null,
         muteMinutes: null,
         historyOffset: null,
         historyLimit: null,
@@ -1474,9 +1451,7 @@ export class TelegramUpdate {
 
       return {
         action: WalletCallbackAction.UNTRACK,
-        targetType: WalletCallbackTargetType.WALLET_ID,
         walletId,
-        walletAddress: null,
         muteMinutes: null,
         historyOffset: null,
         historyLimit: null,
@@ -1496,9 +1471,7 @@ export class TelegramUpdate {
 
       return {
         action: WalletCallbackAction.MUTE,
-        targetType: WalletCallbackTargetType.WALLET_ID,
         walletId: null,
-        walletAddress: null,
         muteMinutes: Number.parseInt(rawMinutes, 10),
         historyOffset: null,
         historyLimit: null,
@@ -1520,9 +1493,7 @@ export class TelegramUpdate {
 
       return {
         action: WalletCallbackAction.IGNORE_24H,
-        targetType: WalletCallbackTargetType.WALLET_ID,
         walletId,
-        walletAddress: null,
         muteMinutes: 1440,
         historyOffset: null,
         historyLimit: null,
@@ -1560,9 +1531,7 @@ export class TelegramUpdate {
 
       return {
         action: WalletCallbackAction.FILTERS,
-        targetType: WalletCallbackTargetType.WALLET_ID,
         walletId,
-        walletAddress: null,
         muteMinutes: null,
         historyOffset: null,
         historyLimit: null,
@@ -1584,36 +1553,12 @@ export class TelegramUpdate {
 
       return {
         action: WalletCallbackAction.FILTERS,
-        targetType: WalletCallbackTargetType.WALLET_ID,
         walletId,
-        walletAddress: null,
         muteMinutes: null,
         historyOffset: null,
         historyLimit: null,
         historyKind: null,
         historyDirection: null,
-        filterTarget: null,
-        filterEnabled: null,
-      };
-    }
-
-    if (callbackData.startsWith(WALLET_HISTORY_ADDR_CALLBACK_PREFIX)) {
-      const rawAddress: string = callbackData.slice(WALLET_HISTORY_ADDR_CALLBACK_PREFIX.length);
-
-      if (!/^0x[a-fA-F0-9]{40}$/.test(rawAddress)) {
-        return null;
-      }
-
-      return {
-        action: WalletCallbackAction.HISTORY,
-        targetType: WalletCallbackTargetType.ADDRESS,
-        walletId: null,
-        walletAddress: rawAddress,
-        muteMinutes: null,
-        historyOffset: 0,
-        historyLimit: CALLBACK_HISTORY_LIMIT,
-        historyKind: HistoryKind.ALL,
-        historyDirection: HistoryDirectionFilter.ALL,
         filterTarget: null,
         filterEnabled: null,
       };
@@ -1658,9 +1603,7 @@ export class TelegramUpdate {
 
       return {
         action: WalletCallbackAction.HISTORY,
-        targetType: WalletCallbackTargetType.WALLET_ID,
         walletId,
-        walletAddress: null,
         muteMinutes: null,
         historyOffset,
         historyLimit,
@@ -1707,9 +1650,7 @@ export class TelegramUpdate {
 
       return {
         action: WalletCallbackAction.HISTORY,
-        targetType: WalletCallbackTargetType.WALLET_ID,
         walletId,
-        walletAddress: null,
         muteMinutes: null,
         historyOffset: 0,
         historyLimit,
@@ -1731,9 +1672,7 @@ export class TelegramUpdate {
 
       return {
         action: WalletCallbackAction.HISTORY,
-        targetType: WalletCallbackTargetType.WALLET_ID,
         walletId,
-        walletAddress: null,
         muteMinutes: null,
         historyOffset: 0,
         historyLimit: CALLBACK_HISTORY_LIMIT,

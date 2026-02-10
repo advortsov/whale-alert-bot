@@ -1,11 +1,7 @@
 import type { Context } from 'telegraf';
 import { describe, expect, it, vi } from 'vitest';
 
-import {
-  WalletCallbackAction,
-  WalletCallbackTargetType,
-  type WalletCallbackTarget,
-} from './telegram.interfaces';
+import { WalletCallbackAction, type WalletCallbackTarget } from './telegram.interfaces';
 import { TelegramUpdate } from './telegram.update';
 import { HistoryDirectionFilter, HistoryKind } from '../features/tracking/dto/history-request.dto';
 import type { RuntimeStatusService } from '../runtime/runtime-status.service';
@@ -124,18 +120,17 @@ describe('TelegramUpdate', (): void => {
 
     expect(callbackTarget).toMatchObject({
       action: WalletCallbackAction.IGNORE_24H,
-      targetType: WalletCallbackTargetType.WALLET_ID,
       walletId: 16,
       muteMinutes: 1440,
     });
   });
 
   it('uses policy-aware history method for callback and returns cooldown error text', async (): Promise<void> => {
-    const getAddressHistoryWithPolicyMock: ReturnType<typeof vi.fn> = vi
+    const getAddressHistoryPageWithPolicyMock: ReturnType<typeof vi.fn> = vi
       .fn()
       .mockRejectedValue(new Error('Слишком часто нажимаешь кнопку истории. Повтори через 2 сек.'));
     const trackingServiceStub = {
-      getAddressHistoryWithPolicy: getAddressHistoryWithPolicyMock,
+      getAddressHistoryPageWithPolicy: getAddressHistoryPageWithPolicyMock,
     } as unknown as TrackingService;
     const update: TelegramUpdate = createUpdate(trackingServiceStub);
     const answerCbQueryMock: ReturnType<typeof vi.fn> = vi.fn().mockResolvedValue(undefined);
@@ -144,7 +139,7 @@ describe('TelegramUpdate', (): void => {
       .mockResolvedValue({ message_id: 777, text: 'ok' });
     const callbackContext = {
       callbackQuery: {
-        data: 'wallet_history_addr:0x96b0Dc619A86572524c15C1fC9c42DA9A94BCAa0',
+        data: 'wallet_history:16',
       },
       from: {
         id: 42,
@@ -159,13 +154,14 @@ describe('TelegramUpdate', (): void => {
 
     await update.onCallbackQuery(callbackContext as unknown as Context);
 
-    expect(getAddressHistoryWithPolicyMock).toHaveBeenCalledWith(
+    expect(getAddressHistoryPageWithPolicyMock).toHaveBeenCalledWith(
       {
         telegramId: '42',
         username: 'tester',
       },
-      '0x96b0Dc619A86572524c15C1fC9c42DA9A94BCAa0',
+      '#16',
       '10',
+      '0',
       HistoryRequestSource.CALLBACK,
       HistoryKind.ALL,
       HistoryDirectionFilter.ALL,
