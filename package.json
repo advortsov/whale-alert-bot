@@ -21,6 +21,7 @@
     "db:info": "tsx scripts/db/info.ts",
     "db:validate": "tsx scripts/db/validate.ts",
     "db:migrate": "tsx scripts/db/migrate.ts",
+    "smoke:solana": "tsx scripts/smoke/solana-rpc-smoke.ts",
     "build:test": "tsc -p tsconfig.test.json",
     "check": "npm run lint && npm run db:validate && npm run typecheck && npm run test && npm run build",
     "precommit": "npm run format:write && npm run lint && npm run typecheck && npm run test && npm run build",

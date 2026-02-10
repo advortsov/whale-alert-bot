@@ -110,6 +110,10 @@ CHAIN_BACKOFF_MAX_MS=30000
 CHAIN_BLOCK_QUEUE_MAX=120
 CHAIN_HEARTBEAT_INTERVAL_SEC=60
 CHAIN_REORG_CONFIRMATIONS=2
+SOLANA_HELIUS_HTTP_URL=https://api.mainnet-beta.solana.com
+SOLANA_HELIUS_WSS_URL=wss://api.mainnet-beta.solana.com
+SOLANA_PUBLIC_HTTP_URL=https://solana-rpc.publicnode.com
+SOLANA_PUBLIC_WSS_URL=wss://solana-rpc.publicnode.com
 ETHERSCAN_API_BASE_URL=https://api.etherscan.io/v2/api
 ETHERSCAN_API_KEY=your_free_key
 COINGECKO_API_BASE_URL=https://api.coingecko.com/api/v3
@@ -163,6 +167,22 @@ Etherscan history endpoint:
 ```bash
 curl "https://api.etherscan.io/v2/api?chainid=1&module=account&action=txlist&address=0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045&sort=desc&page=1&offset=5&apikey=<API_KEY>"
 ```
+
+Solana RPC (HTTP + WS):
+
+```bash
+SOLANA_HELIUS_HTTP_URL=https://api.mainnet-beta.solana.com \
+SOLANA_PUBLIC_HTTP_URL=https://solana-rpc.publicnode.com \
+SOLANA_HELIUS_WSS_URL=wss://api.mainnet-beta.solana.com \
+SOLANA_PUBLIC_WSS_URL=wss://solana-rpc.publicnode.com \
+npm run smoke:solana
+```
+
+Проверяется:
+- `getSlot`
+- `getLatestBlockhash`
+- `getSignaturesForAddress`
+- WS `slotSubscribe` для primary/fallback.
 
 ## Docker
 
