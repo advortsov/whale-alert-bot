@@ -21,6 +21,7 @@ export class LocalBotHarness {
     this.update = new TelegramUpdate(
       dependencies.trackingService,
       dependencies.runtimeStatusService,
+      dependencies.appConfigService,
     );
   }
 

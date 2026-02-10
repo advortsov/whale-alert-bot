@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { LocalBotHarness } from './local-bot-harness';
 import type { HarnessRunResult, HarnessUser } from './local-bot-harness.interfaces';
+import type { AppConfigService } from '../../config/app-config.service';
 import { ChainKey } from '../../core/chains/chain-key.interfaces';
 import {
   HistoryDirectionFilter,
@@ -37,6 +38,10 @@ type TrackingServiceStub = {
 type RuntimeStatusServiceStub = {
   readonly getSnapshot: ReturnType<typeof vi.fn>;
   readonly setSnapshot: ReturnType<typeof vi.fn>;
+};
+
+type AppConfigServiceStub = {
+  readonly appVersion: string;
 };
 
 const createTrackingServiceStub = (): TrackingServiceStub => ({
@@ -90,13 +95,19 @@ const createRuntimeStatusServiceStub = (): RuntimeStatusServiceStub => ({
   setSnapshot: vi.fn(),
 });
 
+const createAppConfigServiceStub = (): AppConfigServiceStub => ({
+  appVersion: '0.1.0-test',
+});
+
 describe('LocalBotHarness', (): void => {
   it('executes multiline /track commands as separate bot actions', async (): Promise<void> => {
     const trackingServiceStub: TrackingServiceStub = createTrackingServiceStub();
     const runtimeStatusServiceStub: RuntimeStatusServiceStub = createRuntimeStatusServiceStub();
+    const appConfigServiceStub: AppConfigServiceStub = createAppConfigServiceStub();
     const harness: LocalBotHarness = new LocalBotHarness({
       trackingService: trackingServiceStub as unknown as TrackingService,
       runtimeStatusService: runtimeStatusServiceStub as unknown as RuntimeStatusService,
+      appConfigService: appConfigServiceStub as unknown as AppConfigService,
     });
     const user: HarnessUser = {
       telegramId: '42',
@@ -131,9 +142,11 @@ describe('LocalBotHarness', (): void => {
   it('routes /track sol with explicit chain key', async (): Promise<void> => {
     const trackingServiceStub: TrackingServiceStub = createTrackingServiceStub();
     const runtimeStatusServiceStub: RuntimeStatusServiceStub = createRuntimeStatusServiceStub();
+    const appConfigServiceStub: AppConfigServiceStub = createAppConfigServiceStub();
     const harness: LocalBotHarness = new LocalBotHarness({
       trackingService: trackingServiceStub as unknown as TrackingService,
       runtimeStatusService: runtimeStatusServiceStub as unknown as RuntimeStatusService,
+      appConfigService: appConfigServiceStub as unknown as AppConfigService,
     });
 
     await harness.sendText({
@@ -158,9 +171,11 @@ describe('LocalBotHarness', (): void => {
   it('routes multiline /track sol when address and label are on separate lines', async (): Promise<void> => {
     const trackingServiceStub: TrackingServiceStub = createTrackingServiceStub();
     const runtimeStatusServiceStub: RuntimeStatusServiceStub = createRuntimeStatusServiceStub();
+    const appConfigServiceStub: AppConfigServiceStub = createAppConfigServiceStub();
     const harness: LocalBotHarness = new LocalBotHarness({
       trackingService: trackingServiceStub as unknown as TrackingService,
       runtimeStatusService: runtimeStatusServiceStub as unknown as RuntimeStatusService,
+      appConfigService: appConfigServiceStub as unknown as AppConfigService,
     });
 
     await harness.sendText({
@@ -185,9 +200,11 @@ describe('LocalBotHarness', (): void => {
   it('routes /track tron with explicit chain key', async (): Promise<void> => {
     const trackingServiceStub: TrackingServiceStub = createTrackingServiceStub();
     const runtimeStatusServiceStub: RuntimeStatusServiceStub = createRuntimeStatusServiceStub();
+    const appConfigServiceStub: AppConfigServiceStub = createAppConfigServiceStub();
     const harness: LocalBotHarness = new LocalBotHarness({
       trackingService: trackingServiceStub as unknown as TrackingService,
       runtimeStatusService: runtimeStatusServiceStub as unknown as RuntimeStatusService,
+      appConfigService: appConfigServiceStub as unknown as AppConfigService,
     });
 
     await harness.sendText({
@@ -212,9 +229,11 @@ describe('LocalBotHarness', (): void => {
   it('returns merged runtime and user status for /status', async (): Promise<void> => {
     const trackingServiceStub: TrackingServiceStub = createTrackingServiceStub();
     const runtimeStatusServiceStub: RuntimeStatusServiceStub = createRuntimeStatusServiceStub();
+    const appConfigServiceStub: AppConfigServiceStub = createAppConfigServiceStub();
     const harness: LocalBotHarness = new LocalBotHarness({
       trackingService: trackingServiceStub as unknown as TrackingService,
       runtimeStatusService: runtimeStatusServiceStub as unknown as RuntimeStatusService,
+      appConfigService: appConfigServiceStub as unknown as AppConfigService,
     });
 
     const result: HarnessRunResult = await harness.sendText({
@@ -227,6 +246,7 @@ describe('LocalBotHarness', (): void => {
 
     expect(result.replies).toHaveLength(1);
     expect(result.replies[0]?.text).toContain('Runtime watcher status');
+    expect(result.replies[0]?.text).toContain('app version: 0.1.0-test');
     expect(result.replies[0]?.text).toContain('observed block: 123');
     expect(result.replies[0]?.text).toContain('Пользовательский статус: ok');
   });
@@ -234,9 +254,11 @@ describe('LocalBotHarness', (): void => {
   it('routes callback history request with source=callback and HTML options', async (): Promise<void> => {
     const trackingServiceStub: TrackingServiceStub = createTrackingServiceStub();
     const runtimeStatusServiceStub: RuntimeStatusServiceStub = createRuntimeStatusServiceStub();
+    const appConfigServiceStub: AppConfigServiceStub = createAppConfigServiceStub();
     const harness: LocalBotHarness = new LocalBotHarness({
       trackingService: trackingServiceStub as unknown as TrackingService,
       runtimeStatusService: runtimeStatusServiceStub as unknown as RuntimeStatusService,
+      appConfigService: appConfigServiceStub as unknown as AppConfigService,
     });
     const result: HarnessRunResult = await harness.sendCallback({
       user: {
@@ -272,9 +294,11 @@ describe('LocalBotHarness', (): void => {
   it('handles /filter cex command and routes to tracking service', async (): Promise<void> => {
     const trackingServiceStub: TrackingServiceStub = createTrackingServiceStub();
     const runtimeStatusServiceStub: RuntimeStatusServiceStub = createRuntimeStatusServiceStub();
+    const appConfigServiceStub: AppConfigServiceStub = createAppConfigServiceStub();
     const harness: LocalBotHarness = new LocalBotHarness({
       trackingService: trackingServiceStub as unknown as TrackingService,
       runtimeStatusService: runtimeStatusServiceStub as unknown as RuntimeStatusService,
+      appConfigService: appConfigServiceStub as unknown as AppConfigService,
     });
 
     await harness.sendText({
@@ -298,9 +322,11 @@ describe('LocalBotHarness', (): void => {
     const trackingServiceStub: TrackingServiceStub = createTrackingServiceStub();
     trackingServiceStub.getWalletDetails.mockResolvedValue('wallet card');
     const runtimeStatusServiceStub: RuntimeStatusServiceStub = createRuntimeStatusServiceStub();
+    const appConfigServiceStub: AppConfigServiceStub = createAppConfigServiceStub();
     const harness: LocalBotHarness = new LocalBotHarness({
       trackingService: trackingServiceStub as unknown as TrackingService,
       runtimeStatusService: runtimeStatusServiceStub as unknown as RuntimeStatusService,
+      appConfigService: appConfigServiceStub as unknown as AppConfigService,
     });
 
     const result: HarnessRunResult = await harness.sendText({

@@ -3,6 +3,7 @@ export type NodeEnv = 'development' | 'test' | 'production';
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 export type AppConfig = {
+  readonly appVersion: string;
   readonly nodeEnv: NodeEnv;
   readonly port: number;
   readonly logLevel: LogLevel;

@@ -1,5 +1,6 @@
 import type { Message } from 'telegraf/typings/core/types/typegram';
 
+import type { AppConfigService } from '../../config/app-config.service';
 import type { RuntimeStatusService } from '../../runtime/runtime-status.service';
 import type { TrackingService } from '../../tracking/tracking.service';
 import type { ReplyOptions } from '../telegram.interfaces';
@@ -37,4 +38,5 @@ export type HarnessRunResult = {
 export type LocalBotHarnessDependencies = {
   readonly trackingService: TrackingService;
   readonly runtimeStatusService: RuntimeStatusService;
+  readonly appConfigService: AppConfigService;
 };

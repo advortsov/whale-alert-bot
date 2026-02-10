@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { WalletCallbackAction, type WalletCallbackTarget } from './telegram.interfaces';
 import { TelegramUpdate } from './telegram.update';
+import type { AppConfigService } from '../config/app-config.service';
 import { HistoryDirectionFilter, HistoryKind } from '../features/tracking/dto/history-request.dto';
 import type { RuntimeStatusService } from '../runtime/runtime-status.service';
 import { HistoryRequestSource } from '../tracking/history-rate-limiter.interfaces';
@@ -33,8 +34,11 @@ const createUpdate = (trackingServiceStub: TrackingService): TelegramUpdate => {
     }),
     setSnapshot: (): void => undefined,
   } as unknown as RuntimeStatusService;
+  const appConfigServiceStub: AppConfigService = {
+    appVersion: '0.1.0-test',
+  } as unknown as AppConfigService;
 
-  return new TelegramUpdate(trackingServiceStub, runtimeStatusServiceStub);
+  return new TelegramUpdate(trackingServiceStub, runtimeStatusServiceStub, appConfigServiceStub);
 };
 
 describe('TelegramUpdate', (): void => {

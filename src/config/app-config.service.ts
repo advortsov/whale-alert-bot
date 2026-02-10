@@ -1,4 +1,6 @@
 import { Injectable } from '@nestjs/common';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { z } from 'zod';
 
 import type { AppConfig } from './app-config.types';
@@ -15,7 +17,34 @@ const booleanSchema = z
     return normalizedValue === 'true' || normalizedValue === '1' || normalizedValue === 'yes';
   });
 
+const resolvePackageVersion = (): string => {
+  try {
+    const packageJsonPath: string = resolve(process.cwd(), 'package.json');
+    const packageJsonRaw: string = readFileSync(packageJsonPath, 'utf8');
+    const packageJsonParsed: unknown = JSON.parse(packageJsonRaw);
+
+    if (
+      typeof packageJsonParsed === 'object' &&
+      packageJsonParsed !== null &&
+      'version' in packageJsonParsed
+    ) {
+      const versionValue: unknown = packageJsonParsed.version;
+
+      if (typeof versionValue === 'string' && versionValue.trim().length > 0) {
+        return versionValue.trim();
+      }
+    }
+  } catch {
+    // Fallback is handled below.
+  }
+
+  return '0.0.0';
+};
+
+const DEFAULT_APP_VERSION: string = resolvePackageVersion();
+
 const envSchema = z.object({
+  APP_VERSION: z.string().trim().min(1).default(DEFAULT_APP_VERSION),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(3000),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
@@ -66,6 +95,7 @@ export class AppConfigService {
     this.assertWatcherConfig(parsedEnv);
 
     this.config = {
+      appVersion: parsedEnv.APP_VERSION,
       nodeEnv: parsedEnv.NODE_ENV,
       port: parsedEnv.PORT,
       logLevel: parsedEnv.LOG_LEVEL,
@@ -108,6 +138,10 @@ export class AppConfigService {
 
   public get nodeEnv(): AppConfig['nodeEnv'] {
     return this.config.nodeEnv;
+  }
+
+  public get appVersion(): string {
+    return this.config.appVersion;
   }
 
   public get port(): number {

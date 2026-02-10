@@ -56,8 +56,16 @@ npm run start:dev
 - `npm run build`
 - `npm run check` (полный gate)
 - `npm run test:telegram:harness` (локальный harness Telegram без внешнего API)
+- `npm run release:notes` (отправка release notes в Telegram-чат)
 
 Перед любым деплоем обязательно выполняется минимум `npm run lint`.
+Перед коммитом и перед деплоем в проекте используется `npm run precommit`.
+
+## Версия приложения
+
+- Версия берется из `APP_VERSION` (если задано) или из `package.json`.
+- Команда `/status` показывает текущую версию приложения в ответе бота.
+- Для Docker можно задавать `APP_VERSION` через `docker-compose.yml`/`.env`.
 
 ## Postgrator и checksum
 
@@ -195,6 +203,41 @@ docker compose up --build
 ```
 
 В `docker-compose.yml` зафиксирована точная версия Postgres: `postgres:16.4-alpine`.
+
+## Правила релизов и документации
+
+После каждой доработки:
+
+1. Обновить README и описать добавленный функционал.
+2. Обновить список изменений для релиза (например, в `release-notes/latest.md`).
+3. Прогнать `npm run precommit`.
+4. Выполнить деплой.
+5. Отправить release notes в Telegram-чат бота с версией приложения.
+
+Пример отправки release notes:
+
+```bash
+set -a && source .env && set +a
+npm run release:notes -- \
+  --notes-file release-notes/latest.md \
+  --title "Что нового:"
+```
+
+Альтернатива без файла:
+
+```bash
+set -a && source .env && set +a
+npm run release:notes -- \
+  --highlights "Fix Solana track parsing|Improve wallet card UX|Add tests for callbacks"
+```
+
+Dry-run (проверка текста без отправки):
+
+```bash
+npm run release:notes -- \
+  --dry-run \
+  --highlights "Fix Solana track parsing|Improve wallet card UX"
+```
 
 ## Локальный Telegram harness
 

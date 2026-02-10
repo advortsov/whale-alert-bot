@@ -15,6 +15,7 @@ import {
   type UpdateMeta,
   type WalletCallbackTarget,
 } from './telegram.interfaces';
+import { AppConfigService } from '../config/app-config.service';
 import { ChainKey } from '../core/chains/chain-key.interfaces';
 import { HistoryDirectionFilter, HistoryKind } from '../features/tracking/dto/history-request.dto';
 import { RuntimeStatusService } from '../runtime/runtime-status.service';
@@ -91,6 +92,7 @@ export class TelegramUpdate {
   public constructor(
     private readonly trackingService: TrackingService,
     private readonly runtimeStatusService: RuntimeStatusService,
+    private readonly appConfigService: AppConfigService,
   ) {}
 
   @On('text')
@@ -533,6 +535,7 @@ export class TelegramUpdate {
 
     return [
       'Runtime watcher status:',
+      `- app version: ${this.appConfigService.appVersion}`,
       `- observed block: ${runtimeSnapshot.observedBlock ?? 'n/a'}`,
       `- processed block: ${runtimeSnapshot.processedBlock ?? 'n/a'}`,
       `- lag: ${runtimeSnapshot.lag ?? 'n/a'}`,

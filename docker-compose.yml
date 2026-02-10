@@ -22,6 +22,7 @@ services:
       dockerfile: Dockerfile
     environment:
       NODE_ENV: ${NODE_ENV:-development}
+      APP_VERSION: ${APP_VERSION:-0.1.0}
       PORT: ${PORT:-3000}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       TELEGRAM_ENABLED: ${TELEGRAM_ENABLED:-false}

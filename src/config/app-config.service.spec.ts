@@ -97,4 +97,18 @@ describe('AppConfigService', (): void => {
       expect(config.chainReorgConfirmations).toBe(2);
     });
   });
+
+  it('resolves app version from env override', (): void => {
+    withEnv(
+      {
+        ...createBaseEnv(),
+        APP_VERSION: '1.2.3-test',
+      },
+      (): void => {
+        const config: AppConfigService = new AppConfigService();
+
+        expect(config.appVersion).toBe('1.2.3-test');
+      },
+    );
+  });
 });
