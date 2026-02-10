@@ -8,8 +8,6 @@ import { DatabaseService } from '../storage/database.service';
 
 @Injectable()
 export class HealthService {
-  private static readonly SOLANA_HEALTH_TIMEOUT_MS: number = 5000;
-
   public constructor(
     private readonly appConfigService: AppConfigService,
     private readonly databaseService: DatabaseService,
@@ -37,22 +35,18 @@ export class HealthService {
         };
     const solanaRpcChecksEnabled: boolean = this.appConfigService.solanaWatcherEnabled;
 
-    const solanaPrimaryHealth: ComponentHealth = solanaRpcChecksEnabled
-      ? await this.checkSolanaRpcEndpoint(
-          this.appConfigService.solanaHeliusHttpUrl,
-          'solana-helius-primary',
-        )
+    const solanaPrimaryProviderHealth = solanaRpcChecksEnabled
+      ? await this.providerFactory.createPrimary(ChainKey.SOLANA_MAINNET).healthCheck()
       : {
+          provider: 'solana-helius-primary',
           ok: true,
           details: 'disabled by SOLANA_WATCHER_ENABLED=false',
         };
 
-    const solanaFallbackHealth: ComponentHealth = solanaRpcChecksEnabled
-      ? await this.checkSolanaRpcEndpoint(
-          this.appConfigService.solanaPublicHttpUrl,
-          'solana-public-fallback',
-        )
+    const solanaFallbackProviderHealth = solanaRpcChecksEnabled
+      ? await this.providerFactory.createFallback(ChainKey.SOLANA_MAINNET).healthCheck()
       : {
+          provider: 'solana-public-fallback',
           ok: true,
           details: 'disabled by SOLANA_WATCHER_ENABLED=false',
         };
@@ -79,6 +73,16 @@ export class HealthService {
         : 'disabled by TELEGRAM_ENABLED=false',
     };
 
+    const solanaPrimaryHealth: ComponentHealth = {
+      ok: solanaPrimaryProviderHealth.ok,
+      details: solanaPrimaryProviderHealth.details,
+    };
+
+    const solanaFallbackHealth: ComponentHealth = {
+      ok: solanaFallbackProviderHealth.ok,
+      details: solanaFallbackProviderHealth.details,
+    };
+
     const ethereumChainHealthy: boolean =
       !ethereumRpcChecksEnabled || ethereumRpcPrimary.ok || ethereumRpcFallback.ok;
     const solanaChainHealthy: boolean =
@@ -94,68 +98,5 @@ export class HealthService {
       solanaRpcFallback: solanaFallbackHealth,
       telegram,
     };
-  }
-
-  private async checkSolanaRpcEndpoint(
-    endpointUrl: string | null,
-    endpointName: string,
-  ): Promise<ComponentHealth> {
-    if (!endpointUrl) {
-      return {
-        ok: false,
-        details: `${endpointName} endpoint is not configured`,
-      };
-    }
-
-    const abortController: AbortController = new AbortController();
-    const timeoutHandle: NodeJS.Timeout = setTimeout((): void => {
-      abortController.abort();
-    }, HealthService.SOLANA_HEALTH_TIMEOUT_MS);
-
-    try {
-      const response: Response = await fetch(endpointUrl, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id: 1,
-          method: 'getSlot',
-          params: [],
-        }),
-        signal: abortController.signal,
-      });
-
-      if (!response.ok) {
-        return {
-          ok: false,
-          details: `${endpointName} returned HTTP ${String(response.status)}`,
-        };
-      }
-
-      const responseBody: unknown = await response.json();
-      const slotValue: unknown = (responseBody as { readonly result?: unknown }).result;
-
-      if (typeof slotValue !== 'number') {
-        return {
-          ok: false,
-          details: `${endpointName} returned invalid getSlot payload`,
-        };
-      }
-
-      return {
-        ok: true,
-        details: `${endpointName} reachable, slot=${String(slotValue)}`,
-      };
-    } catch (error: unknown) {
-      const errorMessage: string = error instanceof Error ? error.message : String(error);
-      return {
-        ok: false,
-        details: `${endpointName} request failed: ${errorMessage}`,
-      };
-    } finally {
-      clearTimeout(timeoutHandle);
-    }
   }
 }

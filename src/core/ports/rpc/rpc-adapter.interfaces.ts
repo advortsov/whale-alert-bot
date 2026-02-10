@@ -36,4 +36,5 @@ export type ProviderOperation<T> = (provider: IRpcAdapter) => Promise<T>;
 
 export interface IProviderFailoverService {
   execute<T>(operation: ProviderOperation<T>): Promise<T>;
+  executeForChain<T>(chainKey: ChainKey, operation: ProviderOperation<T>): Promise<T>;
 }

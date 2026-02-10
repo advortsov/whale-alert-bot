@@ -20,9 +20,11 @@ export class ProviderFailoverService implements IProviderFailoverService {
   ) {}
 
   public async execute<T>(operation: ProviderOperation<T>): Promise<T> {
-    const primaryProvider: IPrimaryRpcAdapter = this.providerFactory.createPrimary(
-      ChainKey.ETHEREUM_MAINNET,
-    );
+    return this.executeForChain(ChainKey.ETHEREUM_MAINNET, operation);
+  }
+
+  public async executeForChain<T>(chainKey: ChainKey, operation: ProviderOperation<T>): Promise<T> {
+    const primaryProvider: IPrimaryRpcAdapter = this.providerFactory.createPrimary(chainKey);
 
     try {
       const primaryResult: T = await this.rpcThrottlerService.schedule(
@@ -36,9 +38,7 @@ export class ProviderFailoverService implements IProviderFailoverService {
       this.applyBackoffIfNeeded(primaryError, `primary:${primaryProvider.getName()}`);
       this.logger.warn(`Primary provider failed: ${primaryErrorMessage}. Switching to fallback.`);
 
-      const fallbackProvider: IFallbackRpcAdapter = this.providerFactory.createFallback(
-        ChainKey.ETHEREUM_MAINNET,
-      );
+      const fallbackProvider: IFallbackRpcAdapter = this.providerFactory.createFallback(chainKey);
 
       try {
         const fallbackResult: T = await this.rpcThrottlerService.schedule(

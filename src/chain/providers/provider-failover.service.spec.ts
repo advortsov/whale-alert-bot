@@ -1,7 +1,10 @@
+import { vi } from 'vitest';
+
 import { ProviderFailoverService } from './provider-failover.service';
-import { ProviderFactory } from './provider.factory';
+import type { ProviderFactory } from './provider.factory';
 import { RpcThrottlerService } from './rpc-throttler.service';
 import type { AppConfigService } from '../../config/app-config.service';
+import { ChainKey } from '../../core/chains/chain-key.interfaces';
 import type { BlockEnvelope, ReceiptEnvelope } from '../../core/ports/rpc/block-stream.interfaces';
 import type {
   IFallbackRpcAdapter,
@@ -89,7 +92,10 @@ describe('ProviderFailoverService', (): void => {
     const primary: IPrimaryRpcAdapter = new PrimaryProviderStub();
     const fallback: IFallbackRpcAdapter = new FallbackProviderStub();
 
-    const factory: ProviderFactory = new ProviderFactory(primary, fallback);
+    const factory: ProviderFactory = {
+      createPrimary: (): IPrimaryRpcAdapter => primary,
+      createFallback: (): IFallbackRpcAdapter => fallback,
+    } as unknown as ProviderFactory;
     const throttler: RpcThrottlerService = new RpcThrottlerService(
       new RpcConfigStub() as unknown as AppConfigService,
     );
@@ -104,5 +110,39 @@ describe('ProviderFailoverService', (): void => {
     });
 
     expect(result).toBe('fallback');
+  });
+
+  it('routes executeForChain call with selected chain key', async (): Promise<void> => {
+    const ethereumPrimary: IPrimaryRpcAdapter = new PrimaryProviderStub();
+    const solanaPrimary: IPrimaryRpcAdapter = new (class SolanaPrimaryProviderStub
+      extends PrimaryProviderStub
+      implements IPrimaryRpcAdapter
+    {
+      public override getName(): string {
+        return 'sol-primary';
+      }
+    })();
+    const fallback: IFallbackRpcAdapter = new FallbackProviderStub();
+
+    const createPrimaryMock = vi.fn(
+      (chainKey: ChainKey): IPrimaryRpcAdapter =>
+        chainKey === ChainKey.SOLANA_MAINNET ? solanaPrimary : ethereumPrimary,
+    );
+    const factory: ProviderFactory = {
+      createPrimary: createPrimaryMock,
+      createFallback: (): IFallbackRpcAdapter => fallback,
+    } as unknown as ProviderFactory;
+    const throttler: RpcThrottlerService = new RpcThrottlerService(
+      new RpcConfigStub() as unknown as AppConfigService,
+    );
+    const service: ProviderFailoverService = new ProviderFailoverService(factory, throttler);
+
+    const result: string = await service.executeForChain(
+      ChainKey.SOLANA_MAINNET,
+      async (provider): Promise<string> => provider.getName(),
+    );
+
+    expect(result).toBe('sol-primary');
+    expect(createPrimaryMock).toHaveBeenCalledWith(ChainKey.SOLANA_MAINNET);
   });
 });
