@@ -10,18 +10,14 @@ import {
 import { ProviderFailoverService } from '../../chain/providers/provider-failover.service';
 import { AppConfigService } from '../../config/app-config.service';
 import { ChainKey } from '../../core/chains/chain-key.interfaces';
-import type {
-  BlockEnvelope,
-  ReceiptEnvelope,
-  TransactionEnvelope,
-} from '../../core/ports/rpc/block-stream.interfaces';
+import type { TransactionEnvelope } from '../../core/ports/rpc/block-stream.interfaces';
 import type { ISubscriptionHandle } from '../../core/ports/rpc/rpc-adapter.interfaces';
 import { ChainCheckpointsRepository } from '../../storage/repositories/chain-checkpoints.repository';
 import { ProcessedEventsRepository } from '../../storage/repositories/processed-events.repository';
 import { SubscriptionsRepository } from '../../storage/repositories/subscriptions.repository';
 import { WalletEventsRepository } from '../../storage/repositories/wallet-events.repository';
 
-type SolanaMatchedTransaction = {
+type TronMatchedTransaction = {
   readonly txHash: string;
   readonly txFrom: string;
   readonly txTo: string | null;
@@ -30,10 +26,8 @@ type SolanaMatchedTransaction = {
 };
 
 @Injectable()
-export class SolanaChainStreamService implements OnModuleInit, OnModuleDestroy {
-  private static readonly SPL_TOKEN_PROGRAM: string = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
-
-  private readonly logger: Logger = new Logger(SolanaChainStreamService.name);
+export class TronChainStreamService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger: Logger = new Logger(TronChainStreamService.name);
   private readonly blockQueue: number[] = [];
   private subscriptionHandle: ISubscriptionHandle | null = null;
   private isProcessingQueue: boolean = false;
@@ -50,22 +44,22 @@ export class SolanaChainStreamService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   public async onModuleInit(): Promise<void> {
-    if (!this.appConfigService.solanaWatcherEnabled) {
-      this.logger.log('Solana watcher is disabled by config.');
+    if (!this.appConfigService.tronWatcherEnabled) {
+      this.logger.log('TRON watcher is disabled by config.');
       return;
     }
 
     await this.recoverFromCheckpoint();
 
     this.subscriptionHandle = await this.providerFailoverService.executeForChain(
-      ChainKey.SOLANA_MAINNET,
+      ChainKey.TRON_MAINNET,
       (provider) =>
         provider.subscribeBlocks(async (blockNumber: number): Promise<void> => {
           this.enqueueBlock(blockNumber);
         }),
     );
 
-    this.logger.log('Solana watcher subscribed to new blocks.');
+    this.logger.log('TRON watcher subscribed to new blocks.');
   }
 
   public async onModuleDestroy(): Promise<void> {
@@ -77,11 +71,11 @@ export class SolanaChainStreamService implements OnModuleInit, OnModuleDestroy {
 
   private async recoverFromCheckpoint(): Promise<void> {
     const latestBlockNumber: number = await this.providerFailoverService.executeForChain(
-      ChainKey.SOLANA_MAINNET,
+      ChainKey.TRON_MAINNET,
       (provider): Promise<number> => provider.getLatestBlockNumber(),
     );
     const checkpointBlockNumber: number | null =
-      await this.chainCheckpointsRepository.getLastProcessedBlock(ChainKey.SOLANA_MAINNET);
+      await this.chainCheckpointsRepository.getLastProcessedBlock(ChainKey.TRON_MAINNET);
 
     if (checkpointBlockNumber === null) {
       return;
@@ -120,7 +114,7 @@ export class SolanaChainStreamService implements OnModuleInit, OnModuleDestroy {
     if (this.blockQueue.length >= this.appConfigService.chainBlockQueueMax) {
       const droppedCount: number = this.blockQueue.length;
       this.blockQueue.splice(0, this.blockQueue.length, blockNumber);
-      this.logger.warn(`solana queue overflow dropped=${droppedCount} retained=${blockNumber}`);
+      this.logger.warn(`tron queue overflow dropped=${droppedCount} retained=${blockNumber}`);
     } else {
       this.blockQueue.push(blockNumber);
     }
@@ -149,15 +143,13 @@ export class SolanaChainStreamService implements OnModuleInit, OnModuleDestroy {
           await this.processBlock(blockNumber);
           this.lastProcessedBlockNumber = blockNumber;
           await this.chainCheckpointsRepository.saveLastProcessedBlock(
-            ChainKey.SOLANA_MAINNET,
-            ChainId.SOLANA_MAINNET,
+            ChainKey.TRON_MAINNET,
+            ChainId.TRON_MAINNET,
             blockNumber,
           );
         } catch (error: unknown) {
           const errorMessage: string = error instanceof Error ? error.message : String(error);
-          this.logger.warn(
-            `solana processBlock failed block=${blockNumber} reason=${errorMessage}`,
-          );
+          this.logger.warn(`tron processBlock failed block=${blockNumber} reason=${errorMessage}`);
         }
       }
     } finally {
@@ -171,29 +163,27 @@ export class SolanaChainStreamService implements OnModuleInit, OnModuleDestroy {
 
   private async processBlock(blockNumber: number): Promise<void> {
     const trackedAddresses: readonly string[] =
-      await this.subscriptionsRepository.listTrackedAddresses(ChainKey.SOLANA_MAINNET);
+      await this.subscriptionsRepository.listTrackedAddresses(ChainKey.TRON_MAINNET);
 
     if (trackedAddresses.length === 0) {
       return;
     }
 
     const trackedAddressSet: ReadonlySet<string> = new Set(trackedAddresses);
-
-    const blockEnvelope: BlockEnvelope | null = await this.providerFailoverService.executeForChain(
-      ChainKey.SOLANA_MAINNET,
-      (provider): Promise<BlockEnvelope | null> => provider.getBlockEnvelope(blockNumber),
+    const blockEnvelope = await this.providerFailoverService.executeForChain(
+      ChainKey.TRON_MAINNET,
+      (provider) => provider.getBlockEnvelope(blockNumber),
     );
 
     if (blockEnvelope === null) {
       return;
     }
 
-    const matchedTransactions: readonly SolanaMatchedTransaction[] =
-      this.collectMatchedTransactions(
-        blockEnvelope.transactions,
-        trackedAddressSet,
-        blockEnvelope.timestampSec,
-      );
+    const matchedTransactions: readonly TronMatchedTransaction[] = this.collectMatchedTransactions(
+      blockEnvelope.transactions,
+      trackedAddressSet,
+      blockEnvelope.timestampSec,
+    );
 
     for (const matchedTransaction of matchedTransactions) {
       await this.processMatchedTransaction(matchedTransaction);
@@ -204,8 +194,8 @@ export class SolanaChainStreamService implements OnModuleInit, OnModuleDestroy {
     transactions: readonly TransactionEnvelope[],
     trackedAddressSet: ReadonlySet<string>,
     blockTimestampSec: number | null,
-  ): readonly SolanaMatchedTransaction[] {
-    const matchedTransactions: SolanaMatchedTransaction[] = [];
+  ): readonly TronMatchedTransaction[] {
+    const matchedTransactions: TronMatchedTransaction[] = [];
 
     for (const transaction of transactions) {
       const txFrom: string = transaction.from;
@@ -249,13 +239,13 @@ export class SolanaChainStreamService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async processMatchedTransaction(
-    matchedTransaction: SolanaMatchedTransaction,
+    matchedTransaction: TronMatchedTransaction,
   ): Promise<void> {
     const processedKey = {
       txHash: matchedTransaction.txHash,
       logIndex: 0,
-      chainId: ChainId.SOLANA_MAINNET,
-      chainKey: ChainKey.SOLANA_MAINNET,
+      chainId: ChainId.TRON_MAINNET,
+      chainKey: ChainKey.TRON_MAINNET,
       trackedAddress: matchedTransaction.trackedAddress,
     };
     const alreadyProcessed: boolean =
@@ -265,23 +255,11 @@ export class SolanaChainStreamService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    const receiptEnvelope: ReceiptEnvelope | null =
-      await this.providerFailoverService.executeForChain(
-        ChainKey.SOLANA_MAINNET,
-        (provider): Promise<ReceiptEnvelope | null> =>
-          provider.getReceiptEnvelope(matchedTransaction.txHash),
-      );
-
-    const classifiedEvent: ClassifiedEvent = this.classifyTransaction(
-      matchedTransaction,
-      receiptEnvelope,
-    );
-
-    if (classifiedEvent.eventType === ClassifiedEventType.UNKNOWN) {
-      return;
-    }
-
-    const occurredAt: Date = this.resolveOccurredAt(matchedTransaction.blockTimestampSec);
+    const classifiedEvent: ClassifiedEvent = this.classifyMatchedTransaction(matchedTransaction);
+    const occurredAt: Date =
+      matchedTransaction.blockTimestampSec !== null
+        ? new Date(matchedTransaction.blockTimestampSec * 1000)
+        : new Date();
 
     await this.walletEventsRepository.saveEvent({
       event: classifiedEvent,
@@ -291,82 +269,32 @@ export class SolanaChainStreamService implements OnModuleInit, OnModuleDestroy {
     await this.alertDispatcherService.dispatch(classifiedEvent);
   }
 
-  private classifyTransaction(
-    matchedTransaction: SolanaMatchedTransaction,
-    receiptEnvelope: ReceiptEnvelope | null,
-  ): ClassifiedEvent {
-    const direction: EventDirection = this.resolveDirection(
-      matchedTransaction.txFrom,
-      matchedTransaction.txTo,
-      matchedTransaction.trackedAddress,
-    );
-    const isSplTransfer: boolean = this.isSplTransfer(receiptEnvelope);
+  private classifyMatchedTransaction(matchedTransaction: TronMatchedTransaction): ClassifiedEvent {
+    const direction: EventDirection =
+      matchedTransaction.trackedAddress === matchedTransaction.txFrom
+        ? EventDirection.OUT
+        : matchedTransaction.txTo === matchedTransaction.trackedAddress
+          ? EventDirection.IN
+          : EventDirection.UNKNOWN;
     const counterpartyAddress: string | null =
-      direction === EventDirection.IN
-        ? matchedTransaction.txFrom
-        : direction === EventDirection.OUT
-          ? matchedTransaction.txTo
-          : null;
-    const eventType: ClassifiedEventType =
-      direction === EventDirection.UNKNOWN
-        ? ClassifiedEventType.UNKNOWN
-        : ClassifiedEventType.TRANSFER;
+      direction === EventDirection.OUT ? matchedTransaction.txTo : matchedTransaction.txFrom;
 
     return {
-      chainId: ChainId.SOLANA_MAINNET,
+      chainId: ChainId.TRON_MAINNET,
       txHash: matchedTransaction.txHash,
       logIndex: 0,
       trackedAddress: matchedTransaction.trackedAddress,
-      eventType,
+      eventType: ClassifiedEventType.TRANSFER,
       direction,
-      contractAddress: isSplTransfer ? SolanaChainStreamService.SPL_TOKEN_PROGRAM : null,
+      contractAddress: null,
       tokenAddress: null,
-      tokenSymbol: isSplTransfer ? 'SPL' : 'SOL',
-      tokenDecimals: null,
+      tokenSymbol: 'TRX',
+      tokenDecimals: 6,
       tokenAmountRaw: null,
       valueFormatted: null,
       counterpartyAddress,
       dex: null,
       pair: null,
     };
-  }
-
-  private isSplTransfer(receiptEnvelope: ReceiptEnvelope | null): boolean {
-    if (receiptEnvelope === null) {
-      return false;
-    }
-
-    return receiptEnvelope.logs.some((log): boolean => {
-      const normalizedLog: string = log.data.toLowerCase();
-      return (
-        normalizedLog.includes('tokenkeg') ||
-        normalizedLog.includes('spl-token') ||
-        normalizedLog.includes('instruction: transferchecked')
-      );
-    });
-  }
-
-  private resolveDirection(
-    txFrom: string,
-    txTo: string | null,
-    trackedAddress: string,
-  ): EventDirection {
-    if (txTo !== null && txTo === trackedAddress) {
-      return EventDirection.IN;
-    }
-
-    if (txFrom === trackedAddress) {
-      return EventDirection.OUT;
-    }
-
-    return EventDirection.UNKNOWN;
-  }
-
-  private resolveOccurredAt(blockTimestampSec: number | null): Date {
-    if (blockTimestampSec === null) {
-      return new Date();
-    }
-
-    return new Date(blockTimestampSec * 1000);
   }
 }

@@ -10,5 +10,7 @@ export type AppHealthStatus = {
   readonly ethereumRpcFallback: ComponentHealth;
   readonly solanaRpcPrimary: ComponentHealth;
   readonly solanaRpcFallback: ComponentHealth;
+  readonly tronRpcPrimary: ComponentHealth;
+  readonly tronRpcFallback: ComponentHealth;
   readonly telegram: ComponentHealth;
 };

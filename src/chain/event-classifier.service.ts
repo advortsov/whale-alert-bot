@@ -28,6 +28,7 @@ export class EventClassifierService {
   }
 
   public classify(event: ObservedTransaction): ClassifiedEvent {
+    const trackedAddress: string = event.trackedAddress;
     const normalizedTrackedAddress: string = event.trackedAddress.toLowerCase();
 
     for (const log of event.logs) {
@@ -54,7 +55,7 @@ export class EventClassifierService {
             chainId: ChainId.ETHEREUM_MAINNET,
             txHash: event.txHash,
             logIndex: log.logIndex,
-            trackedAddress: normalizedTrackedAddress,
+            trackedAddress,
             eventType: ClassifiedEventType.TRANSFER,
             direction: transferDirection,
             contractAddress: log.address,
@@ -85,7 +86,7 @@ export class EventClassifierService {
           chainId: event.chainId,
           txHash: event.txHash,
           logIndex: log.logIndex,
-          trackedAddress: normalizedTrackedAddress,
+          trackedAddress,
           eventType: ClassifiedEventType.SWAP,
           direction: swapDirection,
           contractAddress: log.address,
@@ -105,7 +106,7 @@ export class EventClassifierService {
       chainId: event.chainId,
       txHash: event.txHash,
       logIndex: 0,
-      trackedAddress: normalizedTrackedAddress,
+      trackedAddress,
       eventType: ClassifiedEventType.UNKNOWN,
       direction: EventDirection.UNKNOWN,
       contractAddress: null,

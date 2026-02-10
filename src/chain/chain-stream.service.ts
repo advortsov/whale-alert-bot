@@ -229,8 +229,11 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
       `processBlock tracked addresses count=${trackedAddresses.length} blockNumber=${blockNumber}`,
     );
 
-    const trackedAddressSet: ReadonlySet<string> = new Set(
-      trackedAddresses.map((address: string): string => address.toLowerCase()),
+    const trackedAddressMap: ReadonlyMap<string, string> = new Map(
+      trackedAddresses.map((address: string): readonly [string, string] => [
+        address.toLowerCase(),
+        address,
+      ]),
     );
 
     const block: BlockEnvelope | null = await this.providerFailoverService.execute((provider) =>
@@ -244,7 +247,7 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
 
     const matchedTransactions: readonly MatchedTransaction[] = this.collectMatchedTransactions(
       block.transactions,
-      trackedAddressSet,
+      trackedAddressMap,
       block.timestampSec,
     );
 
@@ -261,18 +264,20 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
 
   private collectMatchedTransactions(
     transactions: readonly TransactionEnvelope[],
-    trackedAddressSet: ReadonlySet<string>,
+    trackedAddressMap: ReadonlyMap<string, string>,
     blockTimestampSec: number | null,
   ): readonly MatchedTransaction[] {
     const matchedTransactions: MatchedTransaction[] = [];
 
     for (const transaction of transactions) {
-      const txFrom: string = transaction.from.toLowerCase();
-      const txTo: string | null = transaction.to ? transaction.to.toLowerCase() : null;
+      const txFrom: string = transaction.from;
+      const txTo: string | null = transaction.to;
+      const txFromLower: string = txFrom.toLowerCase();
+      const txToLower: string | null = txTo ? txTo.toLowerCase() : null;
       const matchedAddress: string | null = this.matchTrackedAddress(
-        txFrom,
-        txTo,
-        trackedAddressSet,
+        txFromLower,
+        txToLower,
+        trackedAddressMap,
       );
 
       if (!matchedAddress) {
@@ -386,14 +391,20 @@ export class ChainStreamService implements OnModuleInit, OnModuleDestroy {
   private matchTrackedAddress(
     txFrom: string,
     txTo: string | null,
-    trackedAddressSet: ReadonlySet<string>,
+    trackedAddressMap: ReadonlyMap<string, string>,
   ): string | null {
-    if (trackedAddressSet.has(txFrom)) {
-      return txFrom;
+    const matchedFromAddress: string | undefined = trackedAddressMap.get(txFrom);
+
+    if (matchedFromAddress !== undefined) {
+      return matchedFromAddress;
     }
 
-    if (txTo && trackedAddressSet.has(txTo)) {
-      return txTo;
+    if (txTo !== null) {
+      const matchedToAddress: string | undefined = trackedAddressMap.get(txTo);
+
+      if (matchedToAddress !== undefined) {
+        return matchedToAddress;
+      }
     }
 
     return null;

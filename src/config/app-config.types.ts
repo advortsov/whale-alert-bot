@@ -10,6 +10,7 @@ export type AppConfig = {
   readonly telegramEnabled: boolean;
   readonly chainWatcherEnabled: boolean;
   readonly solanaWatcherEnabled: boolean;
+  readonly tronWatcherEnabled: boolean;
   readonly chainReceiptConcurrency: number;
   readonly chainRpcMinIntervalMs: number;
   readonly chainBackoffBaseMs: number;
@@ -25,6 +26,8 @@ export type AppConfig = {
   readonly solanaHeliusWssUrl: string | null;
   readonly solanaPublicHttpUrl: string | null;
   readonly solanaPublicWssUrl: string | null;
+  readonly tronPrimaryHttpUrl: string | null;
+  readonly tronFallbackHttpUrl: string | null;
   readonly uniswapSwapAllowlist: readonly string[];
   readonly ethCexAddressAllowlist: readonly string[];
   readonly etherscanTxBaseUrl: string;

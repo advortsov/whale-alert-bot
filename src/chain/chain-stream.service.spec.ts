@@ -97,11 +97,11 @@ const sleep = async (waitMs: number): Promise<void> => {
 
 describe('ChainStreamService', (): void => {
   it('uses prefetched block transactions and requests receipts only for matched addresses', async (): Promise<void> => {
-    const trackedAddress: string = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const trackedAddress: string = '0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa';
     const providerStub: ProviderStub = new ProviderStub();
     const txMatchedByFrom: TransactionEnvelope = {
       hash: '0x1',
-      from: trackedAddress,
+      from: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       to: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
       blockTimestampSec: 1_739_400_000,
     };
@@ -224,6 +224,8 @@ describe('ChainStreamService', (): void => {
     expect(providerStub.receiptCalls).toEqual(['0x1', '0x2']);
     expect(dispatched).toHaveLength(2);
     expect(saveEvent).toHaveBeenCalledTimes(2);
+    expect(dispatched[0]?.trackedAddress).toBe(trackedAddress);
+    expect(dispatched[1]?.trackedAddress).toBe(trackedAddress);
 
     await service.onModuleDestroy();
   });

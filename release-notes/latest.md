@@ -1,7 +1,8 @@
 # Последний релиз
 
-- Добавлен TRON history fallback через TronGrid (native TRX + TRC20) для команды `/history`.
-- История и ссылки на транзакции для TRON теперь корректно отображаются через Tronscan.
-- Обновлены тексты бота и README: TRON включен в поддерживаемые сети для истории.
-- Добавлены/обновлены тесты: TRON explorer adapter, history router, tracking history links, config defaults.
-- Исправлен старт в Docker при пустом `TRON_GRID_API_KEY` (пустое значение корректно интерпретируется как `null`).
+- Добавлен live watcher для TRON (`TRON_WATCHER_ENABLED`) на базе domain-based RPC adapters: primary/fallback, polling `getnowblock/getblockbynum`.
+- Реализован `TronChainStreamService`: pipeline `block -> match -> dedupe -> store -> alert` с сохранением событий в `wallet_events` и `processed_events`.
+- `/health` теперь показывает отдельный статус `tronRpcPrimary/tronRpcFallback`.
+- Исправлено сопоставление адресов в Ethereum/Solana watcher: сохраняется канонический `trackedAddress`, алерты корректно доставляются для mixed-case адресов.
+- Улучшены action-кнопки в live-alert: explorer/portfolio/chart теперь chain-aware для ETH/SOL/TRON.
+- Добавлены тесты: TRON RPC adapter, TRON chain stream, failover routing на TRON, расширены config tests под TRON watcher.

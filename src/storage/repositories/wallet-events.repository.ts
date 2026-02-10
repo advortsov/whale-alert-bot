@@ -125,6 +125,10 @@ export class WalletEventsRepository {
       return ChainKey.SOLANA_MAINNET;
     }
 
+    if (chainId === 111) {
+      return ChainKey.TRON_MAINNET;
+    }
+
     return ChainKey.ETHEREUM_MAINNET;
   }
 }

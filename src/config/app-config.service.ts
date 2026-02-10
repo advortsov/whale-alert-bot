@@ -62,6 +62,7 @@ const envSchema = z.object({
   TELEGRAM_ENABLED: booleanSchema.default(false),
   CHAIN_WATCHER_ENABLED: booleanSchema.default(false),
   SOLANA_WATCHER_ENABLED: booleanSchema.default(false),
+  TRON_WATCHER_ENABLED: booleanSchema.default(false),
   CHAIN_RECEIPT_CONCURRENCY: z.coerce.number().int().positive().default(2),
   CHAIN_RPC_MIN_INTERVAL_MS: z.coerce.number().int().min(0).default(350),
   CHAIN_BACKOFF_BASE_MS: z.coerce.number().int().positive().default(1000),
@@ -77,6 +78,8 @@ const envSchema = z.object({
   SOLANA_HELIUS_WSS_URL: z.url().optional(),
   SOLANA_PUBLIC_HTTP_URL: z.url().optional(),
   SOLANA_PUBLIC_WSS_URL: z.url().optional(),
+  TRON_PRIMARY_HTTP_URL: z.url().optional(),
+  TRON_FALLBACK_HTTP_URL: z.url().optional(),
   UNISWAP_SWAP_ALLOWLIST: z.string().trim().optional(),
   ETH_CEX_ADDRESS_ALLOWLIST: z.string().trim().optional(),
   ETHERSCAN_TX_BASE_URL: z.url().default('https://etherscan.io/tx/'),
@@ -116,6 +119,7 @@ export class AppConfigService {
       telegramEnabled: parsedEnv.TELEGRAM_ENABLED,
       chainWatcherEnabled: parsedEnv.CHAIN_WATCHER_ENABLED,
       solanaWatcherEnabled: parsedEnv.SOLANA_WATCHER_ENABLED,
+      tronWatcherEnabled: parsedEnv.TRON_WATCHER_ENABLED,
       chainReceiptConcurrency: parsedEnv.CHAIN_RECEIPT_CONCURRENCY,
       chainRpcMinIntervalMs: parsedEnv.CHAIN_RPC_MIN_INTERVAL_MS,
       chainBackoffBaseMs: parsedEnv.CHAIN_BACKOFF_BASE_MS,
@@ -131,6 +135,8 @@ export class AppConfigService {
       solanaHeliusWssUrl: parsedEnv.SOLANA_HELIUS_WSS_URL ?? null,
       solanaPublicHttpUrl: parsedEnv.SOLANA_PUBLIC_HTTP_URL ?? null,
       solanaPublicWssUrl: parsedEnv.SOLANA_PUBLIC_WSS_URL ?? null,
+      tronPrimaryHttpUrl: parsedEnv.TRON_PRIMARY_HTTP_URL ?? null,
+      tronFallbackHttpUrl: parsedEnv.TRON_FALLBACK_HTTP_URL ?? null,
       uniswapSwapAllowlist: this.parseAllowlist(parsedEnv.UNISWAP_SWAP_ALLOWLIST),
       ethCexAddressAllowlist: this.parseAllowlist(parsedEnv.ETH_CEX_ADDRESS_ALLOWLIST),
       etherscanTxBaseUrl: parsedEnv.ETHERSCAN_TX_BASE_URL,
@@ -179,6 +185,10 @@ export class AppConfigService {
 
   public get solanaWatcherEnabled(): boolean {
     return this.config.solanaWatcherEnabled;
+  }
+
+  public get tronWatcherEnabled(): boolean {
+    return this.config.tronWatcherEnabled;
   }
 
   public get chainReceiptConcurrency(): number {
@@ -239,6 +249,14 @@ export class AppConfigService {
 
   public get solanaPublicWssUrl(): string | null {
     return this.config.solanaPublicWssUrl;
+  }
+
+  public get tronPrimaryHttpUrl(): string | null {
+    return this.config.tronPrimaryHttpUrl;
+  }
+
+  public get tronFallbackHttpUrl(): string | null {
+    return this.config.tronFallbackHttpUrl;
   }
 
   public get uniswapSwapAllowlist(): readonly string[] {
@@ -351,6 +369,16 @@ export class AppConfigService {
 
       if (!parsedEnv.SOLANA_PUBLIC_WSS_URL) {
         throw new Error('SOLANA_PUBLIC_WSS_URL is required when SOLANA_WATCHER_ENABLED=true');
+      }
+    }
+
+    if (parsedEnv.TRON_WATCHER_ENABLED) {
+      if (!parsedEnv.TRON_PRIMARY_HTTP_URL) {
+        throw new Error('TRON_PRIMARY_HTTP_URL is required when TRON_WATCHER_ENABLED=true');
+      }
+
+      if (!parsedEnv.TRON_FALLBACK_HTTP_URL) {
+        throw new Error('TRON_FALLBACK_HTTP_URL is required when TRON_WATCHER_ENABLED=true');
       }
     }
   }

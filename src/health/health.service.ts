@@ -50,6 +50,23 @@ export class HealthService {
           ok: true,
           details: 'disabled by SOLANA_WATCHER_ENABLED=false',
         };
+    const tronRpcChecksEnabled: boolean = this.appConfigService.tronWatcherEnabled;
+
+    const tronPrimaryProviderHealth = tronRpcChecksEnabled
+      ? await this.providerFactory.createPrimary(ChainKey.TRON_MAINNET).healthCheck()
+      : {
+          provider: 'tron-grid-primary',
+          ok: true,
+          details: 'disabled by TRON_WATCHER_ENABLED=false',
+        };
+
+    const tronFallbackProviderHealth = tronRpcChecksEnabled
+      ? await this.providerFactory.createFallback(ChainKey.TRON_MAINNET).healthCheck()
+      : {
+          provider: 'tron-public-fallback',
+          ok: true,
+          details: 'disabled by TRON_WATCHER_ENABLED=false',
+        };
 
     const database: ComponentHealth = {
       ok: databaseOk,
@@ -82,12 +99,24 @@ export class HealthService {
       ok: solanaFallbackProviderHealth.ok,
       details: solanaFallbackProviderHealth.details,
     };
+    const tronPrimaryHealth: ComponentHealth = {
+      ok: tronPrimaryProviderHealth.ok,
+      details: tronPrimaryProviderHealth.details,
+    };
+
+    const tronFallbackHealth: ComponentHealth = {
+      ok: tronFallbackProviderHealth.ok,
+      details: tronFallbackProviderHealth.details,
+    };
 
     const ethereumChainHealthy: boolean =
       !ethereumRpcChecksEnabled || ethereumRpcPrimary.ok || ethereumRpcFallback.ok;
     const solanaChainHealthy: boolean =
       !solanaRpcChecksEnabled || solanaPrimaryHealth.ok || solanaFallbackHealth.ok;
-    const isHealthy: boolean = database.ok && ethereumChainHealthy && solanaChainHealthy;
+    const tronChainHealthy: boolean =
+      !tronRpcChecksEnabled || tronPrimaryHealth.ok || tronFallbackHealth.ok;
+    const isHealthy: boolean =
+      database.ok && ethereumChainHealthy && solanaChainHealthy && tronChainHealthy;
 
     return {
       status: isHealthy ? 'ok' : 'degraded',
@@ -96,6 +125,8 @@ export class HealthService {
       ethereumRpcFallback,
       solanaRpcPrimary: solanaPrimaryHealth,
       solanaRpcFallback: solanaFallbackHealth,
+      tronRpcPrimary: tronPrimaryHealth,
+      tronRpcFallback: tronFallbackHealth,
       telegram,
     };
   }

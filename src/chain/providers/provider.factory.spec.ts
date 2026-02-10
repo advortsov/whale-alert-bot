@@ -90,12 +90,16 @@ describe('ProviderFactory', (): void => {
     const ethereumFallback: IFallbackRpcAdapter = new FallbackAdapterStub('eth-fallback');
     const solanaPrimary: IPrimaryRpcAdapter = new PrimaryAdapterStub('sol-primary');
     const solanaFallback: IFallbackRpcAdapter = new FallbackAdapterStub('sol-fallback');
+    const tronPrimary: IPrimaryRpcAdapter = new PrimaryAdapterStub('tron-primary');
+    const tronFallback: IFallbackRpcAdapter = new FallbackAdapterStub('tron-fallback');
 
     const factory: ProviderFactory = new ProviderFactory(
       ethereumPrimary,
       ethereumFallback,
       solanaPrimary,
       solanaFallback,
+      tronPrimary,
+      tronFallback,
     );
 
     expect(factory.createPrimary(ChainKey.ETHEREUM_MAINNET).getName()).toBe('eth-primary');
@@ -107,36 +111,40 @@ describe('ProviderFactory', (): void => {
     const ethereumFallback: IFallbackRpcAdapter = new FallbackAdapterStub('eth-fallback');
     const solanaPrimary: IPrimaryRpcAdapter = new PrimaryAdapterStub('sol-primary');
     const solanaFallback: IFallbackRpcAdapter = new FallbackAdapterStub('sol-fallback');
+    const tronPrimary: IPrimaryRpcAdapter = new PrimaryAdapterStub('tron-primary');
+    const tronFallback: IFallbackRpcAdapter = new FallbackAdapterStub('tron-fallback');
 
     const factory: ProviderFactory = new ProviderFactory(
       ethereumPrimary,
       ethereumFallback,
       solanaPrimary,
       solanaFallback,
+      tronPrimary,
+      tronFallback,
     );
 
     expect(factory.createPrimary(ChainKey.SOLANA_MAINNET).getName()).toBe('sol-primary');
     expect(factory.createFallback(ChainKey.SOLANA_MAINNET).getName()).toBe('sol-fallback');
   });
 
-  it('throws for unsupported chain key', (): void => {
+  it('returns tron providers for tron chain key', (): void => {
     const ethereumPrimary: IPrimaryRpcAdapter = new PrimaryAdapterStub('eth-primary');
     const ethereumFallback: IFallbackRpcAdapter = new FallbackAdapterStub('eth-fallback');
     const solanaPrimary: IPrimaryRpcAdapter = new PrimaryAdapterStub('sol-primary');
     const solanaFallback: IFallbackRpcAdapter = new FallbackAdapterStub('sol-fallback');
+    const tronPrimary: IPrimaryRpcAdapter = new PrimaryAdapterStub('tron-primary');
+    const tronFallback: IFallbackRpcAdapter = new FallbackAdapterStub('tron-fallback');
 
     const factory: ProviderFactory = new ProviderFactory(
       ethereumPrimary,
       ethereumFallback,
       solanaPrimary,
       solanaFallback,
+      tronPrimary,
+      tronFallback,
     );
 
-    expect((): IPrimaryRpcAdapter => factory.createPrimary(ChainKey.TRON_MAINNET)).toThrow(
-      'Primary RPC adapter is not configured for chainKey=tron_mainnet',
-    );
-    expect((): IFallbackRpcAdapter => factory.createFallback(ChainKey.TRON_MAINNET)).toThrow(
-      'Fallback RPC adapter is not configured for chainKey=tron_mainnet',
-    );
+    expect(factory.createPrimary(ChainKey.TRON_MAINNET).getName()).toBe('tron-primary');
+    expect(factory.createFallback(ChainKey.TRON_MAINNET).getName()).toBe('tron-fallback');
   });
 });

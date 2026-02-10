@@ -118,6 +118,7 @@ export class AlertDispatcherService {
       const sendOptions: TelegramSendTextOptions = this.buildAlertInlineKeyboard(
         subscriber.walletId,
         enrichedEvent,
+        subscriber.chainKey,
       );
 
       try {
@@ -452,10 +453,12 @@ export class AlertDispatcherService {
   private buildAlertInlineKeyboard(
     walletId: number,
     event: ClassifiedEvent,
+    chainKey: ChainKey,
   ): TelegramSendTextOptions {
-    const txUrl: string = `${this.appConfigService.etherscanTxBaseUrl}${event.txHash}`;
+    const txUrl: string = this.buildTxUrl(chainKey, event.txHash);
+    const txButtonLabel: string = this.getTxButtonLabel(chainKey);
     const chartUrl: string = this.buildChartUrl(event);
-    const portfolioUrl: string = `https://debank.com/profile/${event.trackedAddress}`;
+    const portfolioUrl: string = this.buildPortfolioUrl(chainKey, event.trackedAddress);
 
     return {
       reply_markup: {
@@ -466,7 +469,7 @@ export class AlertDispatcherService {
               url: chartUrl,
             },
             {
-              text: '🔍 Etherscan',
+              text: txButtonLabel,
               url: txUrl,
             },
           ],
@@ -495,11 +498,65 @@ export class AlertDispatcherService {
   }
 
   private buildChartUrl(event: ClassifiedEvent): string {
+    const chainKey: ChainKey = this.resolveChainKey(event.chainId);
+
     if (event.tokenAddress !== null && event.tokenAddress.length > 0) {
+      if (chainKey === ChainKey.SOLANA_MAINNET) {
+        return `https://dexscreener.com/solana/${event.tokenAddress}`;
+      }
+
+      if (chainKey === ChainKey.TRON_MAINNET) {
+        return `https://dexscreener.com/tron/${event.tokenAddress}`;
+      }
+
       return `https://dexscreener.com/ethereum/${event.tokenAddress}`;
     }
 
+    if (chainKey === ChainKey.SOLANA_MAINNET) {
+      return 'https://www.tradingview.com/symbols/SOLUSD/';
+    }
+
+    if (chainKey === ChainKey.TRON_MAINNET) {
+      return 'https://www.tradingview.com/symbols/TRXUSD/';
+    }
+
     return 'https://www.tradingview.com/symbols/ETHUSD/';
+  }
+
+  private buildTxUrl(chainKey: ChainKey, txHash: string): string {
+    if (chainKey === ChainKey.SOLANA_MAINNET) {
+      return `https://solscan.io/tx/${txHash}`;
+    }
+
+    if (chainKey === ChainKey.TRON_MAINNET) {
+      return `${this.appConfigService.tronscanTxBaseUrl}${txHash}`;
+    }
+
+    return `${this.appConfigService.etherscanTxBaseUrl}${txHash}`;
+  }
+
+  private buildPortfolioUrl(chainKey: ChainKey, trackedAddress: string): string {
+    if (chainKey === ChainKey.SOLANA_MAINNET) {
+      return `https://solscan.io/account/${trackedAddress}`;
+    }
+
+    if (chainKey === ChainKey.TRON_MAINNET) {
+      return `https://tronscan.org/#/address/${trackedAddress}`;
+    }
+
+    return `https://debank.com/profile/${trackedAddress}`;
+  }
+
+  private getTxButtonLabel(chainKey: ChainKey): string {
+    if (chainKey === ChainKey.SOLANA_MAINNET) {
+      return '🔍 Solscan';
+    }
+
+    if (chainKey === ChainKey.TRON_MAINNET) {
+      return '🔍 Tronscan';
+    }
+
+    return '🔍 Etherscan';
   }
 
   private resolveChainKey(chainId: number): ChainKey {
@@ -509,6 +566,10 @@ export class AlertDispatcherService {
 
     if (chainId === 101) {
       return ChainKey.SOLANA_MAINNET;
+    }
+
+    if (chainId === 111) {
+      return ChainKey.TRON_MAINNET;
     }
 
     return ChainKey.ETHEREUM_MAINNET;

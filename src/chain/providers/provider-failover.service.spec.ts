@@ -145,4 +145,38 @@ describe('ProviderFailoverService', (): void => {
     expect(result).toBe('sol-primary');
     expect(createPrimaryMock).toHaveBeenCalledWith(ChainKey.SOLANA_MAINNET);
   });
+
+  it('routes executeForChain to tron provider', async (): Promise<void> => {
+    const ethereumPrimary: IPrimaryRpcAdapter = new PrimaryProviderStub();
+    const tronPrimary: IPrimaryRpcAdapter = new (class TronPrimaryProviderStub
+      extends PrimaryProviderStub
+      implements IPrimaryRpcAdapter
+    {
+      public override getName(): string {
+        return 'tron-primary';
+      }
+    })();
+    const fallback: IFallbackRpcAdapter = new FallbackProviderStub();
+
+    const createPrimaryMock = vi.fn(
+      (chainKey: ChainKey): IPrimaryRpcAdapter =>
+        chainKey === ChainKey.TRON_MAINNET ? tronPrimary : ethereumPrimary,
+    );
+    const factory: ProviderFactory = {
+      createPrimary: createPrimaryMock,
+      createFallback: (): IFallbackRpcAdapter => fallback,
+    } as unknown as ProviderFactory;
+    const throttler: RpcThrottlerService = new RpcThrottlerService(
+      new RpcConfigStub() as unknown as AppConfigService,
+    );
+    const service: ProviderFailoverService = new ProviderFailoverService(factory, throttler);
+
+    const result: string = await service.executeForChain(
+      ChainKey.TRON_MAINNET,
+      async (provider): Promise<string> => provider.getName(),
+    );
+
+    expect(result).toBe('tron-primary');
+    expect(createPrimaryMock).toHaveBeenCalledWith(ChainKey.TRON_MAINNET);
+  });
 });

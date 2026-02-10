@@ -22,11 +22,13 @@ services:
       dockerfile: Dockerfile
     environment:
       NODE_ENV: ${NODE_ENV:-development}
-      APP_VERSION: ${APP_VERSION:-0.1.1}
+      APP_VERSION: ${APP_VERSION:-0.1.2}
       PORT: ${PORT:-3000}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       TELEGRAM_ENABLED: ${TELEGRAM_ENABLED:-false}
       CHAIN_WATCHER_ENABLED: ${CHAIN_WATCHER_ENABLED:-false}
+      SOLANA_WATCHER_ENABLED: ${SOLANA_WATCHER_ENABLED:-false}
+      TRON_WATCHER_ENABLED: ${TRON_WATCHER_ENABLED:-false}
       CHAIN_RECEIPT_CONCURRENCY: ${CHAIN_RECEIPT_CONCURRENCY:-2}
       CHAIN_RPC_MIN_INTERVAL_MS: ${CHAIN_RPC_MIN_INTERVAL_MS:-350}
       CHAIN_BACKOFF_BASE_MS: ${CHAIN_BACKOFF_BASE_MS:-1000}
@@ -37,6 +39,12 @@ services:
       BOT_TOKEN: ${BOT_TOKEN:-0000000000:TEST_TOKEN_FOR_DOCKER}
       ETH_ALCHEMY_WSS_URL: ${ETH_ALCHEMY_WSS_URL:-wss://example.invalid/alchemy}
       ETH_INFURA_WSS_URL: ${ETH_INFURA_WSS_URL:-wss://example.invalid/infura}
+      SOLANA_HELIUS_HTTP_URL: ${SOLANA_HELIUS_HTTP_URL:-https://api.mainnet-beta.solana.com}
+      SOLANA_HELIUS_WSS_URL: ${SOLANA_HELIUS_WSS_URL:-wss://api.mainnet-beta.solana.com}
+      SOLANA_PUBLIC_HTTP_URL: ${SOLANA_PUBLIC_HTTP_URL:-https://solana-rpc.publicnode.com}
+      SOLANA_PUBLIC_WSS_URL: ${SOLANA_PUBLIC_WSS_URL:-wss://solana-rpc.publicnode.com}
+      TRON_PRIMARY_HTTP_URL: ${TRON_PRIMARY_HTTP_URL:-https://api.trongrid.io}
+      TRON_FALLBACK_HTTP_URL: ${TRON_FALLBACK_HTTP_URL:-https://api.trongrid.io}
       ETHERSCAN_TX_BASE_URL: ${ETHERSCAN_TX_BASE_URL:-https://etherscan.io/tx/}
       ETHERSCAN_API_BASE_URL: ${ETHERSCAN_API_BASE_URL:-https://api.etherscan.io/v2/api}
       ETHERSCAN_API_KEY: ${ETHERSCAN_API_KEY:-}

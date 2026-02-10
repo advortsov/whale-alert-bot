@@ -88,6 +88,36 @@ describe('AppConfigService', (): void => {
     );
   });
 
+  it('throws when tron watcher is enabled without primary http url', (): void => {
+    withEnv(
+      {
+        ...createBaseEnv(),
+        TRON_WATCHER_ENABLED: 'true',
+        TRON_FALLBACK_HTTP_URL: 'https://api.trongrid.io',
+      },
+      (): void => {
+        expect((): AppConfigService => new AppConfigService()).toThrow(
+          'TRON_PRIMARY_HTTP_URL is required when TRON_WATCHER_ENABLED=true',
+        );
+      },
+    );
+  });
+
+  it('throws when tron watcher is enabled without fallback http url', (): void => {
+    withEnv(
+      {
+        ...createBaseEnv(),
+        TRON_WATCHER_ENABLED: 'true',
+        TRON_PRIMARY_HTTP_URL: 'https://api.trongrid.io',
+      },
+      (): void => {
+        expect((): AppConfigService => new AppConfigService()).toThrow(
+          'TRON_FALLBACK_HTTP_URL is required when TRON_WATCHER_ENABLED=true',
+        );
+      },
+    );
+  });
+
   it('uses default values for alert throttling and token metadata cache config', (): void => {
     withEnv(createBaseEnv(), (): void => {
       const config: AppConfigService = new AppConfigService();
@@ -119,6 +149,9 @@ describe('AppConfigService', (): void => {
       expect(config.tronGridApiBaseUrl).toBe('https://api.trongrid.io');
       expect(config.tronGridApiKey).toBeNull();
       expect(config.tronscanTxBaseUrl).toBe('https://tronscan.org/#/transaction/');
+      expect(config.tronWatcherEnabled).toBe(false);
+      expect(config.tronPrimaryHttpUrl).toBeNull();
+      expect(config.tronFallbackHttpUrl).toBeNull();
     });
   });
 

@@ -92,8 +92,8 @@ npm run db:migrate
 
 ## Multichain-ready архитектура (Core + Adapters, домены)
 
-Текущий runtime поддерживает Ethereum + Solana, а для TRON доступен history fallback через TronGrid.
-Live watcher для `tron_mainnet` пока не включен, но контракты и данные уже chain-aware.
+Текущий runtime поддерживает Ethereum + Solana + TRON.
+Для TRON доступны и history fallback, и live watcher (включается отдельно через `TRON_WATCHER_ENABLED`).
 
 - `src/core/chains`: ключи сетей и базовые chain-контракты (`ChainKey`).
 - `src/core/ports/rpc`: доменный порт RPC/block stream.
@@ -105,7 +105,7 @@ Live watcher для `tron_mainnet` пока не включен, но контр
 Технические ограничения этапа:
 
 - production-фокус пока на `ethereum_mainnet`, Solana включается staged-rollout (см. ниже);
-- для `tron_mainnet` доступны `/track`, `/list`, `/wallet`, `/history`, но live watcher пока выключен;
+- для `tron_mainnet` live-классификация на этом этапе ограничена событиями `TRANSFER` (v1);
 - все chain-specific данные в БД помечаются `chain_key`.
 
 TRON history fallback в текущем этапе:
@@ -120,6 +120,7 @@ TRON history fallback в текущем этапе:
 ```env
 CHAIN_WATCHER_ENABLED=false
 SOLANA_WATCHER_ENABLED=false
+TRON_WATCHER_ENABLED=false
 CHAIN_RECEIPT_CONCURRENCY=2
 CHAIN_RPC_MIN_INTERVAL_MS=350
 CHAIN_BACKOFF_BASE_MS=1000
@@ -131,6 +132,8 @@ SOLANA_HELIUS_HTTP_URL=https://api.mainnet-beta.solana.com
 SOLANA_HELIUS_WSS_URL=wss://api.mainnet-beta.solana.com
 SOLANA_PUBLIC_HTTP_URL=https://solana-rpc.publicnode.com
 SOLANA_PUBLIC_WSS_URL=wss://solana-rpc.publicnode.com
+TRON_PRIMARY_HTTP_URL=https://api.trongrid.io
+TRON_FALLBACK_HTTP_URL=https://api.trongrid.io
 ETHERSCAN_API_BASE_URL=https://api.etherscan.io/v2/api
 ETHERSCAN_API_KEY=your_free_key
 TRON_GRID_API_BASE_URL=https://api.trongrid.io
@@ -152,6 +155,7 @@ TOKEN_META_CACHE_TTL_SEC=3600
 Fail-fast правила:
 - если `CHAIN_WATCHER_ENABLED=true`, то `ETH_ALCHEMY_WSS_URL` и `ETH_INFURA_WSS_URL` обязательны;
 - если `SOLANA_WATCHER_ENABLED=true`, то обязательны все: `SOLANA_HELIUS_HTTP_URL`, `SOLANA_HELIUS_WSS_URL`, `SOLANA_PUBLIC_HTTP_URL`, `SOLANA_PUBLIC_WSS_URL`.
+- если `TRON_WATCHER_ENABLED=true`, то обязательны `TRON_PRIMARY_HTTP_URL` и `TRON_FALLBACK_HTTP_URL`.
 
 ## Workflow внешних API
 
@@ -211,6 +215,18 @@ TronGrid history endpoint:
 ```bash
 curl "https://api.trongrid.io/v1/accounts/TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7/transactions?only_confirmed=true&order_by=block_timestamp,desc&limit=3"
 curl "https://api.trongrid.io/v1/accounts/TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7/transactions/trc20?limit=3"
+```
+
+TRON watcher endpoint (HTTP polling):
+
+```bash
+curl -X POST "https://api.trongrid.io/wallet/getnowblock" \
+  -H "content-type: application/json" \
+  -d '{}'
+
+curl -X POST "https://api.trongrid.io/wallet/getblockbynum" \
+  -H "content-type: application/json" \
+  -d '{"num": 80000000, "visible": true}'
 ```
 
 ## Docker
