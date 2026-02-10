@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { LocalBotHarness } from './local-bot-harness';
 import type { HarnessRunResult, HarnessUser } from './local-bot-harness.interfaces';
+import { ChainKey } from '../../core/chains/chain-key.interfaces';
 import {
   HistoryDirectionFilter,
   HistoryKind,
@@ -95,16 +96,53 @@ describe('LocalBotHarness', (): void => {
     const result: HarnessRunResult = await harness.sendText({
       user,
       text: [
-        '/track 0x28C6c06298d514Db089934071355E5743bf21d60 Binance_Cold_Wallet_1',
-        '/track 0xBE0eB53F46cd790Cd13851d5EFf43D12404d33E8 Binance_Cold_Wallet_2',
+        '/track eth 0x28C6c06298d514Db089934071355E5743bf21d60 Binance_Cold_Wallet_1',
+        '/track eth 0xBE0eB53F46cd790Cd13851d5EFf43D12404d33E8 Binance_Cold_Wallet_2',
       ].join('\n'),
     });
 
     expect(trackingServiceStub.trackAddress).toHaveBeenCalledTimes(2);
+    expect(trackingServiceStub.trackAddress).toHaveBeenNthCalledWith(
+      1,
+      {
+        telegramId: '42',
+        username: 'tester',
+      },
+      '0x28C6c06298d514Db089934071355E5743bf21d60',
+      'Binance_Cold_Wallet_1',
+      ChainKey.ETHEREUM_MAINNET,
+    );
     expect(result.replies).toHaveLength(1);
     expect(result.replies[0]?.text).toContain('Обработано команд: 2');
     expect(result.replies[0]?.text).toContain('tracked 0x28C6c06298d514Db089934071355E5743bf21d60');
     expect(result.replies[0]?.text).toContain('tracked 0xBE0eB53F46cd790Cd13851d5EFf43D12404d33E8');
+  });
+
+  it('routes /track sol with explicit chain key', async (): Promise<void> => {
+    const trackingServiceStub: TrackingServiceStub = createTrackingServiceStub();
+    const runtimeStatusServiceStub: RuntimeStatusServiceStub = createRuntimeStatusServiceStub();
+    const harness: LocalBotHarness = new LocalBotHarness({
+      trackingService: trackingServiceStub as unknown as TrackingService,
+      runtimeStatusService: runtimeStatusServiceStub as unknown as RuntimeStatusService,
+    });
+
+    await harness.sendText({
+      user: {
+        telegramId: '42',
+        username: 'tester',
+      },
+      text: '/track sol 11111111111111111111111111111111 system',
+    });
+
+    expect(trackingServiceStub.trackAddress).toHaveBeenCalledWith(
+      {
+        telegramId: '42',
+        username: 'tester',
+      },
+      '11111111111111111111111111111111',
+      'system',
+      ChainKey.SOLANA_MAINNET,
+    );
   });
 
   it('returns merged runtime and user status for /status', async (): Promise<void> => {

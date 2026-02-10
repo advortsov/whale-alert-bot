@@ -16,6 +16,7 @@ import {
   type UpdateMeta,
   type WalletCallbackTarget,
 } from './telegram.interfaces';
+import { ChainKey } from '../core/chains/chain-key.interfaces';
 import { HistoryDirectionFilter, HistoryKind } from '../features/tracking/dto/history-request.dto';
 import { RuntimeStatusService } from '../runtime/runtime-status.service';
 import type { HistoryPageResult } from '../tracking/history-page.interfaces';
@@ -61,6 +62,13 @@ const MENU_BUTTON_COMMAND_MAP: Readonly<Record<string, SupportedTelegramCommand>
 const ALERT_FILTER_TARGET_MAP: Readonly<Record<string, AlertFilterToggleTarget>> = {
   transfer: AlertFilterToggleTarget.TRANSFER,
   swap: AlertFilterToggleTarget.SWAP,
+};
+
+const TRACK_CHAIN_ALIAS_MAP: Readonly<Record<string, ChainKey>> = {
+  eth: ChainKey.ETHEREUM_MAINNET,
+  ethereum: ChainKey.ETHEREUM_MAINNET,
+  sol: ChainKey.SOLANA_MAINNET,
+  solana: ChainKey.SOLANA_MAINNET,
 };
 
 const WALLET_HISTORY_CALLBACK_PREFIX: string = 'wallet_history:';
@@ -298,19 +306,23 @@ export class TelegramUpdate {
     commandEntry: ParsedMessageCommand,
     updateMeta: UpdateMeta,
   ): Promise<string> {
-    const address: string | null = commandEntry.args[0] ?? null;
-    const labelRaw: string | null =
-      commandEntry.args.length > 1 ? commandEntry.args.slice(1).join(' ') : null;
-    const label: string | null = labelRaw && labelRaw.trim().length > 0 ? labelRaw.trim() : null;
+    const parsedTrackArgs: {
+      readonly chainKey: ChainKey;
+      readonly address: string;
+      readonly label: string | null;
+    } | null = this.parseTrackArgs(commandEntry.args);
 
-    if (!address) {
+    if (!parsedTrackArgs) {
       this.logger.debug(
         `Track command rejected: missing address line=${commandEntry.lineNumber} updateId=${updateMeta.updateId ?? 'n/a'}`,
       );
       return [
         'Передай адрес для отслеживания.',
-        'Формат: /track <address> [label]',
-        'Пример: /track 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045 vitalik',
+        'Форматы:',
+        '/track <eth|sol> <address> [label]',
+        'Примеры:',
+        '/track eth 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045 vitalik',
+        '/track sol 11111111111111111111111111111111 system',
       ].join('\n');
     }
 
@@ -323,11 +335,12 @@ export class TelegramUpdate {
 
     const responseMessage: string = await this.trackingService.trackAddress(
       userRef,
-      address,
-      label,
+      parsedTrackArgs.address,
+      parsedTrackArgs.label,
+      parsedTrackArgs.chainKey,
     );
     this.logger.log(
-      `Track command success line=${commandEntry.lineNumber} telegramId=${userRef.telegramId} address=${address} updateId=${updateMeta.updateId ?? 'n/a'}`,
+      `Track command success line=${commandEntry.lineNumber} telegramId=${userRef.telegramId} chainKey=${parsedTrackArgs.chainKey} address=${parsedTrackArgs.address} updateId=${updateMeta.updateId ?? 'n/a'}`,
     );
 
     return responseMessage;
@@ -1105,7 +1118,7 @@ export class TelegramUpdate {
       '3. Показывать последние транзакции через Etherscan.',
       '',
       'Быстрый старт:',
-      '/track <address> [label]',
+      '/track <eth|sol> <address> [label]',
       '/list',
       '/wallet #id',
       '/history <address|#id> [limit]',
@@ -1131,7 +1144,7 @@ export class TelegramUpdate {
   private buildHelpMessage(): string {
     return [
       'Команды:',
-      '/track <address> [label] - добавить адрес',
+      '/track <eth|sol> <address> [label] - добавить адрес',
       '/list - показать список адресов и их id',
       '/wallet <#id> - карточка кошелька и действия кнопками',
       '/untrack <address|id> - удалить адрес',
@@ -1151,7 +1164,8 @@ export class TelegramUpdate {
       '/mute <minutes|off> - пауза алертов',
       '',
       'Примеры:',
-      '/track 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045 vitalik',
+      '/track eth 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045 vitalik',
+      '/track sol 11111111111111111111111111111111 system',
       '/history #1 10',
       '/filters transfer off',
       '/walletfilters #3',
@@ -1177,9 +1191,11 @@ export class TelegramUpdate {
   private buildTrackHintMessage(): string {
     return [
       'Добавление адреса:',
-      '/track <address> [label]',
-      'Пример:',
-      '/track 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045 vitalik',
+      '/track <eth|sol> <address> [label]',
+      '',
+      'Примеры:',
+      '/track eth 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045 vitalik',
+      '/track sol 11111111111111111111111111111111 system',
     ].join('\n');
   }
 
@@ -1194,7 +1210,57 @@ export class TelegramUpdate {
   }
 
   private buildUntrackHintMessage(): string {
-    return ['Удаление адреса:', '/untrack <address|id>', 'Пример:', '/untrack #1'].join('\n');
+    return [
+      'Удаление адреса:',
+      '/untrack <address|id>',
+      'Примеры:',
+      '/untrack #1',
+      '/untrack 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
+      '/untrack 11111111111111111111111111111111',
+    ].join('\n');
+  }
+
+  private parseTrackArgs(args: readonly string[]): {
+    readonly chainKey: ChainKey;
+    readonly address: string;
+    readonly label: string | null;
+  } | null {
+    if (args.length === 0) {
+      return null;
+    }
+
+    if (args.length < 2) {
+      return null;
+    }
+
+    const firstArgCandidate: string | undefined = args[0];
+    const addressCandidate: string | undefined = args[1];
+
+    if (!firstArgCandidate || !addressCandidate) {
+      return null;
+    }
+
+    const firstArg: string = firstArgCandidate.trim();
+    const chainKeyByAlias: ChainKey | null = this.resolveTrackChainAlias(firstArg);
+
+    if (chainKeyByAlias === null) {
+      return null;
+    }
+
+    const address: string = addressCandidate.trim();
+    const labelRaw: string | null = args.length > 2 ? args.slice(2).join(' ') : null;
+    const label: string | null = labelRaw && labelRaw.trim().length > 0 ? labelRaw.trim() : null;
+
+    return {
+      chainKey: chainKeyByAlias,
+      address,
+      label,
+    };
+  }
+
+  private resolveTrackChainAlias(rawChainAlias: string): ChainKey | null {
+    const normalizedAlias: string = rawChainAlias.trim().toLowerCase();
+    return TRACK_CHAIN_ALIAS_MAP[normalizedAlias] ?? null;
   }
 
   private formatExecutionResults(results: readonly CommandExecutionResult[]): string {
@@ -1323,13 +1389,23 @@ export class TelegramUpdate {
       const commandLineNumber: number = lineIndex + 1;
       let args: readonly string[] = parts.slice(1);
 
-      if (command === SupportedTelegramCommand.TRACK && args.length === 1) {
+      if (
+        command === SupportedTelegramCommand.TRACK &&
+        args.length === 2 &&
+        this.resolveTrackChainAlias(args[0] ?? '') !== null
+      ) {
         const nextLine: string | undefined = lines[lineIndex + 1];
         const nextTrimmedLine: string = nextLine?.trim() ?? '';
-        const currentAddressArg: string | undefined = args[0];
+        const currentChainArg: string | undefined = args[0];
+        const currentAddressArg: string | undefined = args[1];
 
-        if (currentAddressArg && nextTrimmedLine.length > 0 && !nextTrimmedLine.startsWith('/')) {
-          args = [currentAddressArg, nextTrimmedLine];
+        if (
+          currentChainArg &&
+          currentAddressArg &&
+          nextTrimmedLine.length > 0 &&
+          !nextTrimmedLine.startsWith('/')
+        ) {
+          args = [currentChainArg, currentAddressArg, nextTrimmedLine];
           lineIndex += 1;
         }
       }

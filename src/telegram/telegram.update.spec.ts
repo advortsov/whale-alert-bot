@@ -49,9 +49,9 @@ describe('TelegramUpdate', (): void => {
 
     const parsed: readonly ParsedMessageCommandView[] = privateApi.parseMessageCommands(
       [
-        '/track 0x28C6c06298d514Db089934071355E5743bf21d60',
+        '/track eth 0x28C6c06298d514Db089934071355E5743bf21d60',
         'Binance_Cold_Wallet_1',
-        '/track 0xBE0eB53F46cd790Cd13851d5EFf43D12404d33E8',
+        '/track eth 0xBE0eB53F46cd790Cd13851d5EFf43D12404d33E8',
         'Binance_Cold_Wallet_2',
       ].join('\n'),
     );
@@ -59,13 +59,30 @@ describe('TelegramUpdate', (): void => {
     expect(parsed).toHaveLength(2);
     expect(parsed[0]).toMatchObject({
       command: 'track',
-      args: ['0x28C6c06298d514Db089934071355E5743bf21d60', 'Binance_Cold_Wallet_1'],
+      args: ['eth', '0x28C6c06298d514Db089934071355E5743bf21d60', 'Binance_Cold_Wallet_1'],
       lineNumber: 1,
     });
     expect(parsed[1]).toMatchObject({
       command: 'track',
-      args: ['0xBE0eB53F46cd790Cd13851d5EFf43D12404d33E8', 'Binance_Cold_Wallet_2'],
+      args: ['eth', '0xBE0eB53F46cd790Cd13851d5EFf43D12404d33E8', 'Binance_Cold_Wallet_2'],
       lineNumber: 3,
+    });
+  });
+
+  it('parses explicit chain in /track command', (): void => {
+    const trackingServiceStub: TrackingService = {} as TrackingService;
+    const update: TelegramUpdate = createUpdate(trackingServiceStub);
+    const privateApi: TelegramUpdatePrivateApi = update as unknown as TelegramUpdatePrivateApi;
+
+    const parsed: readonly ParsedMessageCommandView[] = privateApi.parseMessageCommands(
+      '/track sol 11111111111111111111111111111111 system',
+    );
+
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0]).toMatchObject({
+      command: 'track',
+      args: ['sol', '11111111111111111111111111111111', 'system'],
+      lineNumber: 1,
     });
   });
 

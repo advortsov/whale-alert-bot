@@ -11,6 +11,8 @@ import { AlertFilterToggleTarget, type TelegramUserRef } from './tracking.interf
 import { TrackingService } from './tracking.service';
 import type { AppConfigService } from '../config/app-config.service';
 import { ChainKey } from '../core/chains/chain-key.interfaces';
+import type { IAddressCodecRegistry } from '../core/ports/address/address-codec-registry.interfaces';
+import type { IAddressCodec } from '../core/ports/address/address-codec.interfaces';
 import type { IHistoryExplorerAdapter } from '../core/ports/explorers/history-explorer.interfaces';
 import { HistoryDirection, HistoryItemType } from '../features/tracking/dto/history-item.dto';
 import { HistoryDirectionFilter, HistoryKind } from '../features/tracking/dto/history-request.dto';
@@ -40,6 +42,10 @@ type TrackedWalletsRepositoryStub = {
 
 type HistoryExplorerAdapterStub = {
   readonly loadRecentTransactions: ReturnType<typeof vi.fn>;
+};
+
+type AddressCodecRegistryStub = {
+  readonly getCodec: ReturnType<typeof vi.fn>;
 };
 
 type AppConfigServiceStub = {
@@ -88,6 +94,7 @@ type TestContext = {
   readonly trackedWalletsRepositoryStub: TrackedWalletsRepositoryStub;
   readonly subscriptionsRepositoryStub: SubscriptionsRepositoryStub;
   readonly historyExplorerAdapterStub: HistoryExplorerAdapterStub;
+  readonly addressCodecRegistryStub: AddressCodecRegistryStub;
   readonly historyCacheServiceStub: HistoryCacheServiceStub;
   readonly historyRateLimiterServiceStub: HistoryRateLimiterServiceStub;
   readonly userAlertPreferencesRepositoryStub: UserAlertPreferencesRepositoryStub;
@@ -121,6 +128,9 @@ const createTestContext = (): TestContext => {
   const historyExplorerAdapterStub: HistoryExplorerAdapterStub = {
     loadRecentTransactions: vi.fn(),
   };
+  const addressCodecRegistryStub: AddressCodecRegistryStub = {
+    getCodec: vi.fn(),
+  };
   const historyCacheServiceStub: HistoryCacheServiceStub = {
     getFresh: vi.fn(),
     getStale: vi.fn(),
@@ -153,6 +163,24 @@ const createTestContext = (): TestContext => {
   const appConfigServiceStub: AppConfigServiceStub = {
     etherscanTxBaseUrl: 'https://etherscan.io/tx/',
   };
+
+  const ethereumAddressCodecStub: IAddressCodec = {
+    validate: (): boolean => true,
+    normalize: (rawAddress: string): string => rawAddress.trim(),
+    formatShort: (address: string): string => address,
+  };
+  const solanaAddressCodecStub: IAddressCodec = {
+    validate: (): boolean => true,
+    normalize: (rawAddress: string): string => rawAddress.trim(),
+    formatShort: (address: string): string => address,
+  };
+  addressCodecRegistryStub.getCodec.mockImplementation((chainKey: ChainKey): IAddressCodec => {
+    if (chainKey === ChainKey.SOLANA_MAINNET) {
+      return solanaAddressCodecStub;
+    }
+
+    return ethereumAddressCodecStub;
+  });
 
   const userRef: TelegramUserRef = {
     telegramId: '42',
@@ -249,6 +277,7 @@ const createTestContext = (): TestContext => {
     usersRepositoryStub as unknown as UsersRepository,
     trackedWalletsRepositoryStub as unknown as TrackedWalletsRepository,
     subscriptionsRepositoryStub as unknown as SubscriptionsRepository,
+    addressCodecRegistryStub as unknown as IAddressCodecRegistry,
     historyExplorerAdapterStub as unknown as IHistoryExplorerAdapter,
     historyCacheServiceStub as unknown as HistoryCacheService,
     historyRateLimiterServiceStub as unknown as HistoryRateLimiterService,
@@ -266,6 +295,7 @@ const createTestContext = (): TestContext => {
     trackedWalletsRepositoryStub,
     subscriptionsRepositoryStub,
     historyExplorerAdapterStub,
+    addressCodecRegistryStub,
     historyCacheServiceStub,
     historyRateLimiterServiceStub,
     userAlertPreferencesRepositoryStub,
@@ -279,6 +309,32 @@ const createTestContext = (): TestContext => {
 };
 
 describe('TrackingService', (): void => {
+  it('tracks solana wallet with explicit chain key', async (): Promise<void> => {
+    const context: TestContext = createTestContext();
+    context.trackedWalletsRepositoryStub.findOrCreate.mockResolvedValue({
+      id: 21,
+      chain_key: ChainKey.SOLANA_MAINNET,
+      address: '11111111111111111111111111111111',
+      label: 'system',
+      created_at: new Date('2026-02-01T00:00:00.000Z'),
+    });
+    context.subscriptionsRepositoryStub.addSubscription.mockResolvedValue(true);
+
+    const message: string = await context.service.trackAddress(
+      context.userRef,
+      '11111111111111111111111111111111',
+      'system',
+      ChainKey.SOLANA_MAINNET,
+    );
+
+    expect(context.trackedWalletsRepositoryStub.findOrCreate).toHaveBeenCalledWith(
+      ChainKey.SOLANA_MAINNET,
+      '11111111111111111111111111111111',
+      'system',
+    );
+    expect(message).toContain('[solana_mainnet]');
+  });
+
   it('returns cached history without explorer call on fresh cache hit', async (): Promise<void> => {
     const context: TestContext = createTestContext();
     context.subscriptionsRepositoryStub.listByUserId.mockResolvedValue([

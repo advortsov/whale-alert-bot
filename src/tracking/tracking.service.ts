@@ -1,7 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { formatUnits } from 'ethers';
 
-import { isEthereumAddressCandidate, tryNormalizeEthereumAddress } from './address.util';
 import type { HistoryCacheEntry } from './history-cache.interfaces';
 import { HistoryCacheService } from './history-cache.service';
 import type { HistoryPageResult } from './history-page.interfaces';
@@ -22,6 +21,8 @@ import {
 } from './tracking.interfaces';
 import { AppConfigService } from '../config/app-config.service';
 import { ChainKey } from '../core/chains/chain-key.interfaces';
+import type { IAddressCodecRegistry } from '../core/ports/address/address-codec-registry.interfaces';
+import { ADDRESS_CODEC_REGISTRY } from '../core/ports/address/address-port.tokens';
 import { HISTORY_EXPLORER_ADAPTER } from '../core/ports/explorers/explorer-port.tokens';
 import type { IHistoryExplorerAdapter } from '../core/ports/explorers/history-explorer.interfaces';
 import { AlertCexFlowMode } from '../features/alerts/cex-flow.interfaces';
@@ -52,11 +53,17 @@ export class TrackingService {
   private static readonly DEFAULT_HISTORY_LIMIT: number = 5;
   private static readonly MAX_HISTORY_LIMIT: number = 20;
   private static readonly WALLET_CARD_RECENT_EVENTS_LIMIT: number = 3;
+  private static readonly SUPPORTED_TRACK_CHAINS: readonly ChainKey[] = [
+    ChainKey.ETHEREUM_MAINNET,
+    ChainKey.SOLANA_MAINNET,
+  ];
 
   public constructor(
     private readonly usersRepository: UsersRepository,
     private readonly trackedWalletsRepository: TrackedWalletsRepository,
     private readonly subscriptionsRepository: SubscriptionsRepository,
+    @Inject(ADDRESS_CODEC_REGISTRY)
+    private readonly addressCodecRegistry: IAddressCodecRegistry,
     @Inject(HISTORY_EXPLORER_ADAPTER)
     private readonly historyExplorerAdapter: IHistoryExplorerAdapter,
     private readonly historyCacheService: HistoryCacheService,
@@ -73,42 +80,34 @@ export class TrackingService {
     userRef: TelegramUserRef,
     rawAddress: string,
     label: string | null,
+    chainKey: ChainKey = ChainKey.ETHEREUM_MAINNET,
   ): Promise<string> {
     this.logger.debug(
-      `trackAddress start telegramId=${userRef.telegramId} rawAddress=${rawAddress} label=${label ?? 'n/a'}`,
+      `trackAddress start telegramId=${userRef.telegramId} chainKey=${chainKey} rawAddress=${rawAddress} label=${label ?? 'n/a'}`,
     );
-    if (!isEthereumAddressCandidate(rawAddress)) {
+    const addressCodec = this.addressCodecRegistry.getCodec(chainKey);
+
+    if (!addressCodec.validate(rawAddress)) {
       this.logger.warn(
-        `trackAddress invalid format telegramId=${userRef.telegramId} rawAddress=${rawAddress}`,
+        `trackAddress invalid format telegramId=${userRef.telegramId} chainKey=${chainKey} rawAddress=${rawAddress}`,
       );
-      throw new Error(
-        [
-          'Неверный Ethereum адрес.',
-          'Ожидаю формат 0x + 40 hex-символов.',
-          'Пример: /track 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045 vitalik',
-        ].join('\n'),
-      );
+      throw new Error(this.buildInvalidAddressFormatMessage(chainKey));
     }
 
-    const normalizedAddress: string | null = tryNormalizeEthereumAddress(rawAddress);
+    const normalizedAddress: string | null = addressCodec.normalize(rawAddress);
 
     if (!normalizedAddress) {
       this.logger.warn(
-        `trackAddress invalid checksum telegramId=${userRef.telegramId} rawAddress=${rawAddress}`,
+        `trackAddress invalid checksum telegramId=${userRef.telegramId} chainKey=${chainKey} rawAddress=${rawAddress}`,
       );
-      throw new Error(
-        [
-          'Неверный Ethereum адрес: ошибка checksum.',
-          'Совет: передай адрес целиком в lower-case, бот сам нормализует checksum.',
-        ].join('\n'),
-      );
+      throw new Error(this.buildInvalidAddressNormalizationMessage(chainKey));
     }
 
     this.logger.debug(`trackAddress normalizedAddress=${normalizedAddress}`);
 
     const user = await this.usersRepository.findOrCreate(userRef.telegramId, userRef.username);
     const wallet = await this.trackedWalletsRepository.findOrCreate(
-      ChainKey.ETHEREUM_MAINNET,
+      chainKey,
       normalizedAddress,
       label,
     );
@@ -119,27 +118,27 @@ export class TrackingService {
 
     if (!insertedSubscription) {
       this.logger.log(
-        `trackAddress skipped duplicate telegramId=${userRef.telegramId} address=${normalizedAddress}`,
+        `trackAddress skipped duplicate telegramId=${userRef.telegramId} chainKey=${chainKey} address=${normalizedAddress}`,
       );
       return [
-        `Адрес уже отслеживается: #${wallet.id} ${normalizedAddress}.`,
+        `Адрес уже отслеживается: #${wallet.id} [${chainKey}] ${normalizedAddress}.`,
         `История: /history #${wallet.id} ${TrackingService.DEFAULT_HISTORY_LIMIT}`,
       ].join('\n');
     }
 
     this.logger.log(
-      `trackAddress success telegramId=${userRef.telegramId} walletId=${wallet.id} address=${normalizedAddress}`,
+      `trackAddress success telegramId=${userRef.telegramId} chainKey=${chainKey} walletId=${wallet.id} address=${normalizedAddress}`,
     );
     if (label) {
       return [
-        `Добавил адрес #${wallet.id} ${normalizedAddress} (${label}).`,
+        `Добавил адрес #${wallet.id} [${chainKey}] ${normalizedAddress} (${label}).`,
         `История: /history #${wallet.id} ${TrackingService.DEFAULT_HISTORY_LIMIT}`,
         `Удалить: /untrack #${wallet.id}`,
       ].join('\n');
     }
 
     return [
-      `Добавил адрес #${wallet.id} ${normalizedAddress}.`,
+      `Добавил адрес #${wallet.id} [${chainKey}] ${normalizedAddress}.`,
       `История: /history #${wallet.id} ${TrackingService.DEFAULT_HISTORY_LIMIT}`,
       `Удалить: /untrack #${wallet.id}`,
     ].join('\n');
@@ -155,9 +154,11 @@ export class TrackingService {
 
     if (subscriptions.length === 0) {
       this.logger.log(`listTrackedAddresses empty telegramId=${userRef.telegramId}`);
-      return ['Список отслеживания пуст.', 'Добавь первый адрес:', '/track <address> [label]'].join(
-        '\n',
-      );
+      return [
+        'Список отслеживания пуст.',
+        'Добавь первый адрес:',
+        '/track <chain> <address> [label]',
+      ].join('\n');
     }
 
     const rows: string[] = subscriptions.map((subscription, index: number): string => {
@@ -290,33 +291,50 @@ export class TrackingService {
         : `Не нашел подписку с id #${walletId}. Проверь список через /list.`;
     }
 
-    const normalizedAddress: string | null = tryNormalizeEthereumAddress(rawIdentifier);
+    const normalizedAddresses: readonly {
+      readonly chainKey: ChainKey;
+      readonly address: string;
+    }[] = this.resolveNormalizedAddressCandidates(rawIdentifier);
 
-    if (!normalizedAddress) {
+    if (normalizedAddresses.length === 0) {
       this.logger.warn(
         `untrackAddress invalid identifier telegramId=${userRef.telegramId} identifier=${rawIdentifier}`,
       );
       throw new Error(
         [
           'Неверный идентификатор.',
-          'Передай id из /list или Ethereum адрес.',
-          'Примеры: /untrack #3 или /untrack 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
+          'Передай id из /list или адрес Ethereum/Solana.',
+          'Примеры:',
+          '/untrack #3',
+          '/untrack 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
+          '/untrack 11111111111111111111111111111111',
         ].join('\n'),
       );
     }
 
-    const removedByAddress: boolean = await this.subscriptionsRepository.removeByAddress(
-      user.id,
-      ChainKey.ETHEREUM_MAINNET,
-      normalizedAddress,
-    );
-    this.logger.log(
-      `untrackAddress byAddress telegramId=${userRef.telegramId} address=${normalizedAddress} removed=${String(removedByAddress)}`,
-    );
+    for (const normalizedAddress of normalizedAddresses) {
+      const removedByAddress: boolean = await this.subscriptionsRepository.removeByAddress(
+        user.id,
+        normalizedAddress.chainKey,
+        normalizedAddress.address,
+      );
+      this.logger.log(
+        `untrackAddress byAddress telegramId=${userRef.telegramId} chainKey=${normalizedAddress.chainKey} address=${normalizedAddress.address} removed=${String(removedByAddress)}`,
+      );
 
-    return removedByAddress
-      ? `Удалил адрес ${normalizedAddress} из отслеживания.`
-      : `Адрес ${normalizedAddress} не найден в списке. Проверь /list.`;
+      if (removedByAddress) {
+        return `Удалил адрес [${normalizedAddress.chainKey}] ${normalizedAddress.address} из отслеживания.`;
+      }
+    }
+
+    const firstNormalizedAddress = normalizedAddresses[0];
+
+    if (!firstNormalizedAddress) {
+      throw new Error('Адрес не найден в списке. Проверь /list.');
+    }
+
+    const displayAddress: string = firstNormalizedAddress.address;
+    return `Адрес ${displayAddress} не найден в списке. Проверь /list.`;
   }
 
   public async getUserAlertFilters(userRef: TelegramUserRef): Promise<string> {
@@ -657,6 +675,7 @@ export class TrackingService {
     const offset: number = this.parseHistoryOffset(rawOffset);
     const historyKind: HistoryKind = this.parseHistoryKind(rawKind);
     const historyDirection: HistoryDirectionFilter = this.parseHistoryDirection(rawDirection);
+    this.assertHistoryChainIsSupported(historyTarget.chainKey);
 
     if (offset === 0) {
       const message: string = await this.getAddressHistoryWithPolicy(
@@ -669,6 +688,7 @@ export class TrackingService {
       );
       const localEventsWithFilters: readonly WalletEventHistoryView[] =
         await this.loadLocalEventsForHistory(
+          historyTarget.chainKey,
           historyTarget.address,
           limit + 1,
           0,
@@ -699,6 +719,7 @@ export class TrackingService {
 
     const localEventsWithProbe: readonly WalletEventHistoryView[] =
       await this.loadLocalEventsForHistory(
+        historyTarget.chainKey,
         historyTarget.address,
         limit + 1,
         offset,
@@ -745,6 +766,7 @@ export class TrackingService {
 
     const user = await this.usersRepository.findOrCreate(userRef.telegramId, userRef.username);
     const historyTarget = await this.resolveHistoryTarget(user.id, rawAddress);
+    this.assertHistoryChainIsSupported(historyTarget.chainKey);
     const normalizedAddress: string = historyTarget.address;
     const limit: number = this.parseHistoryLimit(rawLimit);
     const historyKind: HistoryKind = this.parseHistoryKind(rawKind);
@@ -796,6 +818,7 @@ export class TrackingService {
 
     try {
       const localEvents: readonly WalletEventHistoryView[] = await this.loadLocalEventsForHistory(
+        historyTarget.chainKey,
         normalizedAddress,
         limit,
         0,
@@ -828,7 +851,7 @@ export class TrackingService {
         `history_local_miss telegramId=${userRef.telegramId} source=${source} address=${normalizedAddress} limit=${String(limit)}`,
       );
       const historyPage: HistoryPageDto = await this.historyExplorerAdapter.loadRecentTransactions({
-        chainKey: ChainKey.ETHEREUM_MAINNET,
+        chainKey: historyTarget.chainKey,
         address: normalizedAddress,
         limit,
         offset: 0,
@@ -915,6 +938,7 @@ export class TrackingService {
     userId: number,
     rawAddress: string,
   ): Promise<{
+    readonly chainKey: ChainKey;
     readonly address: string;
     readonly walletId: number | null;
   }> {
@@ -929,36 +953,110 @@ export class TrackingService {
       }
 
       return {
+        chainKey: matchedSubscription.chainKey,
         address: matchedSubscription.walletAddress,
         walletId,
       };
     }
 
-    if (!isEthereumAddressCandidate(rawAddress)) {
+    const normalizedAddresses: readonly {
+      readonly chainKey: ChainKey;
+      readonly address: string;
+    }[] = this.resolveNormalizedAddressCandidates(rawAddress);
+
+    if (normalizedAddresses.length === 0) {
       throw new Error(
         [
-          'Неверный Ethereum адрес.',
-          'Ожидаю формат 0x + 40 hex-символов.',
+          'Неверный адрес.',
+          'Поддерживаются Ethereum и Solana адреса.',
           'Можно передать id из /list: /history #3 10',
         ].join('\n'),
       );
     }
 
-    const normalizedAddress: string | null = tryNormalizeEthereumAddress(rawAddress);
+    const firstCandidate = normalizedAddresses[0];
 
-    if (!normalizedAddress) {
-      throw new Error(
-        [
-          'Неверный Ethereum адрес: ошибка checksum.',
-          'Совет: передай адрес целиком в lower-case, бот сам нормализует checksum.',
-        ].join('\n'),
-      );
+    if (!firstCandidate) {
+      throw new Error(['Неверный адрес.', 'Поддерживаются Ethereum и Solana адреса.'].join('\n'));
     }
 
     return {
-      address: normalizedAddress,
+      chainKey: firstCandidate.chainKey,
+      address: firstCandidate.address,
       walletId: null,
     };
+  }
+
+  private resolveNormalizedAddressCandidates(rawAddress: string): readonly {
+    readonly chainKey: ChainKey;
+    readonly address: string;
+  }[] {
+    const resolved: {
+      chainKey: ChainKey;
+      address: string;
+    }[] = [];
+
+    for (const chainKey of TrackingService.SUPPORTED_TRACK_CHAINS) {
+      const codec = this.addressCodecRegistry.getCodec(chainKey);
+      const normalizedAddress: string | null = codec.normalize(rawAddress);
+
+      if (normalizedAddress) {
+        resolved.push({
+          chainKey,
+          address: normalizedAddress,
+        });
+      }
+    }
+
+    return resolved;
+  }
+
+  private assertHistoryChainIsSupported(chainKey: ChainKey): void {
+    if (chainKey === ChainKey.ETHEREUM_MAINNET) {
+      return;
+    }
+
+    throw new Error(
+      [
+        `История для сети ${chainKey} пока недоступна на этом этапе.`,
+        'Сейчас поддерживается /history только для Ethereum.',
+      ].join('\n'),
+    );
+  }
+
+  private buildInvalidAddressFormatMessage(chainKey: ChainKey): string {
+    if (chainKey === ChainKey.ETHEREUM_MAINNET) {
+      return [
+        'Неверный Ethereum адрес.',
+        'Ожидаю формат 0x + 40 hex-символов.',
+        'Пример: /track eth 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045 vitalik',
+      ].join('\n');
+    }
+
+    if (chainKey === ChainKey.SOLANA_MAINNET) {
+      return [
+        'Неверный Solana адрес.',
+        'Ожидаю base58 адрес длиной 32 байта.',
+        'Пример: /track sol 11111111111111111111111111111111 test-wallet',
+      ].join('\n');
+    }
+
+    return `Неверный адрес для сети ${chainKey}.`;
+  }
+
+  private buildInvalidAddressNormalizationMessage(chainKey: ChainKey): string {
+    if (chainKey === ChainKey.ETHEREUM_MAINNET) {
+      return [
+        'Неверный Ethereum адрес: ошибка checksum.',
+        'Совет: передай адрес целиком в lower-case, бот сам нормализует checksum.',
+      ].join('\n');
+    }
+
+    if (chainKey === ChainKey.SOLANA_MAINNET) {
+      return ['Неверный Solana адрес.', 'Проверь символы base58 и корректность длины.'].join('\n');
+    }
+
+    return `Не удалось нормализовать адрес для сети ${chainKey}.`;
   }
 
   private parseHistoryLimit(rawLimit: string | null): number {
@@ -1050,6 +1148,7 @@ export class TrackingService {
   }
 
   private async loadLocalEventsForHistory(
+    chainKey: ChainKey,
     normalizedAddress: string,
     limit: number,
     offset: number,
@@ -1059,7 +1158,7 @@ export class TrackingService {
     const rawFetchLimit: number = Math.min(Math.max(offset + limit + 50, limit), 200);
     const rawEvents: readonly WalletEventHistoryView[] =
       await this.walletEventsRepository.listRecentByTrackedAddress(
-        ChainKey.ETHEREUM_MAINNET,
+        chainKey,
         normalizedAddress,
         rawFetchLimit,
         0,
