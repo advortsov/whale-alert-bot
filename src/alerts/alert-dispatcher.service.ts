@@ -12,6 +12,10 @@ import { ChainKey } from '../core/chains/chain-key.interfaces';
 import { TOKEN_PRICING_PORT } from '../core/ports/token-pricing/token-pricing-port.tokens';
 import type { ITokenPricingPort } from '../core/ports/token-pricing/token-pricing.interfaces';
 import type { AlertFilterPolicy } from '../features/alerts/alert-filter.interfaces';
+import {
+  AlertSmartFilterType,
+  type AlertSemanticFilterPolicy,
+} from '../features/alerts/smart-filter.interfaces';
 import { AlertMutesRepository } from '../storage/repositories/alert-mutes.repository';
 import { SubscriptionsRepository } from '../storage/repositories/subscriptions.repository';
 import type { SubscriberWalletRecipient } from '../storage/repositories/subscriptions.repository.interfaces';
@@ -268,6 +272,23 @@ export class AlertDispatcherService {
 
     const usdWarningEnabled: boolean =
       thresholdDecision.usdUnavailable && (policy.thresholdUsd > 0 || policy.minAmountUsd > 0);
+    const semanticPolicy: AlertSemanticFilterPolicy = this.mapSemanticPolicy(settings);
+    const semanticDecision = this.alertFilterPolicyService.evaluateSemanticFilters(semanticPolicy, {
+      eventType: event.eventType,
+      direction: event.direction,
+      dex: event.dex,
+    });
+
+    if (!semanticDecision.allowed) {
+      return {
+        skip: true,
+        reason: semanticDecision.suppressedReason,
+        messageContext: {
+          usdAmount: thresholdDecision.usdAmount,
+          usdUnavailable: usdWarningEnabled,
+        },
+      };
+    }
 
     return {
       skip: false,
@@ -277,6 +298,66 @@ export class AlertDispatcherService {
         usdUnavailable: usdWarningEnabled,
       },
     };
+  }
+
+  private mapSemanticPolicy(settings: {
+    readonly smart_filter_type?: string | null;
+    readonly include_dexes?: readonly string[] | null;
+    readonly exclude_dexes?: readonly string[] | null;
+  }): AlertSemanticFilterPolicy {
+    const smartFilterType: AlertSmartFilterType = this.parseSmartFilterType(
+      settings.smart_filter_type,
+    );
+
+    return {
+      type: smartFilterType,
+      includeDexes: this.normalizeDexList(settings.include_dexes),
+      excludeDexes: this.normalizeDexList(settings.exclude_dexes),
+    };
+  }
+
+  private parseSmartFilterType(rawValue: string | null | undefined): AlertSmartFilterType {
+    if (rawValue === null || rawValue === undefined) {
+      return AlertSmartFilterType.ALL;
+    }
+
+    const normalizedValue: string = rawValue.trim().toLowerCase();
+
+    if (normalizedValue === 'buy') {
+      return AlertSmartFilterType.BUY;
+    }
+
+    if (normalizedValue === 'sell') {
+      return AlertSmartFilterType.SELL;
+    }
+
+    if (normalizedValue === 'transfer') {
+      return AlertSmartFilterType.TRANSFER;
+    }
+
+    return AlertSmartFilterType.ALL;
+  }
+
+  private normalizeDexList(rawList: readonly string[] | null | undefined): readonly string[] {
+    if (!rawList || rawList.length === 0) {
+      return [];
+    }
+
+    const normalizedList: string[] = [];
+
+    for (const item of rawList) {
+      const normalizedItem: string = item.trim().toLowerCase();
+
+      if (normalizedItem.length === 0) {
+        continue;
+      }
+
+      if (!normalizedList.includes(normalizedItem)) {
+        normalizedList.push(normalizedItem);
+      }
+    }
+
+    return normalizedList;
   }
 
   private async resolveUsdContext(

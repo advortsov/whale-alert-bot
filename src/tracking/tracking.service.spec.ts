@@ -199,6 +199,9 @@ const createTestContext = (): TestContext => {
     chain_key: ChainKey.ETHEREUM_MAINNET,
     threshold_usd: 0,
     min_amount_usd: 0,
+    smart_filter_type: 'all',
+    include_dexes: [],
+    exclude_dexes: [],
     quiet_from: null,
     quiet_to: null,
     timezone: 'UTC',
@@ -210,6 +213,9 @@ const createTestContext = (): TestContext => {
     chain_key: ChainKey.ETHEREUM_MAINNET,
     threshold_usd: 50000,
     min_amount_usd: 1000,
+    smart_filter_type: 'all',
+    include_dexes: [],
+    exclude_dexes: [],
     quiet_from: '23:00',
     quiet_to: '07:00',
     timezone: 'Europe/Moscow',
@@ -370,6 +376,54 @@ describe('TrackingService', (): void => {
       },
     );
     expect(message).toContain('1000.00');
+  });
+
+  it('updates smart type filter', async (): Promise<void> => {
+    const context: TestContext = createTestContext();
+
+    const message: string = await context.service.setSmartFilterType(context.userRef, 'buy');
+
+    expect(context.userAlertSettingsRepositoryStub.updateByUserAndChain).toHaveBeenCalledWith(
+      7,
+      ChainKey.ETHEREUM_MAINNET,
+      {
+        smartFilterType: 'buy',
+      },
+    );
+    expect(message).toContain('Smart type обновлен');
+  });
+
+  it('updates include dex filter list', async (): Promise<void> => {
+    const context: TestContext = createTestContext();
+
+    const message: string = await context.service.setIncludeDexFilter(
+      context.userRef,
+      'uniswap,curve',
+    );
+
+    expect(context.userAlertSettingsRepositoryStub.updateByUserAndChain).toHaveBeenCalledWith(
+      7,
+      ChainKey.ETHEREUM_MAINNET,
+      {
+        includeDexes: ['uniswap', 'curve'],
+      },
+    );
+    expect(message).toContain('Include DEX фильтр обновлен');
+  });
+
+  it('updates exclude dex filter list', async (): Promise<void> => {
+    const context: TestContext = createTestContext();
+
+    const message: string = await context.service.setExcludeDexFilter(context.userRef, 'uniswap');
+
+    expect(context.userAlertSettingsRepositoryStub.updateByUserAndChain).toHaveBeenCalledWith(
+      7,
+      ChainKey.ETHEREUM_MAINNET,
+      {
+        excludeDexes: ['uniswap'],
+      },
+    );
+    expect(message).toContain('Exclude DEX фильтр обновлен');
   });
 
   it('updates quiet hours window', async (): Promise<void> => {

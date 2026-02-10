@@ -78,16 +78,22 @@ describe('TelegramUpdate', (): void => {
       [
         '/threshold 50000',
         '/filter min_amount_usd 100000',
+        '/filter type buy',
+        '/filter include_dex uniswap,curve',
+        '/filter exclude_dex off',
         '/quiet 23:00-07:00',
         '/tz Europe/Moscow',
       ].join('\n'),
     );
 
-    expect(parsed).toHaveLength(4);
+    expect(parsed).toHaveLength(7);
     expect(parsed[0]).toMatchObject({ command: 'threshold', args: ['50000'] });
     expect(parsed[1]).toMatchObject({ command: 'filter', args: ['min_amount_usd', '100000'] });
-    expect(parsed[2]).toMatchObject({ command: 'quiet', args: ['23:00-07:00'] });
-    expect(parsed[3]).toMatchObject({ command: 'tz', args: ['Europe/Moscow'] });
+    expect(parsed[2]).toMatchObject({ command: 'filter', args: ['type', 'buy'] });
+    expect(parsed[3]).toMatchObject({ command: 'filter', args: ['include_dex', 'uniswap,curve'] });
+    expect(parsed[4]).toMatchObject({ command: 'filter', args: ['exclude_dex', 'off'] });
+    expect(parsed[5]).toMatchObject({ command: 'quiet', args: ['23:00-07:00'] });
+    expect(parsed[6]).toMatchObject({ command: 'tz', args: ['Europe/Moscow'] });
   });
 
   it('parses alert ignore callback payload', (): void => {

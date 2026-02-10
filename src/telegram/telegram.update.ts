@@ -858,22 +858,38 @@ export class TelegramUpdate {
     }
 
     const keyArg: string | null = commandEntry.args[0] ?? null;
-    const valueArg: string | null = commandEntry.args[1] ?? null;
+    const valueArg: string | null =
+      commandEntry.args.length > 1 ? commandEntry.args.slice(1).join(' ') : null;
 
     if (!keyArg || !valueArg) {
       return [
-        'Формат: /filter min_amount_usd <amount|off>',
-        'Пример: /filter min_amount_usd 100000',
+        'Форматы:',
+        '/filter min_amount_usd <amount|off>',
+        '/filter type <all|buy|sell|transfer>',
+        '/filter include_dex <dex|off>',
+        '/filter exclude_dex <dex|off>',
       ].join('\n');
     }
 
     const normalizedKey: string = keyArg.trim().toLowerCase();
 
-    if (normalizedKey !== 'min_amount_usd') {
-      return 'Поддерживается только: /filter min_amount_usd <amount|off>.';
+    if (normalizedKey === 'min_amount_usd') {
+      return this.trackingService.setMinAmountUsd(userRef, valueArg);
     }
 
-    return this.trackingService.setMinAmountUsd(userRef, valueArg);
+    if (normalizedKey === 'type') {
+      return this.trackingService.setSmartFilterType(userRef, valueArg);
+    }
+
+    if (normalizedKey === 'include_dex') {
+      return this.trackingService.setIncludeDexFilter(userRef, valueArg);
+    }
+
+    if (normalizedKey === 'exclude_dex') {
+      return this.trackingService.setExcludeDexFilter(userRef, valueArg);
+    }
+
+    return 'Поддерживается: min_amount_usd, type, include_dex, exclude_dex.';
   }
 
   private async executeThresholdCommand(
@@ -1091,6 +1107,9 @@ export class TelegramUpdate {
       '/status',
       '/threshold <amount|off>',
       '/filter min_amount_usd <amount|off>',
+      '/filter type <all|buy|sell|transfer>',
+      '/filter include_dex <dex|off>',
+      '/filter exclude_dex <dex|off>',
       '/filters',
       '/walletfilters <#id>',
       '/wfilter <#id> <transfer|swap> <on|off>',
@@ -1114,6 +1133,9 @@ export class TelegramUpdate {
       '/status - runtime статус watcher и quota',
       '/threshold <amount|off> - порог по USD',
       '/filter min_amount_usd <amount|off> - минимальная сумма в USD',
+      '/filter type <all|buy|sell|transfer> - фильтр типа сделки',
+      '/filter include_dex <dex|off> - оставить только выбранные DEX',
+      '/filter exclude_dex <dex|off> - исключить DEX из алертов',
       '/filters - показать/изменить фильтры',
       '/walletfilters <#id> - фильтры конкретного кошелька',
       '/wfilter <#id> <transfer|swap> <on|off> - переключить фильтр кошелька',
@@ -1129,6 +1151,9 @@ export class TelegramUpdate {
       '/wfilter #3 transfer off',
       '/threshold 50000',
       '/filter min_amount_usd 100000',
+      '/filter type buy',
+      '/filter include_dex uniswap',
+      '/filter exclude_dex off',
       '/quiet 23:00-07:00',
       '/tz Europe/Moscow',
       '/mute 30',

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import type { ChainKey } from '../../core/chains/chain-key.interfaces';
+import { AlertSmartFilterType } from '../../features/alerts/smart-filter.interfaces';
 import { DatabaseService } from '../database.service';
 import type { NewUserAlertSettingsRow, UserAlertSettingsRow } from '../database.types';
 import type { UserAlertSettingsUpdatePatch } from './user-alert-settings.repository.interfaces';
@@ -64,6 +65,9 @@ export class UserAlertSettingsRepository {
     const updatePatch: {
       threshold_usd?: number;
       min_amount_usd?: number;
+      smart_filter_type?: string;
+      include_dexes?: string[];
+      exclude_dexes?: string[];
       quiet_from?: string | null;
       quiet_to?: string | null;
       timezone?: string;
@@ -78,6 +82,18 @@ export class UserAlertSettingsRepository {
 
     if (patch.minAmountUsd !== undefined) {
       updatePatch.min_amount_usd = patch.minAmountUsd;
+    }
+
+    if (patch.smartFilterType !== undefined) {
+      updatePatch.smart_filter_type = patch.smartFilterType;
+    }
+
+    if (patch.includeDexes !== undefined) {
+      updatePatch.include_dexes = [...patch.includeDexes];
+    }
+
+    if (patch.excludeDexes !== undefined) {
+      updatePatch.exclude_dexes = [...patch.excludeDexes];
     }
 
     if (patch.quietFrom !== undefined) {
@@ -108,6 +124,9 @@ export class UserAlertSettingsRepository {
       chain_key: chainKey,
       threshold_usd: 0,
       min_amount_usd: 0,
+      smart_filter_type: AlertSmartFilterType.ALL,
+      include_dexes: [],
+      exclude_dexes: [],
       quiet_from: null,
       quiet_to: null,
       timezone: 'UTC',

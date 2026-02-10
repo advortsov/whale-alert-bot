@@ -21,6 +21,9 @@ type TrackingServiceStub = {
   readonly getUserAlertFilters: ReturnType<typeof vi.fn>;
   readonly setThresholdUsd: ReturnType<typeof vi.fn>;
   readonly setMinAmountUsd: ReturnType<typeof vi.fn>;
+  readonly setSmartFilterType: ReturnType<typeof vi.fn>;
+  readonly setIncludeDexFilter: ReturnType<typeof vi.fn>;
+  readonly setExcludeDexFilter: ReturnType<typeof vi.fn>;
   readonly setQuietHours: ReturnType<typeof vi.fn>;
   readonly setUserTimezone: ReturnType<typeof vi.fn>;
   readonly muteWalletAlertsForDuration: ReturnType<typeof vi.fn>;
@@ -51,6 +54,9 @@ const createTrackingServiceStub = (): TrackingServiceStub => ({
   getUserAlertFilters: vi.fn().mockResolvedValue('filters'),
   setThresholdUsd: vi.fn().mockResolvedValue('threshold'),
   setMinAmountUsd: vi.fn().mockResolvedValue('min_amount_usd'),
+  setSmartFilterType: vi.fn().mockResolvedValue('smart_type'),
+  setIncludeDexFilter: vi.fn().mockResolvedValue('include_dex'),
+  setExcludeDexFilter: vi.fn().mockResolvedValue('exclude_dex'),
   setQuietHours: vi.fn().mockResolvedValue('quiet'),
   setUserTimezone: vi.fn().mockResolvedValue('timezone'),
   muteWalletAlertsForDuration: vi.fn().mockResolvedValue('muted wallet'),

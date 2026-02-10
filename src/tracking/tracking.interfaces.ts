@@ -1,4 +1,5 @@
 import type { ChainKey } from '../core/chains/chain-key.interfaces';
+import type { AlertSmartFilterType } from '../features/alerts/smart-filter.interfaces';
 
 export type TelegramUserRef = {
   readonly telegramId: string;
@@ -26,6 +27,9 @@ export type UserAlertPreferences = {
 export type UserAlertSettingsSnapshot = {
   readonly thresholdUsd: number;
   readonly minAmountUsd: number;
+  readonly smartFilterType: AlertSmartFilterType;
+  readonly includeDexes: readonly string[];
+  readonly excludeDexes: readonly string[];
   readonly quietHoursFrom: string | null;
   readonly quietHoursTo: string | null;
   readonly timezone: string;

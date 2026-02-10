@@ -24,6 +24,8 @@ import { AppConfigService } from '../config/app-config.service';
 import { ChainKey } from '../core/chains/chain-key.interfaces';
 import { HISTORY_EXPLORER_ADAPTER } from '../core/ports/explorers/explorer-port.tokens';
 import type { IHistoryExplorerAdapter } from '../core/ports/explorers/history-explorer.interfaces';
+import { normalizeDexKey } from '../features/alerts/dex-normalizer.util';
+import { AlertSmartFilterType } from '../features/alerts/smart-filter.interfaces';
 import type { HistoryItemDto, HistoryPageDto } from '../features/tracking/dto/history-item.dto';
 import { HistoryDirectionFilter, HistoryKind } from '../features/tracking/dto/history-request.dto';
 import type {
@@ -254,6 +256,7 @@ export class TrackingService {
       `📍 Address: ${matchedSubscription.walletAddress}`,
       `🔔 Фильтры: transfer=${allowTransfer ? 'on' : 'off'}, swap=${allowSwap ? 'on' : 'off'} (${filterSource})`,
       `💵 USD: threshold=${settingsSnapshot.thresholdUsd.toFixed(2)}, min=${settingsSnapshot.minAmountUsd.toFixed(2)}`,
+      `🧠 Smart: type=${settingsSnapshot.smartFilterType}, include_dex=${this.formatDexFilter(settingsSnapshot.includeDexes)}, exclude_dex=${this.formatDexFilter(settingsSnapshot.excludeDexes)}`,
       `🌙 Quiet: ${quietText} (${settingsSnapshot.timezone})`,
       `🚫 Ignore 24h до: ${muteStatusText}`,
       '',
@@ -333,6 +336,9 @@ export class TrackingService {
       'Текущие фильтры алертов:',
       `- threshold usd: ${settingsSnapshot.thresholdUsd.toFixed(2)}`,
       `- min amount usd: ${settingsSnapshot.minAmountUsd.toFixed(2)}`,
+      `- type: ${settingsSnapshot.smartFilterType}`,
+      `- include dex: ${this.formatDexFilter(settingsSnapshot.includeDexes)}`,
+      `- exclude dex: ${this.formatDexFilter(settingsSnapshot.excludeDexes)}`,
       `- transfer: ${preferences.allowTransfer ? 'on' : 'off'}`,
       `- swap: ${preferences.allowSwap ? 'on' : 'off'}`,
       `- mute до: ${mutedUntilText}`,
@@ -341,6 +347,9 @@ export class TrackingService {
       'Команды:',
       '/threshold <amount|off>',
       '/filter min_amount_usd <amount|off>',
+      '/filter type <all|buy|sell|transfer>',
+      '/filter include_dex <dex|off>',
+      '/filter exclude_dex <dex|off>',
       '/mute <minutes|off>',
       '/quiet <HH:mm-HH:mm|off>',
       '/tz <Area/City>',
@@ -395,6 +404,51 @@ export class TrackingService {
     const settingsSnapshot: UserAlertSettingsSnapshot = this.mapSettings(updatedSettings);
 
     return `Минимальная сумма USD обновлена: ${settingsSnapshot.minAmountUsd.toFixed(2)}.`;
+  }
+
+  public async setSmartFilterType(userRef: TelegramUserRef, rawValue: string): Promise<string> {
+    const smartFilterType: AlertSmartFilterType = this.parseSmartFilterType(rawValue);
+    const user = await this.usersRepository.findOrCreate(userRef.telegramId, userRef.username);
+    const updatedSettings: UserAlertSettingsRow =
+      await this.userAlertSettingsRepository.updateByUserAndChain(
+        user.id,
+        ChainKey.ETHEREUM_MAINNET,
+        {
+          smartFilterType,
+        },
+      );
+    const settingsSnapshot: UserAlertSettingsSnapshot = this.mapSettings(updatedSettings);
+    return `Smart type обновлен: ${settingsSnapshot.smartFilterType}.`;
+  }
+
+  public async setIncludeDexFilter(userRef: TelegramUserRef, rawValue: string): Promise<string> {
+    const includeDexes: readonly string[] = this.parseDexFilterList(rawValue);
+    const user = await this.usersRepository.findOrCreate(userRef.telegramId, userRef.username);
+    const updatedSettings: UserAlertSettingsRow =
+      await this.userAlertSettingsRepository.updateByUserAndChain(
+        user.id,
+        ChainKey.ETHEREUM_MAINNET,
+        {
+          includeDexes,
+        },
+      );
+    const settingsSnapshot: UserAlertSettingsSnapshot = this.mapSettings(updatedSettings);
+    return `Include DEX фильтр обновлен: ${this.formatDexFilter(settingsSnapshot.includeDexes)}.`;
+  }
+
+  public async setExcludeDexFilter(userRef: TelegramUserRef, rawValue: string): Promise<string> {
+    const excludeDexes: readonly string[] = this.parseDexFilterList(rawValue);
+    const user = await this.usersRepository.findOrCreate(userRef.telegramId, userRef.username);
+    const updatedSettings: UserAlertSettingsRow =
+      await this.userAlertSettingsRepository.updateByUserAndChain(
+        user.id,
+        ChainKey.ETHEREUM_MAINNET,
+        {
+          excludeDexes,
+        },
+      );
+    const settingsSnapshot: UserAlertSettingsSnapshot = this.mapSettings(updatedSettings);
+    return `Exclude DEX фильтр обновлен: ${this.formatDexFilter(settingsSnapshot.excludeDexes)}.`;
   }
 
   public async setQuietHours(userRef: TelegramUserRef, rawWindow: string): Promise<string> {
@@ -539,6 +593,9 @@ export class TrackingService {
       'Пользовательский статус:',
       `- threshold usd: ${settingsSnapshot.thresholdUsd.toFixed(2)}`,
       `- min amount usd: ${settingsSnapshot.minAmountUsd.toFixed(2)}`,
+      `- type: ${settingsSnapshot.smartFilterType}`,
+      `- include dex: ${this.formatDexFilter(settingsSnapshot.includeDexes)}`,
+      `- exclude dex: ${this.formatDexFilter(settingsSnapshot.excludeDexes)}`,
       `- transfer: ${preferences.allowTransfer ? 'on' : 'off'}`,
       `- swap: ${preferences.allowSwap ? 'on' : 'off'}`,
       `- mute до: ${preferences.mutedUntil ? this.formatTimestamp(preferences.mutedUntil) : 'выключен'}`,
@@ -1041,10 +1098,18 @@ export class TrackingService {
   private mapSettings(row: UserAlertSettingsRow): UserAlertSettingsSnapshot {
     const thresholdUsd: number = Number.parseFloat(String(row.threshold_usd));
     const minAmountUsd: number = Number.parseFloat(String(row.min_amount_usd));
+    const smartFilterType: AlertSmartFilterType = this.parseStoredSmartFilterType(
+      row.smart_filter_type,
+    );
+    const includeDexes: readonly string[] = this.normalizeStoredDexFilter(row.include_dexes);
+    const excludeDexes: readonly string[] = this.normalizeStoredDexFilter(row.exclude_dexes);
 
     return {
       thresholdUsd: Number.isNaN(thresholdUsd) ? 0 : thresholdUsd,
       minAmountUsd: Number.isNaN(minAmountUsd) ? 0 : minAmountUsd,
+      smartFilterType,
+      includeDexes,
+      excludeDexes,
       quietHoursFrom: row.quiet_from,
       quietHoursTo: row.quiet_to,
       timezone: row.timezone,
@@ -1077,6 +1142,116 @@ export class TrackingService {
     }
 
     return parsedValue;
+  }
+
+  private parseSmartFilterType(rawValue: string): AlertSmartFilterType {
+    const normalizedValue: string = rawValue.trim().toLowerCase();
+
+    if (normalizedValue === 'off' || normalizedValue === 'all') {
+      return AlertSmartFilterType.ALL;
+    }
+
+    if (normalizedValue === 'buy') {
+      return AlertSmartFilterType.BUY;
+    }
+
+    if (normalizedValue === 'sell') {
+      return AlertSmartFilterType.SELL;
+    }
+
+    if (normalizedValue === 'transfer') {
+      return AlertSmartFilterType.TRANSFER;
+    }
+
+    throw new Error('Неверный type фильтр. Используй: /filter type <all|buy|sell|transfer>.');
+  }
+
+  private parseDexFilterList(rawValue: string): readonly string[] {
+    const normalizedValue: string = rawValue.trim().toLowerCase();
+
+    if (
+      normalizedValue === 'off' ||
+      normalizedValue === 'none' ||
+      normalizedValue === 'all' ||
+      normalizedValue === '0'
+    ) {
+      return [];
+    }
+
+    const rawParts: readonly string[] = normalizedValue
+      .split(',')
+      .map((token: string): string => token.trim())
+      .filter((token: string): boolean => token.length > 0);
+
+    if (rawParts.length === 0) {
+      throw new Error('DEX список пуст. Используй /filter include_dex <dex|off>.');
+    }
+
+    const normalizedDexes: string[] = [];
+
+    for (const rawPart of rawParts) {
+      const normalizedDex: string | null = normalizeDexKey(rawPart);
+
+      if (normalizedDex === null) {
+        throw new Error(`Не удалось распознать DEX: ${rawPart}.`);
+      }
+
+      if (!normalizedDexes.includes(normalizedDex)) {
+        normalizedDexes.push(normalizedDex);
+      }
+    }
+
+    return normalizedDexes;
+  }
+
+  private parseStoredSmartFilterType(rawValue: string | null | undefined): AlertSmartFilterType {
+    const normalizedValue: string = (rawValue ?? '').trim().toLowerCase();
+
+    if (normalizedValue === 'buy') {
+      return AlertSmartFilterType.BUY;
+    }
+
+    if (normalizedValue === 'sell') {
+      return AlertSmartFilterType.SELL;
+    }
+
+    if (normalizedValue === 'transfer') {
+      return AlertSmartFilterType.TRANSFER;
+    }
+
+    return AlertSmartFilterType.ALL;
+  }
+
+  private normalizeStoredDexFilter(
+    rawValue: readonly string[] | null | undefined,
+  ): readonly string[] {
+    if (!rawValue || rawValue.length === 0) {
+      return [];
+    }
+
+    const normalizedDexes: string[] = [];
+
+    for (const rawItem of rawValue) {
+      const normalizedDex: string | null = normalizeDexKey(rawItem);
+
+      if (normalizedDex === null) {
+        continue;
+      }
+
+      if (!normalizedDexes.includes(normalizedDex)) {
+        normalizedDexes.push(normalizedDex);
+      }
+    }
+
+    return normalizedDexes;
+  }
+
+  private formatDexFilter(values: readonly string[]): string {
+    if (values.length === 0) {
+      return 'all';
+    }
+
+    return values.join(', ');
   }
 
   private parseQuietHours(rawWindow: string): {

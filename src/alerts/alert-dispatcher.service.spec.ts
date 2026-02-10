@@ -36,6 +36,7 @@ type AlertSuppressionServiceStub = {
 
 type AlertFilterPolicyServiceStub = {
   readonly evaluateUsdThreshold: ReturnType<typeof vi.fn>;
+  readonly evaluateSemanticFilters: ReturnType<typeof vi.fn>;
 };
 
 type QuietHoursServiceStub = {
@@ -119,6 +120,7 @@ const createService = (): {
   };
   const alertFilterPolicyServiceStub: AlertFilterPolicyServiceStub = {
     evaluateUsdThreshold: vi.fn(),
+    evaluateSemanticFilters: vi.fn(),
   };
   const quietHoursServiceStub: QuietHoursServiceStub = {
     evaluate: vi.fn(),
@@ -169,6 +171,11 @@ const createService = (): {
     usdAmount: 120,
     usdUnavailable: false,
   });
+  alertFilterPolicyServiceStub.evaluateSemanticFilters.mockReturnValue({
+    allowed: true,
+    suppressedReason: null,
+    normalizedDex: null,
+  });
   quietHoursServiceStub.evaluate.mockReturnValue({
     suppressed: false,
     currentMinuteOfDay: 100,
@@ -190,6 +197,9 @@ const createService = (): {
     chain_key: ChainKey.ETHEREUM_MAINNET,
     threshold_usd: 0,
     min_amount_usd: 0,
+    smart_filter_type: 'all',
+    include_dexes: [],
+    exclude_dexes: [],
     quiet_from: null,
     quiet_to: null,
     timezone: 'UTC',
@@ -299,6 +309,9 @@ describe('AlertDispatcherService', (): void => {
       chain_key: ChainKey.ETHEREUM_MAINNET,
       threshold_usd: 1000,
       min_amount_usd: 0,
+      smart_filter_type: 'all',
+      include_dexes: [],
+      exclude_dexes: [],
       quiet_from: null,
       quiet_to: null,
       timezone: 'UTC',
@@ -312,6 +325,68 @@ describe('AlertDispatcherService', (): void => {
     });
 
     await context.service.dispatch(buildEvent('12.000000'));
+
+    expect(context.telegramSenderServiceStub.sendText).not.toHaveBeenCalled();
+  });
+
+  it('skips alert when smart type filter expects buy but event is transfer', async (): Promise<void> => {
+    const context = createService();
+    context.alertFilterPolicyServiceStub.evaluateSemanticFilters.mockReturnValue({
+      allowed: false,
+      suppressedReason: 'type_filter',
+      normalizedDex: null,
+    });
+
+    context.userAlertSettingsRepositoryStub.findOrCreateByUserAndChain.mockResolvedValue({
+      id: 1,
+      user_id: 7,
+      chain_key: ChainKey.ETHEREUM_MAINNET,
+      threshold_usd: 0,
+      min_amount_usd: 0,
+      smart_filter_type: 'buy',
+      include_dexes: [],
+      exclude_dexes: [],
+      quiet_from: null,
+      quiet_to: null,
+      timezone: 'UTC',
+      updated_at: new Date('2026-02-09T00:00:00.000Z'),
+    });
+
+    await context.service.dispatch(buildEvent('12.000000'));
+
+    expect(context.telegramSenderServiceStub.sendText).not.toHaveBeenCalled();
+  });
+
+  it('skips swap alert when dex is excluded', async (): Promise<void> => {
+    const context = createService();
+    context.alertFilterPolicyServiceStub.evaluateSemanticFilters.mockReturnValue({
+      allowed: false,
+      suppressedReason: 'dex_exclude',
+      normalizedDex: 'uniswap',
+    });
+    const swapEvent: ClassifiedEvent = {
+      ...buildEvent('12.000000'),
+      eventType: ClassifiedEventType.SWAP,
+      direction: EventDirection.OUT,
+      dex: 'Uniswap V3',
+    };
+
+    context.userAlertSettingsRepositoryStub.findOrCreateByUserAndChain.mockResolvedValue({
+      id: 1,
+      user_id: 7,
+      chain_key: ChainKey.ETHEREUM_MAINNET,
+      threshold_usd: 0,
+      min_amount_usd: 0,
+      smart_filter_type: 'all',
+      include_dexes: [],
+      exclude_dexes: ['uniswap'],
+      quiet_from: null,
+      quiet_to: null,
+      timezone: 'UTC',
+      updated_at: new Date('2026-02-09T00:00:00.000Z'),
+    });
+
+    await context.service.dispatch(swapEvent);
 
     expect(context.telegramSenderServiceStub.sendText).not.toHaveBeenCalled();
   });

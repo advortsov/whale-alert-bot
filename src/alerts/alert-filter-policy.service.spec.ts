@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { AlertFilterPolicyService } from './alert-filter-policy.service';
+import { ClassifiedEventType, EventDirection } from '../chain/chain.types';
+import { AlertSmartFilterType } from '../features/alerts/smart-filter.interfaces';
 
 describe('AlertFilterPolicyService', (): void => {
   it('blocks alert when usd amount is below threshold', (): void => {
@@ -31,5 +33,85 @@ describe('AlertFilterPolicyService', (): void => {
 
     expect(decision.allowed).toBe(true);
     expect(decision.usdUnavailable).toBe(true);
+  });
+
+  it('blocks swap when type filter is transfer', (): void => {
+    const service: AlertFilterPolicyService = new AlertFilterPolicyService();
+
+    const decision = service.evaluateSemanticFilters(
+      {
+        type: AlertSmartFilterType.TRANSFER,
+        includeDexes: [],
+        excludeDexes: [],
+      },
+      {
+        eventType: ClassifiedEventType.SWAP,
+        direction: EventDirection.IN,
+        dex: 'Uniswap V3',
+      },
+    );
+
+    expect(decision.allowed).toBe(false);
+    expect(decision.suppressedReason).toBe('type_filter');
+  });
+
+  it('allows buy filter for incoming swap', (): void => {
+    const service: AlertFilterPolicyService = new AlertFilterPolicyService();
+
+    const decision = service.evaluateSemanticFilters(
+      {
+        type: AlertSmartFilterType.BUY,
+        includeDexes: [],
+        excludeDexes: [],
+      },
+      {
+        eventType: ClassifiedEventType.SWAP,
+        direction: EventDirection.IN,
+        dex: 'Uniswap V2',
+      },
+    );
+
+    expect(decision.allowed).toBe(true);
+    expect(decision.suppressedReason).toBeNull();
+  });
+
+  it('blocks swap when dex is not in include list', (): void => {
+    const service: AlertFilterPolicyService = new AlertFilterPolicyService();
+
+    const decision = service.evaluateSemanticFilters(
+      {
+        type: AlertSmartFilterType.ALL,
+        includeDexes: ['curve'],
+        excludeDexes: [],
+      },
+      {
+        eventType: ClassifiedEventType.SWAP,
+        direction: EventDirection.IN,
+        dex: 'Uniswap V2',
+      },
+    );
+
+    expect(decision.allowed).toBe(false);
+    expect(decision.suppressedReason).toBe('dex_include');
+  });
+
+  it('blocks swap when dex is in exclude list', (): void => {
+    const service: AlertFilterPolicyService = new AlertFilterPolicyService();
+
+    const decision = service.evaluateSemanticFilters(
+      {
+        type: AlertSmartFilterType.ALL,
+        includeDexes: [],
+        excludeDexes: ['uniswap'],
+      },
+      {
+        eventType: ClassifiedEventType.SWAP,
+        direction: EventDirection.OUT,
+        dex: 'Uniswap V3',
+      },
+    );
+
+    expect(decision.allowed).toBe(false);
+    expect(decision.suppressedReason).toBe('dex_exclude');
   });
 });

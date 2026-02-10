@@ -1,9 +1,17 @@
 import { Injectable } from '@nestjs/common';
 
+import { ClassifiedEventType, EventDirection } from '../chain/chain.types';
 import type {
   AlertFilterPolicy,
   ThresholdDecision,
 } from '../features/alerts/alert-filter.interfaces';
+import { normalizeDexKey } from '../features/alerts/dex-normalizer.util';
+import type {
+  AlertSemanticEventContext,
+  AlertSemanticFilterPolicy,
+  SemanticFilterDecision,
+} from '../features/alerts/smart-filter.interfaces';
+import { AlertSmartFilterType } from '../features/alerts/smart-filter.interfaces';
 
 @Injectable()
 export class AlertFilterPolicyService {
@@ -56,6 +64,78 @@ export class AlertFilterPolicyService {
       suppressedReason: null,
       usdAmount,
       usdUnavailable: false,
+    };
+  }
+
+  public evaluateSemanticFilters(
+    policy: AlertSemanticFilterPolicy,
+    eventContext: AlertSemanticEventContext,
+  ): SemanticFilterDecision {
+    const normalizedDex: string | null = normalizeDexKey(eventContext.dex);
+    const normalizedType: AlertSmartFilterType = policy.type;
+
+    if (
+      normalizedType === AlertSmartFilterType.TRANSFER &&
+      eventContext.eventType !== ClassifiedEventType.TRANSFER
+    ) {
+      return {
+        allowed: false,
+        suppressedReason: 'type_filter',
+        normalizedDex,
+      };
+    }
+
+    if (
+      normalizedType === AlertSmartFilterType.BUY &&
+      (eventContext.eventType !== ClassifiedEventType.SWAP ||
+        eventContext.direction !== EventDirection.IN)
+    ) {
+      return {
+        allowed: false,
+        suppressedReason: 'type_filter',
+        normalizedDex,
+      };
+    }
+
+    if (
+      normalizedType === AlertSmartFilterType.SELL &&
+      (eventContext.eventType !== ClassifiedEventType.SWAP ||
+        eventContext.direction !== EventDirection.OUT)
+    ) {
+      return {
+        allowed: false,
+        suppressedReason: 'type_filter',
+        normalizedDex,
+      };
+    }
+
+    if (eventContext.eventType === ClassifiedEventType.SWAP) {
+      if (policy.includeDexes.length > 0) {
+        const inIncludeList: boolean =
+          normalizedDex !== null && policy.includeDexes.includes(normalizedDex);
+
+        if (!inIncludeList) {
+          return {
+            allowed: false,
+            suppressedReason: 'dex_include',
+            normalizedDex,
+          };
+        }
+      }
+
+      if (normalizedDex !== null && policy.excludeDexes.includes(normalizedDex)) {
+        return {
+          allowed: false,
+          suppressedReason: 'dex_exclude',
+          normalizedDex,
+        };
+      }
+    }
+
+    return {
+      allowed: true,
+      suppressedReason: null,
+      normalizedDex,
     };
   }
 }
