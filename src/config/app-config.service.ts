@@ -21,6 +21,7 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   TELEGRAM_ENABLED: booleanSchema.default(false),
   CHAIN_WATCHER_ENABLED: booleanSchema.default(false),
+  SOLANA_WATCHER_ENABLED: booleanSchema.default(false),
   CHAIN_RECEIPT_CONCURRENCY: z.coerce.number().int().positive().default(2),
   CHAIN_RPC_MIN_INTERVAL_MS: z.coerce.number().int().min(0).default(350),
   CHAIN_BACKOFF_BASE_MS: z.coerce.number().int().positive().default(1000),
@@ -32,6 +33,10 @@ const envSchema = z.object({
   DATABASE_URL: z.url(),
   ETH_ALCHEMY_WSS_URL: z.url().optional(),
   ETH_INFURA_WSS_URL: z.url().optional(),
+  SOLANA_HELIUS_HTTP_URL: z.url().optional(),
+  SOLANA_HELIUS_WSS_URL: z.url().optional(),
+  SOLANA_PUBLIC_HTTP_URL: z.url().optional(),
+  SOLANA_PUBLIC_WSS_URL: z.url().optional(),
   UNISWAP_SWAP_ALLOWLIST: z.string().trim().optional(),
   ETH_CEX_ADDRESS_ALLOWLIST: z.string().trim().optional(),
   ETHERSCAN_TX_BASE_URL: z.url().default('https://etherscan.io/tx/'),
@@ -66,6 +71,7 @@ export class AppConfigService {
       logLevel: parsedEnv.LOG_LEVEL,
       telegramEnabled: parsedEnv.TELEGRAM_ENABLED,
       chainWatcherEnabled: parsedEnv.CHAIN_WATCHER_ENABLED,
+      solanaWatcherEnabled: parsedEnv.SOLANA_WATCHER_ENABLED,
       chainReceiptConcurrency: parsedEnv.CHAIN_RECEIPT_CONCURRENCY,
       chainRpcMinIntervalMs: parsedEnv.CHAIN_RPC_MIN_INTERVAL_MS,
       chainBackoffBaseMs: parsedEnv.CHAIN_BACKOFF_BASE_MS,
@@ -77,6 +83,10 @@ export class AppConfigService {
       databaseUrl: parsedEnv.DATABASE_URL,
       ethAlchemyWssUrl: parsedEnv.ETH_ALCHEMY_WSS_URL ?? null,
       ethInfuraWssUrl: parsedEnv.ETH_INFURA_WSS_URL ?? null,
+      solanaHeliusHttpUrl: parsedEnv.SOLANA_HELIUS_HTTP_URL ?? null,
+      solanaHeliusWssUrl: parsedEnv.SOLANA_HELIUS_WSS_URL ?? null,
+      solanaPublicHttpUrl: parsedEnv.SOLANA_PUBLIC_HTTP_URL ?? null,
+      solanaPublicWssUrl: parsedEnv.SOLANA_PUBLIC_WSS_URL ?? null,
       uniswapSwapAllowlist: this.parseAllowlist(parsedEnv.UNISWAP_SWAP_ALLOWLIST),
       ethCexAddressAllowlist: this.parseAllowlist(parsedEnv.ETH_CEX_ADDRESS_ALLOWLIST),
       etherscanTxBaseUrl: parsedEnv.ETHERSCAN_TX_BASE_URL,
@@ -114,6 +124,10 @@ export class AppConfigService {
 
   public get chainWatcherEnabled(): boolean {
     return this.config.chainWatcherEnabled;
+  }
+
+  public get solanaWatcherEnabled(): boolean {
+    return this.config.solanaWatcherEnabled;
   }
 
   public get chainReceiptConcurrency(): number {
@@ -158,6 +172,22 @@ export class AppConfigService {
 
   public get ethInfuraWssUrl(): string | null {
     return this.config.ethInfuraWssUrl;
+  }
+
+  public get solanaHeliusHttpUrl(): string | null {
+    return this.config.solanaHeliusHttpUrl;
+  }
+
+  public get solanaHeliusWssUrl(): string | null {
+    return this.config.solanaHeliusWssUrl;
+  }
+
+  public get solanaPublicHttpUrl(): string | null {
+    return this.config.solanaPublicHttpUrl;
+  }
+
+  public get solanaPublicWssUrl(): string | null {
+    return this.config.solanaPublicWssUrl;
   }
 
   public get uniswapSwapAllowlist(): readonly string[] {
@@ -233,16 +263,32 @@ export class AppConfigService {
       throw new Error('PRICE_CACHE_STALE_TTL_SEC must be >= PRICE_CACHE_FRESH_TTL_SEC');
     }
 
-    if (!parsedEnv.CHAIN_WATCHER_ENABLED) {
-      return;
+    if (parsedEnv.CHAIN_WATCHER_ENABLED) {
+      if (!parsedEnv.ETH_ALCHEMY_WSS_URL) {
+        throw new Error('ETH_ALCHEMY_WSS_URL is required when CHAIN_WATCHER_ENABLED=true');
+      }
+
+      if (!parsedEnv.ETH_INFURA_WSS_URL) {
+        throw new Error('ETH_INFURA_WSS_URL is required when CHAIN_WATCHER_ENABLED=true');
+      }
     }
 
-    if (!parsedEnv.ETH_ALCHEMY_WSS_URL) {
-      throw new Error('ETH_ALCHEMY_WSS_URL is required when CHAIN_WATCHER_ENABLED=true');
-    }
+    if (parsedEnv.SOLANA_WATCHER_ENABLED) {
+      if (!parsedEnv.SOLANA_HELIUS_HTTP_URL) {
+        throw new Error('SOLANA_HELIUS_HTTP_URL is required when SOLANA_WATCHER_ENABLED=true');
+      }
 
-    if (!parsedEnv.ETH_INFURA_WSS_URL) {
-      throw new Error('ETH_INFURA_WSS_URL is required when CHAIN_WATCHER_ENABLED=true');
+      if (!parsedEnv.SOLANA_HELIUS_WSS_URL) {
+        throw new Error('SOLANA_HELIUS_WSS_URL is required when SOLANA_WATCHER_ENABLED=true');
+      }
+
+      if (!parsedEnv.SOLANA_PUBLIC_HTTP_URL) {
+        throw new Error('SOLANA_PUBLIC_HTTP_URL is required when SOLANA_WATCHER_ENABLED=true');
+      }
+
+      if (!parsedEnv.SOLANA_PUBLIC_WSS_URL) {
+        throw new Error('SOLANA_PUBLIC_WSS_URL is required when SOLANA_WATCHER_ENABLED=true');
+      }
     }
   }
 

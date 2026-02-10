@@ -54,6 +54,40 @@ describe('AppConfigService', (): void => {
     );
   });
 
+  it('throws when solana watcher is enabled without primary http url', (): void => {
+    withEnv(
+      {
+        ...createBaseEnv(),
+        SOLANA_WATCHER_ENABLED: 'true',
+        SOLANA_HELIUS_WSS_URL: 'wss://api.mainnet-beta.solana.com',
+        SOLANA_PUBLIC_HTTP_URL: 'https://solana-rpc.publicnode.com',
+        SOLANA_PUBLIC_WSS_URL: 'wss://solana-rpc.publicnode.com',
+      },
+      (): void => {
+        expect((): AppConfigService => new AppConfigService()).toThrow(
+          'SOLANA_HELIUS_HTTP_URL is required when SOLANA_WATCHER_ENABLED=true',
+        );
+      },
+    );
+  });
+
+  it('throws when solana watcher is enabled without fallback ws url', (): void => {
+    withEnv(
+      {
+        ...createBaseEnv(),
+        SOLANA_WATCHER_ENABLED: 'true',
+        SOLANA_HELIUS_HTTP_URL: 'https://api.mainnet-beta.solana.com',
+        SOLANA_HELIUS_WSS_URL: 'wss://api.mainnet-beta.solana.com',
+        SOLANA_PUBLIC_HTTP_URL: 'https://solana-rpc.publicnode.com',
+      },
+      (): void => {
+        expect((): AppConfigService => new AppConfigService()).toThrow(
+          'SOLANA_PUBLIC_WSS_URL is required when SOLANA_WATCHER_ENABLED=true',
+        );
+      },
+    );
+  });
+
   it('uses default values for alert throttling and token metadata cache config', (): void => {
     withEnv(createBaseEnv(), (): void => {
       const config: AppConfigService = new AppConfigService();

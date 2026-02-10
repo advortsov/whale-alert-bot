@@ -6,7 +6,9 @@ export type ComponentHealth = {
 export type AppHealthStatus = {
   readonly status: 'ok' | 'degraded';
   readonly database: ComponentHealth;
-  readonly rpcPrimary: ComponentHealth;
-  readonly rpcFallback: ComponentHealth;
+  readonly ethereumRpcPrimary: ComponentHealth;
+  readonly ethereumRpcFallback: ComponentHealth;
+  readonly solanaRpcPrimary: ComponentHealth;
+  readonly solanaRpcFallback: ComponentHealth;
   readonly telegram: ComponentHealth;
 };
