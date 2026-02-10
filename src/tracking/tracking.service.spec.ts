@@ -174,9 +174,18 @@ const createTestContext = (): TestContext => {
     normalize: (rawAddress: string): string => rawAddress.trim(),
     formatShort: (address: string): string => address,
   };
+  const tronAddressCodecStub: IAddressCodec = {
+    validate: (): boolean => true,
+    normalize: (rawAddress: string): string => rawAddress.trim(),
+    formatShort: (address: string): string => address,
+  };
   addressCodecRegistryStub.getCodec.mockImplementation((chainKey: ChainKey): IAddressCodec => {
     if (chainKey === ChainKey.SOLANA_MAINNET) {
       return solanaAddressCodecStub;
+    }
+
+    if (chainKey === ChainKey.TRON_MAINNET) {
+      return tronAddressCodecStub;
     }
 
     return ethereumAddressCodecStub;
@@ -333,6 +342,32 @@ describe('TrackingService', (): void => {
       'system',
     );
     expect(message).toContain('[solana_mainnet]');
+  });
+
+  it('tracks tron wallet with explicit chain key', async (): Promise<void> => {
+    const context: TestContext = createTestContext();
+    context.trackedWalletsRepositoryStub.findOrCreate.mockResolvedValue({
+      id: 22,
+      chain_key: ChainKey.TRON_MAINNET,
+      address: 'TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7',
+      label: 'treasury',
+      created_at: new Date('2026-02-01T00:00:00.000Z'),
+    });
+    context.subscriptionsRepositoryStub.addSubscription.mockResolvedValue(true);
+
+    const message: string = await context.service.trackAddress(
+      context.userRef,
+      'TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7',
+      'treasury',
+      ChainKey.TRON_MAINNET,
+    );
+
+    expect(context.trackedWalletsRepositoryStub.findOrCreate).toHaveBeenCalledWith(
+      ChainKey.TRON_MAINNET,
+      'TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7',
+      'treasury',
+    );
+    expect(message).toContain('[tron_mainnet]');
   });
 
   it('returns cached history without explorer call on fresh cache hit', async (): Promise<void> => {

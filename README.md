@@ -13,7 +13,7 @@ Telegram-бот на `NestJS + TypeScript` для отслеживания ак�
 
 ## Команды бота
 
-- `/track <eth|sol> <address> [label]`
+- `/track <eth|sol|tron> <address> [label]`
 - `/list`
 - `/wallet <#id>`
 - `/untrack <address|id>`
@@ -85,6 +85,7 @@ npm run db:migrate
 ## Multichain-ready архитектура (Core + Adapters, домены)
 
 Текущий runtime поддерживает Ethereum + Solana, а контракты уже подготовлены к подключению TRON и других сетей через порты и `chain_key`.
+Для `tron_mainnet` сейчас включен contracts-only режим: добавление/хранение адресов доступно, live watcher и history fallback пока не включены.
 
 - `src/core/chains`: ключи сетей и базовые chain-контракты (`ChainKey`).
 - `src/core/ports/rpc`: доменный порт RPC/block stream.

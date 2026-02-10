@@ -56,6 +56,7 @@ export class TrackingService {
   private static readonly SUPPORTED_TRACK_CHAINS: readonly ChainKey[] = [
     ChainKey.ETHEREUM_MAINNET,
     ChainKey.SOLANA_MAINNET,
+    ChainKey.TRON_MAINNET,
   ];
 
   public constructor(
@@ -1043,7 +1044,11 @@ export class TrackingService {
       ].join('\n');
     }
 
-    return `Неверный адрес для сети ${chainKey}.`;
+    return [
+      'Неверный TRON адрес.',
+      'Ожидаю base58 (T...) или hex формат (41.../0x...).',
+      'Пример: /track tron TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7 treasury',
+    ].join('\n');
   }
 
   private buildInvalidAddressNormalizationMessage(chainKey: ChainKey): string {
@@ -1058,7 +1063,10 @@ export class TrackingService {
       return ['Неверный Solana адрес.', 'Проверь символы base58 и корректность длины.'].join('\n');
     }
 
-    return `Не удалось нормализовать адрес для сети ${chainKey}.`;
+    return [
+      'Не удалось нормализовать TRON адрес.',
+      'Проверь base58 checksum или hex-представление адреса.',
+    ].join('\n');
   }
 
   private parseHistoryLimit(rawLimit: string | null): number {

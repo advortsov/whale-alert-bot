@@ -82,6 +82,23 @@ describe('TelegramUpdate', (): void => {
     });
   });
 
+  it('parses tron alias in /track command', (): void => {
+    const trackingServiceStub: TrackingService = {} as TrackingService;
+    const update: TelegramUpdate = createUpdate(trackingServiceStub);
+    const privateApi: TelegramUpdatePrivateApi = update as unknown as TelegramUpdatePrivateApi;
+
+    const parsed: readonly ParsedMessageCommandView[] = privateApi.parseMessageCommands(
+      '/track tron TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7 treasury',
+    );
+
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0]).toMatchObject({
+      command: 'track',
+      args: ['tron', 'TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7', 'treasury'],
+      lineNumber: 1,
+    });
+  });
+
   it('parses new smart filter commands', (): void => {
     const trackingServiceStub: TrackingService = {} as TrackingService;
     const update: TelegramUpdate = createUpdate(trackingServiceStub);

@@ -68,6 +68,8 @@ const TRACK_CHAIN_ALIAS_MAP: Readonly<Record<string, ChainKey>> = {
   ethereum: ChainKey.ETHEREUM_MAINNET,
   sol: ChainKey.SOLANA_MAINNET,
   solana: ChainKey.SOLANA_MAINNET,
+  tron: ChainKey.TRON_MAINNET,
+  trx: ChainKey.TRON_MAINNET,
 };
 
 const WALLET_HISTORY_CALLBACK_PREFIX: string = 'wallet_history:';
@@ -317,10 +319,11 @@ export class TelegramUpdate {
       return [
         'Передай адрес для отслеживания.',
         'Форматы:',
-        '/track <eth|sol> <address> [label]',
+        '/track <eth|sol|tron> <address> [label]',
         'Примеры:',
         '/track eth 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045 vitalik',
         '/track sol 11111111111111111111111111111111 system',
+        '/track tron TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7 treasury',
       ].join('\n');
     }
 
@@ -1096,7 +1099,7 @@ export class TelegramUpdate {
       '3. Показывать последние транзакции для Ethereum и Solana.',
       '',
       'Быстрый старт:',
-      '/track <eth|sol> <address> [label]',
+      '/track <eth|sol|tron> <address> [label]',
       '/list',
       '/wallet #id',
       '/history <address|#id> [limit]',
@@ -1122,7 +1125,7 @@ export class TelegramUpdate {
   private buildHelpMessage(): string {
     return [
       'Команды:',
-      '/track <eth|sol> <address> [label] - добавить адрес',
+      '/track <eth|sol|tron> <address> [label] - добавить адрес',
       '/list - показать список адресов и их id',
       '/wallet <#id> - карточка кошелька и действия кнопками',
       '/untrack <address|id> - удалить адрес',
@@ -1144,6 +1147,7 @@ export class TelegramUpdate {
       'Примеры:',
       '/track eth 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045 vitalik',
       '/track sol 11111111111111111111111111111111 system',
+      '/track tron TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7 treasury',
       '/history #1 10',
       '/filters transfer off',
       '/walletfilters #3',
@@ -1169,11 +1173,12 @@ export class TelegramUpdate {
   private buildTrackHintMessage(): string {
     return [
       'Добавление адреса:',
-      '/track <eth|sol> <address> [label]',
+      '/track <eth|sol|tron> <address> [label]',
       '',
       'Примеры:',
       '/track eth 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045 vitalik',
       '/track sol 11111111111111111111111111111111 system',
+      '/track tron TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7 treasury',
     ].join('\n');
   }
 

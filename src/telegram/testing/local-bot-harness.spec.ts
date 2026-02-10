@@ -155,6 +155,33 @@ describe('LocalBotHarness', (): void => {
     );
   });
 
+  it('routes /track tron with explicit chain key', async (): Promise<void> => {
+    const trackingServiceStub: TrackingServiceStub = createTrackingServiceStub();
+    const runtimeStatusServiceStub: RuntimeStatusServiceStub = createRuntimeStatusServiceStub();
+    const harness: LocalBotHarness = new LocalBotHarness({
+      trackingService: trackingServiceStub as unknown as TrackingService,
+      runtimeStatusService: runtimeStatusServiceStub as unknown as RuntimeStatusService,
+    });
+
+    await harness.sendText({
+      user: {
+        telegramId: '42',
+        username: 'tester',
+      },
+      text: '/track tron TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7 treasury',
+    });
+
+    expect(trackingServiceStub.trackAddress).toHaveBeenCalledWith(
+      {
+        telegramId: '42',
+        username: 'tester',
+      },
+      'TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7',
+      'treasury',
+      ChainKey.TRON_MAINNET,
+    );
+  });
+
   it('returns merged runtime and user status for /status', async (): Promise<void> => {
     const trackingServiceStub: TrackingServiceStub = createTrackingServiceStub();
     const runtimeStatusServiceStub: RuntimeStatusServiceStub = createRuntimeStatusServiceStub();
