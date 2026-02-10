@@ -1,5 +1,6 @@
 export enum ChainId {
   ETHEREUM_MAINNET = 1,
+  SOLANA_MAINNET = 101,
 }
 
 export enum ClassifiedEventType {

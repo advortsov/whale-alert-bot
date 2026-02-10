@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { ChainStreamService } from './chain-stream.service';
 import { EventClassifierService } from './event-classifier.service';
 import { AlertsModule } from '../alerts/alerts.module';
+import { SolanaChainStreamService } from '../chains/solana/solana-chain-stream.service';
 import {
   ETHEREUM_FALLBACK_RPC_ADAPTER,
   ETHEREUM_PRIMARY_RPC_ADAPTER,
@@ -47,6 +48,7 @@ import { RpcThrottlerService } from './providers/rpc-throttler.service';
     ProviderFailoverService,
     EventClassifierService,
     ChainStreamService,
+    SolanaChainStreamService,
   ],
   exports: [ProviderFactory, ProviderFailoverService, EventClassifierService],
 })

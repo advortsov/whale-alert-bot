@@ -507,6 +507,10 @@ export class AlertDispatcherService {
       return ChainKey.ETHEREUM_MAINNET;
     }
 
+    if (chainId === 101) {
+      return ChainKey.SOLANA_MAINNET;
+    }
+
     return ChainKey.ETHEREUM_MAINNET;
   }
 }
