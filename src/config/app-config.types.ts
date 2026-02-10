@@ -23,6 +23,11 @@ export type AppConfig = {
   readonly etherscanTxBaseUrl: string;
   readonly etherscanApiBaseUrl: string;
   readonly etherscanApiKey: string | null;
+  readonly coingeckoApiBaseUrl: string;
+  readonly coingeckoTimeoutMs: number;
+  readonly priceCacheMaxEntries: number;
+  readonly priceCacheFreshTtlSec: number;
+  readonly priceCacheStaleTtlSec: number;
   readonly alertMinSendIntervalSec: number;
   readonly tokenMetaCacheTtlSec: number;
   readonly historyCacheTtlSec: number;

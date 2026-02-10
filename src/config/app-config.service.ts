@@ -36,6 +36,11 @@ const envSchema = z.object({
   ETHERSCAN_TX_BASE_URL: z.url().default('https://etherscan.io/tx/'),
   ETHERSCAN_API_BASE_URL: z.url().default('https://api.etherscan.io/v2/api'),
   ETHERSCAN_API_KEY: z.string().trim().min(1).optional(),
+  COINGECKO_API_BASE_URL: z.url().default('https://api.coingecko.com/api/v3'),
+  COINGECKO_TIMEOUT_MS: z.coerce.number().int().positive().default(8000),
+  PRICE_CACHE_MAX_ENTRIES: z.coerce.number().int().positive().default(1000),
+  PRICE_CACHE_FRESH_TTL_SEC: z.coerce.number().int().positive().default(120),
+  PRICE_CACHE_STALE_TTL_SEC: z.coerce.number().int().positive().default(600),
   ALERT_MIN_SEND_INTERVAL_SEC: z.coerce.number().int().min(0).default(10),
   TOKEN_META_CACHE_TTL_SEC: z.coerce.number().int().positive().default(3600),
   HISTORY_CACHE_TTL_SEC: z.coerce.number().int().positive().default(120),
@@ -75,6 +80,11 @@ export class AppConfigService {
       etherscanTxBaseUrl: parsedEnv.ETHERSCAN_TX_BASE_URL,
       etherscanApiBaseUrl: parsedEnv.ETHERSCAN_API_BASE_URL,
       etherscanApiKey: parsedEnv.ETHERSCAN_API_KEY ?? null,
+      coingeckoApiBaseUrl: parsedEnv.COINGECKO_API_BASE_URL,
+      coingeckoTimeoutMs: parsedEnv.COINGECKO_TIMEOUT_MS,
+      priceCacheMaxEntries: parsedEnv.PRICE_CACHE_MAX_ENTRIES,
+      priceCacheFreshTtlSec: parsedEnv.PRICE_CACHE_FRESH_TTL_SEC,
+      priceCacheStaleTtlSec: parsedEnv.PRICE_CACHE_STALE_TTL_SEC,
       alertMinSendIntervalSec: parsedEnv.ALERT_MIN_SEND_INTERVAL_SEC,
       tokenMetaCacheTtlSec: parsedEnv.TOKEN_META_CACHE_TTL_SEC,
       historyCacheTtlSec: parsedEnv.HISTORY_CACHE_TTL_SEC,
@@ -164,6 +174,26 @@ export class AppConfigService {
     return this.config.etherscanApiKey;
   }
 
+  public get coingeckoApiBaseUrl(): string {
+    return this.config.coingeckoApiBaseUrl;
+  }
+
+  public get coingeckoTimeoutMs(): number {
+    return this.config.coingeckoTimeoutMs;
+  }
+
+  public get priceCacheMaxEntries(): number {
+    return this.config.priceCacheMaxEntries;
+  }
+
+  public get priceCacheFreshTtlSec(): number {
+    return this.config.priceCacheFreshTtlSec;
+  }
+
+  public get priceCacheStaleTtlSec(): number {
+    return this.config.priceCacheStaleTtlSec;
+  }
+
   public get alertMinSendIntervalSec(): number {
     return this.config.alertMinSendIntervalSec;
   }
@@ -191,6 +221,10 @@ export class AppConfigService {
   private assertWatcherConfig(parsedEnv: ParsedEnv): void {
     if (parsedEnv.CHAIN_BACKOFF_MAX_MS < parsedEnv.CHAIN_BACKOFF_BASE_MS) {
       throw new Error('CHAIN_BACKOFF_MAX_MS must be >= CHAIN_BACKOFF_BASE_MS');
+    }
+
+    if (parsedEnv.PRICE_CACHE_STALE_TTL_SEC < parsedEnv.PRICE_CACHE_FRESH_TTL_SEC) {
+      throw new Error('PRICE_CACHE_STALE_TTL_SEC must be >= PRICE_CACHE_FRESH_TTL_SEC');
     }
 
     if (!parsedEnv.CHAIN_WATCHER_ENABLED) {

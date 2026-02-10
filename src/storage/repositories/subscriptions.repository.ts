@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import type { ChainKey } from '../../core/chains/chain-key.interfaces';
+import { ChainKey } from '../../core/chains/chain-key.interfaces';
 import { DatabaseService } from '../database.service';
 import type {
   NewUserWalletSubscriptionRow,
@@ -64,7 +64,7 @@ export class SubscriptionsRepository {
       (row): UserWalletSubscriptionView => ({
         subscriptionId: row.id,
         walletId: row.wallet_id,
-        chainKey: row.chain_key,
+        chainKey: this.normalizeChainKey(row.chain_key),
         walletAddress: row.address,
         walletLabel: row.label,
         createdAt: row.created_at,
@@ -149,6 +149,7 @@ export class SubscriptionsRepository {
       telegram_id: string;
       user_id: number;
       wallet_id: number;
+      chain_key: string;
     }[] = await this.databaseService
       .getDb()
       .selectFrom('tracked_wallets')
@@ -162,6 +163,7 @@ export class SubscriptionsRepository {
         'users.telegram_id',
         'user_wallet_subscriptions.user_id',
         'user_wallet_subscriptions.wallet_id',
+        'tracked_wallets.chain_key',
       ])
       .where('tracked_wallets.chain_key', '=', chainKey)
       .where('tracked_wallets.address', '=', address)
@@ -172,7 +174,18 @@ export class SubscriptionsRepository {
         telegramId: row.telegram_id,
         userId: row.user_id,
         walletId: row.wallet_id,
+        chainKey: this.normalizeChainKey(row.chain_key),
       }),
     );
+  }
+
+  private normalizeChainKey(rawChainKey: string): ChainKey {
+    const knownChainKeys: readonly string[] = Object.values(ChainKey);
+
+    if (knownChainKeys.includes(rawChainKey)) {
+      return rawChainKey as ChainKey;
+    }
+
+    return ChainKey.ETHEREUM_MAINNET;
   }
 }

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
+import type { AlertMessageContext } from './alert.interfaces';
 import { ClassifiedEventType, EventDirection, type ClassifiedEvent } from '../chain/chain.types';
 import { AppConfigService } from '../config/app-config.service';
 
@@ -7,39 +8,58 @@ import { AppConfigService } from '../config/app-config.service';
 export class AlertMessageFormatter {
   public constructor(private readonly appConfigService: AppConfigService) {}
 
-  public format(event: ClassifiedEvent): string {
-    const txUrl: string = `${this.appConfigService.etherscanTxBaseUrl}${event.txHash}`;
+  public format(event: ClassifiedEvent, context?: AlertMessageContext): string {
     const directionLabel: string = this.formatDirection(event.direction);
     const valueLabel: string = this.formatValue(event.valueFormatted, event.tokenSymbol);
     const tokenLabel: string = event.tokenSymbol ?? 'n/a';
+    const usdLine: string | null = this.formatUsdLine(context);
+    const txShort: string = this.shortHash(event.txHash);
+    const headerLabel: string =
+      event.eventType === ClassifiedEventType.SWAP ? '🐋 SWAP' : '🐋 TRANSFER';
 
     if (event.eventType === ClassifiedEventType.TRANSFER) {
-      return [
-        '🐋 КИТ АКТИВЕН! Тип: TRANSFER',
+      const rows: string[] = [
+        `${headerLabel} • ${directionLabel}`,
         `Адрес: ${event.trackedAddress}`,
-        `Направление: ${directionLabel}`,
         `Токен: ${tokenLabel}`,
         `Сумма: ${valueLabel}`,
         `Контракт: ${event.tokenAddress ?? event.contractAddress ?? 'n/a'}`,
-        `Tx: ${txUrl}`,
-      ].join('\n');
+        `Tx: ${txShort}`,
+      ];
+
+      if (usdLine !== null) {
+        rows.push(usdLine);
+      }
+
+      return rows.join('\n');
     }
 
     if (event.eventType === ClassifiedEventType.SWAP) {
-      return [
-        '🐋 КИТ АКТИВЕН! Тип: SWAP',
+      const rows: string[] = [
+        `${headerLabel} • ${directionLabel}`,
         `Адрес: ${event.trackedAddress}`,
-        `Направление: ${directionLabel}`,
         `DEX: ${event.dex ?? 'Unknown'}`,
         `Пара: ${event.pair ?? 'n/a'}`,
         `Токен: ${tokenLabel}`,
         `Сумма: ${valueLabel}`,
         `Контракт: ${event.tokenAddress ?? event.contractAddress ?? 'n/a'}`,
-        `Tx: ${txUrl}`,
-      ].join('\n');
+        `Tx: ${txShort}`,
+      ];
+
+      if (usdLine !== null) {
+        rows.push(usdLine);
+      }
+
+      return rows.join('\n');
     }
 
-    return ['Событие не классифицировано.', `Tx: ${txUrl}`].join('\n');
+    const fallbackRows: string[] = ['Событие не классифицировано.', `Tx: ${txShort}`];
+
+    if (usdLine !== null) {
+      fallbackRows.push(usdLine);
+    }
+
+    return fallbackRows.join('\n');
   }
 
   private formatDirection(direction: EventDirection): string {
@@ -61,5 +81,27 @@ export class AlertMessageFormatter {
 
     const symbol: string = tokenSymbol ?? 'TOKEN';
     return `${valueFormatted} ${symbol}`;
+  }
+
+  private formatUsdLine(context: AlertMessageContext | undefined): string | null {
+    if (!context) {
+      return null;
+    }
+
+    if (context.usdAmount !== null && context.usdAmount > 0) {
+      return `USD: ~$${context.usdAmount.toFixed(2)}`;
+    }
+
+    if (context.usdUnavailable) {
+      return '⚠️ USD unavailable';
+    }
+
+    return null;
+  }
+
+  private shortHash(txHash: string): string {
+    const prefix: string = txHash.slice(0, 10);
+    const suffix: string = txHash.slice(-8);
+    return `${prefix}...${suffix}`;
   }
 }

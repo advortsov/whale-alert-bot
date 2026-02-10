@@ -10,6 +10,11 @@ export type AlertPayload = {
   readonly message: string;
 };
 
+export interface AlertMessageContext {
+  readonly usdAmount: number | null;
+  readonly usdUnavailable: boolean;
+}
+
 export type AlertDeliveryResult = {
   readonly telegramId: string;
   readonly success: boolean;

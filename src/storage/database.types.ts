@@ -65,6 +65,28 @@ export interface UserWalletAlertPreferencesTable {
   updated_at: UpdatableTimestampColumn;
 }
 
+export interface UserAlertSettingsTable {
+  id: Generated<number>;
+  user_id: number;
+  chain_key: string;
+  threshold_usd: number;
+  min_amount_usd: number;
+  quiet_from: string | null;
+  quiet_to: string | null;
+  timezone: string;
+  updated_at: UpdatableTimestampColumn;
+}
+
+export interface AlertMutesTable {
+  id: Generated<number>;
+  user_id: number;
+  chain_key: string;
+  wallet_id: number;
+  mute_until: UpdatableTimestampColumn;
+  source: string;
+  created_at: TimestampColumn;
+}
+
 export interface ChainCheckpointsTable {
   chain_id: number;
   chain_key: string;
@@ -100,6 +122,8 @@ export interface Database {
   processed_events: ProcessedEventsTable;
   user_alert_preferences: UserAlertPreferencesTable;
   user_wallet_alert_preferences: UserWalletAlertPreferencesTable;
+  user_alert_settings: UserAlertSettingsTable;
+  alert_mutes: AlertMutesTable;
   chain_checkpoints: ChainCheckpointsTable;
   wallet_events: WalletEventsTable;
 }
@@ -121,6 +145,12 @@ export type NewUserAlertPreferenceRow = Insertable<UserAlertPreferencesTable>;
 
 export type UserWalletAlertPreferenceRow = Selectable<UserWalletAlertPreferencesTable>;
 export type NewUserWalletAlertPreferenceRow = Insertable<UserWalletAlertPreferencesTable>;
+
+export type UserAlertSettingsRow = Selectable<UserAlertSettingsTable>;
+export type NewUserAlertSettingsRow = Insertable<UserAlertSettingsTable>;
+
+export type AlertMuteRow = Selectable<AlertMutesTable>;
+export type NewAlertMuteRow = Insertable<AlertMutesTable>;
 
 export type ChainCheckpointRow = Selectable<ChainCheckpointsTable>;
 export type NewChainCheckpointRow = Insertable<ChainCheckpointsTable>;

@@ -19,10 +19,13 @@ Telegram-бот на `NestJS + TypeScript` для отслеживания ак�
 - `/untrack <address|id>`
 - `/history <address|#id> [limit] [kind] [direction]`
 - `/status`
+- `/threshold <amount|off>`
+- `/filter min_amount_usd <amount|off>`
 - `/filters`
 - `/walletfilters <#id>`
 - `/wfilter <#id> <transfer|swap> <on|off>`
-- `/setmin <amount>`
+- `/quiet <HH:mm-HH:mm|off>`
+- `/tz <Area/City>`
 - `/mute <minutes|off>`
 - `/help`
 
@@ -109,6 +112,11 @@ CHAIN_HEARTBEAT_INTERVAL_SEC=60
 CHAIN_REORG_CONFIRMATIONS=2
 ETHERSCAN_API_BASE_URL=https://api.etherscan.io/v2/api
 ETHERSCAN_API_KEY=your_free_key
+COINGECKO_API_BASE_URL=https://api.coingecko.com/api/v3
+COINGECKO_TIMEOUT_MS=8000
+PRICE_CACHE_MAX_ENTRIES=1000
+PRICE_CACHE_FRESH_TTL_SEC=120
+PRICE_CACHE_STALE_TTL_SEC=600
 HISTORY_CACHE_TTL_SEC=120
 HISTORY_RATE_LIMIT_PER_MINUTE=12
 HISTORY_BUTTON_COOLDOWN_SEC=3

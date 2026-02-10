@@ -17,6 +17,7 @@ import {
   type TelegramUserRef,
   type TrackedWalletOption,
   type UserAlertPreferences,
+  type UserAlertSettingsSnapshot,
   type WalletAlertFilterState,
 } from './tracking.interfaces';
 import { AppConfigService } from '../config/app-config.service';
@@ -26,13 +27,17 @@ import type { IHistoryExplorerAdapter } from '../core/ports/explorers/history-ex
 import type { HistoryItemDto, HistoryPageDto } from '../features/tracking/dto/history-item.dto';
 import { HistoryDirectionFilter, HistoryKind } from '../features/tracking/dto/history-request.dto';
 import type {
+  AlertMuteRow,
   UserAlertPreferenceRow,
+  UserAlertSettingsRow,
   UserWalletAlertPreferenceRow,
 } from '../storage/database.types';
+import { AlertMutesRepository } from '../storage/repositories/alert-mutes.repository';
 import { SubscriptionsRepository } from '../storage/repositories/subscriptions.repository';
 import { TrackedWalletsRepository } from '../storage/repositories/tracked-wallets.repository';
 import { AlertEventFilterType } from '../storage/repositories/user-alert-preferences.interfaces';
 import { UserAlertPreferencesRepository } from '../storage/repositories/user-alert-preferences.repository';
+import { UserAlertSettingsRepository } from '../storage/repositories/user-alert-settings.repository';
 import { UserWalletAlertPreferencesRepository } from '../storage/repositories/user-wallet-alert-preferences.repository';
 import { UsersRepository } from '../storage/repositories/users.repository';
 import { WalletEventsRepository } from '../storage/repositories/wallet-events.repository';
@@ -54,7 +59,9 @@ export class TrackingService {
     private readonly historyCacheService: HistoryCacheService,
     private readonly historyRateLimiterService: HistoryRateLimiterService,
     private readonly userAlertPreferencesRepository: UserAlertPreferencesRepository,
+    private readonly userAlertSettingsRepository: UserAlertSettingsRepository,
     private readonly userWalletAlertPreferencesRepository: UserWalletAlertPreferencesRepository,
+    private readonly alertMutesRepository: AlertMutesRepository,
     private readonly walletEventsRepository: WalletEventsRepository,
     private readonly appConfigService: AppConfigService,
   ) {}
@@ -211,16 +218,22 @@ export class TrackingService {
     }
 
     const labelText: string = matchedSubscription.walletLabel ?? 'без ярлыка';
-    const [globalPreferences, walletPreferences, recentEvents] = await Promise.all([
-      this.userAlertPreferencesRepository.findOrCreateByUserId(user.id),
-      this.userWalletAlertPreferencesRepository.findByUserAndWalletId(user.id, walletId),
-      this.walletEventsRepository.listRecentByTrackedAddress(
-        ChainKey.ETHEREUM_MAINNET,
-        matchedSubscription.walletAddress,
-        TrackingService.WALLET_CARD_RECENT_EVENTS_LIMIT,
-        0,
-      ),
-    ]);
+    const [globalPreferences, settings, walletPreferences, activeMute, recentEvents] =
+      await Promise.all([
+        this.userAlertPreferencesRepository.findOrCreateByUserId(user.id),
+        this.userAlertSettingsRepository.findOrCreateByUserAndChain(
+          user.id,
+          matchedSubscription.chainKey,
+        ),
+        this.userWalletAlertPreferencesRepository.findByUserAndWalletId(user.id, walletId),
+        this.alertMutesRepository.findActiveMute(user.id, matchedSubscription.chainKey, walletId),
+        this.walletEventsRepository.listRecentByTrackedAddress(
+          matchedSubscription.chainKey,
+          matchedSubscription.walletAddress,
+          TrackingService.WALLET_CARD_RECENT_EVENTS_LIMIT,
+          0,
+        ),
+      ]);
     const allowTransfer: boolean = walletPreferences
       ? walletPreferences.allow_transfer
       : globalPreferences.allow_transfer;
@@ -229,13 +242,20 @@ export class TrackingService {
       : globalPreferences.allow_swap;
     const filterSource: string = walletPreferences === null ? 'global' : 'wallet override';
     const recentEventRows: readonly string[] = this.formatWalletCardRecentEvents(recentEvents);
+    const muteStatusText: string =
+      activeMute === null ? 'off' : this.formatTimestamp(activeMute.mute_until);
+    const settingsSnapshot: UserAlertSettingsSnapshot = this.mapSettings(settings);
+    const quietText: string = this.formatQuietHours(settingsSnapshot);
 
     return [
       `💼 Кошелек #${walletId}`,
-      `⛓ Сеть: ${ChainKey.ETHEREUM_MAINNET}`,
+      `⛓ Сеть: ${matchedSubscription.chainKey}`,
       `🏷 Label: ${labelText}`,
       `📍 Address: ${matchedSubscription.walletAddress}`,
       `🔔 Фильтры: transfer=${allowTransfer ? 'on' : 'off'}, swap=${allowSwap ? 'on' : 'off'} (${filterSource})`,
+      `💵 USD: threshold=${settingsSnapshot.thresholdUsd.toFixed(2)}, min=${settingsSnapshot.minAmountUsd.toFixed(2)}`,
+      `🌙 Quiet: ${quietText} (${settingsSnapshot.timezone})`,
+      `🚫 Ignore 24h до: ${muteStatusText}`,
       '',
       `🧾 Последние события (${recentEvents.length}/${TrackingService.WALLET_CARD_RECENT_EVENTS_LIMIT}):`,
       ...recentEventRows,
@@ -296,36 +316,37 @@ export class TrackingService {
 
   public async getUserAlertFilters(userRef: TelegramUserRef): Promise<string> {
     const user = await this.usersRepository.findOrCreate(userRef.telegramId, userRef.username);
-    const preferencesRow: UserAlertPreferenceRow =
-      await this.userAlertPreferencesRepository.findOrCreateByUserId(user.id);
+    const [preferencesRow, settingsRow] = await Promise.all([
+      this.userAlertPreferencesRepository.findOrCreateByUserId(user.id),
+      this.userAlertSettingsRepository.findOrCreateByUserAndChain(
+        user.id,
+        ChainKey.ETHEREUM_MAINNET,
+      ),
+    ]);
     const preferences: UserAlertPreferences = this.mapPreferences(preferencesRow);
+    const settingsSnapshot: UserAlertSettingsSnapshot = this.mapSettings(settingsRow);
     const mutedUntilText: string = preferences.mutedUntil
       ? this.formatTimestamp(preferences.mutedUntil)
       : 'выключен';
 
     return [
       'Текущие фильтры алертов:',
-      `- min amount: ${preferences.minAmount.toFixed(6)}`,
+      `- threshold usd: ${settingsSnapshot.thresholdUsd.toFixed(2)}`,
+      `- min amount usd: ${settingsSnapshot.minAmountUsd.toFixed(2)}`,
       `- transfer: ${preferences.allowTransfer ? 'on' : 'off'}`,
       `- swap: ${preferences.allowSwap ? 'on' : 'off'}`,
       `- mute до: ${mutedUntilText}`,
+      `- quiet: ${this.formatQuietHours(settingsSnapshot)} (${settingsSnapshot.timezone})`,
       '',
       'Команды:',
-      '/setmin <amount>',
+      '/threshold <amount|off>',
+      '/filter min_amount_usd <amount|off>',
       '/mute <minutes|off>',
+      '/quiet <HH:mm-HH:mm|off>',
+      '/tz <Area/City>',
       '/filters transfer <on|off>',
       '/filters swap <on|off>',
     ].join('\n');
-  }
-
-  public async setMinimumAlertAmount(userRef: TelegramUserRef, rawAmount: string): Promise<string> {
-    const minAmount: number = this.parseMinAmount(rawAmount);
-    const user = await this.usersRepository.findOrCreate(userRef.telegramId, userRef.username);
-    const updatedRow: UserAlertPreferenceRow =
-      await this.userAlertPreferencesRepository.updateMinAmount(user.id, minAmount);
-    const preferences: UserAlertPreferences = this.mapPreferences(updatedRow);
-
-    return `Установил минимальную сумму алерта: ${preferences.minAmount.toFixed(6)}.`;
   }
 
   public async setMuteAlerts(userRef: TelegramUserRef, rawMinutes: string): Promise<string> {
@@ -342,6 +363,102 @@ export class TrackingService {
     }
 
     return `Алерты отключены до ${this.formatTimestamp(preferences.mutedUntil)}.`;
+  }
+
+  public async setThresholdUsd(userRef: TelegramUserRef, rawValue: string): Promise<string> {
+    const thresholdUsd: number = this.parseUsdThresholdValue(rawValue);
+    const user = await this.usersRepository.findOrCreate(userRef.telegramId, userRef.username);
+    const updatedSettings: UserAlertSettingsRow =
+      await this.userAlertSettingsRepository.updateByUserAndChain(
+        user.id,
+        ChainKey.ETHEREUM_MAINNET,
+        {
+          thresholdUsd,
+        },
+      );
+    const settingsSnapshot: UserAlertSettingsSnapshot = this.mapSettings(updatedSettings);
+
+    return `Порог USD обновлен: ${settingsSnapshot.thresholdUsd.toFixed(2)}.`;
+  }
+
+  public async setMinAmountUsd(userRef: TelegramUserRef, rawValue: string): Promise<string> {
+    const minAmountUsd: number = this.parseUsdThresholdValue(rawValue);
+    const user = await this.usersRepository.findOrCreate(userRef.telegramId, userRef.username);
+    const updatedSettings: UserAlertSettingsRow =
+      await this.userAlertSettingsRepository.updateByUserAndChain(
+        user.id,
+        ChainKey.ETHEREUM_MAINNET,
+        {
+          minAmountUsd,
+        },
+      );
+    const settingsSnapshot: UserAlertSettingsSnapshot = this.mapSettings(updatedSettings);
+
+    return `Минимальная сумма USD обновлена: ${settingsSnapshot.minAmountUsd.toFixed(2)}.`;
+  }
+
+  public async setQuietHours(userRef: TelegramUserRef, rawWindow: string): Promise<string> {
+    const quietWindow: {
+      readonly quietFrom: string | null;
+      readonly quietTo: string | null;
+    } = this.parseQuietHours(rawWindow);
+    const user = await this.usersRepository.findOrCreate(userRef.telegramId, userRef.username);
+    const updatedSettings: UserAlertSettingsRow =
+      await this.userAlertSettingsRepository.updateByUserAndChain(
+        user.id,
+        ChainKey.ETHEREUM_MAINNET,
+        {
+          quietFrom: quietWindow.quietFrom,
+          quietTo: quietWindow.quietTo,
+        },
+      );
+    const settingsSnapshot: UserAlertSettingsSnapshot = this.mapSettings(updatedSettings);
+
+    return `Quiet hours: ${this.formatQuietHours(settingsSnapshot)} (${settingsSnapshot.timezone}).`;
+  }
+
+  public async setUserTimezone(userRef: TelegramUserRef, rawTimezone: string): Promise<string> {
+    const timezone: string = this.parseTimezone(rawTimezone);
+    const user = await this.usersRepository.findOrCreate(userRef.telegramId, userRef.username);
+    const updatedSettings: UserAlertSettingsRow =
+      await this.userAlertSettingsRepository.updateByUserAndChain(
+        user.id,
+        ChainKey.ETHEREUM_MAINNET,
+        {
+          timezone,
+        },
+      );
+    const settingsSnapshot: UserAlertSettingsSnapshot = this.mapSettings(updatedSettings);
+
+    return `Таймзона обновлена: ${settingsSnapshot.timezone}.`;
+  }
+
+  public async muteWalletAlertsForDuration(
+    userRef: TelegramUserRef,
+    rawWalletId: string,
+    muteMinutes: number,
+    source: string,
+  ): Promise<string> {
+    const user = await this.usersRepository.findOrCreate(userRef.telegramId, userRef.username);
+    const walletSubscription = await this.resolveWalletSubscription(user.id, rawWalletId);
+
+    if (!Number.isSafeInteger(muteMinutes) || muteMinutes <= 0 || muteMinutes > 10_080) {
+      throw new Error('mute для кошелька должен быть от 1 до 10080 минут.');
+    }
+
+    const muteUntil: Date = new Date(Date.now() + muteMinutes * 60_000);
+    const upsertedMute: AlertMuteRow = await this.alertMutesRepository.upsertMute({
+      userId: user.id,
+      chainKey: walletSubscription.chainKey,
+      walletId: walletSubscription.walletId,
+      muteUntil,
+      source,
+    });
+
+    return [
+      `Кошелек #${String(walletSubscription.walletId)} (${walletSubscription.walletLabel ?? 'без ярлыка'}) временно отключен.`,
+      `До: ${this.formatTimestamp(upsertedMute.mute_until)}`,
+    ].join('\n');
   }
 
   public async setEventTypeFilter(
@@ -374,6 +491,7 @@ export class TrackingService {
       walletId: walletSubscription.walletId,
       walletAddress: walletSubscription.walletAddress,
       walletLabel: walletSubscription.walletLabel,
+      chainKey: walletSubscription.chainKey,
       allowTransfer: walletPreferences
         ? walletPreferences.allow_transfer
         : globalPreferences.allow_transfer,
@@ -404,19 +522,27 @@ export class TrackingService {
 
   public async getUserStatus(userRef: TelegramUserRef): Promise<string> {
     const user = await this.usersRepository.findOrCreate(userRef.telegramId, userRef.username);
-    const preferencesRow: UserAlertPreferenceRow =
-      await this.userAlertPreferencesRepository.findOrCreateByUserId(user.id);
+    const [preferencesRow, settingsRow] = await Promise.all([
+      this.userAlertPreferencesRepository.findOrCreateByUserId(user.id),
+      this.userAlertSettingsRepository.findOrCreateByUserAndChain(
+        user.id,
+        ChainKey.ETHEREUM_MAINNET,
+      ),
+    ]);
     const preferences: UserAlertPreferences = this.mapPreferences(preferencesRow);
+    const settingsSnapshot: UserAlertSettingsSnapshot = this.mapSettings(settingsRow);
     const historyQuota: HistoryQuotaSnapshot = this.historyRateLimiterService.getSnapshot(
       userRef.telegramId,
     );
 
     return [
       'Пользовательский статус:',
-      `- min amount: ${preferences.minAmount.toFixed(6)}`,
+      `- threshold usd: ${settingsSnapshot.thresholdUsd.toFixed(2)}`,
+      `- min amount usd: ${settingsSnapshot.minAmountUsd.toFixed(2)}`,
       `- transfer: ${preferences.allowTransfer ? 'on' : 'off'}`,
       `- swap: ${preferences.allowSwap ? 'on' : 'off'}`,
       `- mute до: ${preferences.mutedUntil ? this.formatTimestamp(preferences.mutedUntil) : 'выключен'}`,
+      `- quiet: ${this.formatQuietHours(settingsSnapshot)} (${settingsSnapshot.timezone})`,
       `- history quota: ${historyQuota.minuteUsed}/${historyQuota.minuteLimit} (remaining ${historyQuota.minuteRemaining})`,
       `- history callback cooldown retry: ${historyQuota.callbackRetryAfterSec} sec`,
     ].join('\n');
@@ -631,6 +757,7 @@ export class TrackingService {
         offset: 0,
         kind: historyKind,
         direction: historyDirection,
+        minAmountUsd: null,
       });
       const historyMessage: string = this.formatHistoryMessage(
         normalizedAddress,
@@ -687,6 +814,7 @@ export class TrackingService {
     rawWalletId: string,
   ): Promise<{
     readonly walletId: number;
+    readonly chainKey: ChainKey;
     readonly walletAddress: string;
     readonly walletLabel: string | null;
   }> {
@@ -910,20 +1038,114 @@ export class TrackingService {
     };
   }
 
-  private parseMinAmount(rawAmount: string): number {
-    const normalizedAmount: string = rawAmount.trim();
+  private mapSettings(row: UserAlertSettingsRow): UserAlertSettingsSnapshot {
+    const thresholdUsd: number = Number.parseFloat(String(row.threshold_usd));
+    const minAmountUsd: number = Number.parseFloat(String(row.min_amount_usd));
 
-    if (!/^\d+(\.\d+)?$/.test(normalizedAmount)) {
-      throw new Error('Неверный формат суммы. Пример: /setmin 1000 или /setmin 12.5');
+    return {
+      thresholdUsd: Number.isNaN(thresholdUsd) ? 0 : thresholdUsd,
+      minAmountUsd: Number.isNaN(minAmountUsd) ? 0 : minAmountUsd,
+      quietHoursFrom: row.quiet_from,
+      quietHoursTo: row.quiet_to,
+      timezone: row.timezone,
+    };
+  }
+
+  private formatQuietHours(settingsSnapshot: UserAlertSettingsSnapshot): string {
+    if (settingsSnapshot.quietHoursFrom === null || settingsSnapshot.quietHoursTo === null) {
+      return 'off';
     }
 
-    const parsedAmount: number = Number.parseFloat(normalizedAmount);
+    return `${settingsSnapshot.quietHoursFrom}-${settingsSnapshot.quietHoursTo}`;
+  }
 
-    if (Number.isNaN(parsedAmount) || parsedAmount < 0) {
-      throw new Error('Минимальная сумма должна быть неотрицательным числом.');
+  private parseUsdThresholdValue(rawValue: string): number {
+    const normalizedValue: string = rawValue.trim().toLowerCase();
+
+    if (normalizedValue === 'off' || normalizedValue === '0') {
+      return 0;
     }
 
-    return parsedAmount;
+    if (!/^\d+(\.\d+)?$/.test(normalizedValue)) {
+      throw new Error('Неверный формат суммы. Используй число или off.');
+    }
+
+    const parsedValue: number = Number.parseFloat(normalizedValue);
+
+    if (Number.isNaN(parsedValue) || parsedValue < 0) {
+      throw new Error('Сумма должна быть неотрицательной.');
+    }
+
+    return parsedValue;
+  }
+
+  private parseQuietHours(rawWindow: string): {
+    readonly quietFrom: string | null;
+    readonly quietTo: string | null;
+  } {
+    const normalizedValue: string = rawWindow.trim().toLowerCase();
+
+    if (normalizedValue === 'off') {
+      return {
+        quietFrom: null,
+        quietTo: null,
+      };
+    }
+
+    const quietRangePattern: RegExp = /^(?<from>\d{2}:\d{2})-(?<to>\d{2}:\d{2})$/;
+    const rangeMatch: RegExpExecArray | null = quietRangePattern.exec(normalizedValue);
+
+    if (!rangeMatch?.groups) {
+      throw new Error('Неверный формат quiet. Используй /quiet <HH:mm-HH:mm|off>.');
+    }
+
+    const quietFrom: string = rangeMatch.groups['from'] ?? '';
+    const quietTo: string = rangeMatch.groups['to'] ?? '';
+
+    if (!this.isValidTimeToken(quietFrom) || !this.isValidTimeToken(quietTo)) {
+      throw new Error('Quiet-hours должен быть в формате HH:mm-HH:mm.');
+    }
+
+    return {
+      quietFrom,
+      quietTo,
+    };
+  }
+
+  private parseTimezone(rawTimezone: string): string {
+    const timezone: string = rawTimezone.trim();
+
+    if (timezone.length === 0) {
+      throw new Error('Таймзона пустая. Пример: /tz Europe/Moscow');
+    }
+
+    try {
+      new Intl.DateTimeFormat('en-US', {
+        timeZone: timezone,
+      });
+    } catch {
+      throw new Error(
+        'Неизвестная таймзона. Используй IANA формат, например Europe/Moscow или America/New_York.',
+      );
+    }
+
+    return timezone;
+  }
+
+  private isValidTimeToken(value: string): boolean {
+    if (!/^\d{2}:\d{2}$/.test(value)) {
+      return false;
+    }
+
+    const [hourPart, minutePart] = value.split(':');
+    const hour: number = Number.parseInt(hourPart ?? '', 10);
+    const minute: number = Number.parseInt(minutePart ?? '', 10);
+
+    if (Number.isNaN(hour) || Number.isNaN(minute)) {
+      return false;
+    }
+
+    return hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59;
   }
 
   private parseMuteUntil(rawMinutes: string): Date | null {
@@ -1133,12 +1355,14 @@ export class TrackingService {
   private findSubscriptionByWalletId(
     subscriptions: readonly {
       readonly walletId: number;
+      readonly chainKey?: ChainKey;
       readonly walletAddress: string;
       readonly walletLabel: string | null;
     }[],
     targetWalletId: number,
   ): {
     readonly walletId: number;
+    readonly chainKey: ChainKey;
     readonly walletAddress: string;
     readonly walletLabel: string | null;
   } | null {
@@ -1146,7 +1370,12 @@ export class TrackingService {
       const subscriptionWalletId: number | null = this.normalizeDbId(subscription.walletId);
 
       if (subscriptionWalletId === targetWalletId) {
-        return subscription;
+        return {
+          walletId: subscriptionWalletId,
+          chainKey: subscription.chainKey ?? ChainKey.ETHEREUM_MAINNET,
+          walletAddress: subscription.walletAddress,
+          walletLabel: subscription.walletLabel,
+        };
       }
     }
 

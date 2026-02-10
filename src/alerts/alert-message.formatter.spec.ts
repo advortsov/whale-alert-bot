@@ -13,7 +13,7 @@ describe('AlertMessageFormatter', (): void => {
     applyTestEnv();
   });
 
-  it('formats transfer alert', (): void => {
+  it('formats transfer alert with usd context', (): void => {
     const formatter: AlertMessageFormatter = new AlertMessageFormatter(new AppConfigService());
 
     const event: ClassifiedEvent = {
@@ -33,11 +33,14 @@ describe('AlertMessageFormatter', (): void => {
       pair: null,
     };
 
-    const result: string = formatter.format(event);
+    const result: string = formatter.format(event, {
+      usdAmount: 123.45,
+      usdUnavailable: false,
+    });
 
     expect(result).toContain('TRANSFER');
-    expect(result).toContain('Направление: OUT');
+    expect(result).toContain('OUT');
     expect(result).toContain('Сумма: 0.001000 USDT');
-    expect(result).toContain('0xabc');
+    expect(result).toContain('USD: ~$123.45');
   });
 });

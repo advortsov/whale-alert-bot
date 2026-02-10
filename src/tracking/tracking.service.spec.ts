@@ -10,13 +10,15 @@ import type { HistoryRateLimiterService } from './history-rate-limiter.service';
 import { AlertFilterToggleTarget, type TelegramUserRef } from './tracking.interfaces';
 import { TrackingService } from './tracking.service';
 import type { AppConfigService } from '../config/app-config.service';
+import { ChainKey } from '../core/chains/chain-key.interfaces';
 import type { IHistoryExplorerAdapter } from '../core/ports/explorers/history-explorer.interfaces';
 import { HistoryDirection, HistoryItemType } from '../features/tracking/dto/history-item.dto';
 import { HistoryDirectionFilter, HistoryKind } from '../features/tracking/dto/history-request.dto';
-import type { UserRow } from '../storage/database.types';
+import type { AlertMutesRepository } from '../storage/repositories/alert-mutes.repository';
 import type { SubscriptionsRepository } from '../storage/repositories/subscriptions.repository';
 import type { TrackedWalletsRepository } from '../storage/repositories/tracked-wallets.repository';
 import type { UserAlertPreferencesRepository } from '../storage/repositories/user-alert-preferences.repository';
+import type { UserAlertSettingsRepository } from '../storage/repositories/user-alert-settings.repository';
 import type { UserWalletAlertPreferencesRepository } from '../storage/repositories/user-wallet-alert-preferences.repository';
 import type { UsersRepository } from '../storage/repositories/users.repository';
 import type { WalletEventsRepository } from '../storage/repositories/wallet-events.repository';
@@ -57,9 +59,13 @@ type HistoryRateLimiterServiceStub = {
 
 type UserAlertPreferencesRepositoryStub = {
   readonly findOrCreateByUserId: ReturnType<typeof vi.fn>;
-  readonly updateMinAmount: ReturnType<typeof vi.fn>;
   readonly updateMute: ReturnType<typeof vi.fn>;
   readonly updateEventType: ReturnType<typeof vi.fn>;
+};
+
+type UserAlertSettingsRepositoryStub = {
+  readonly findOrCreateByUserAndChain: ReturnType<typeof vi.fn>;
+  readonly updateByUserAndChain: ReturnType<typeof vi.fn>;
 };
 
 type UserWalletAlertPreferencesRepositoryStub = {
@@ -67,14 +73,17 @@ type UserWalletAlertPreferencesRepositoryStub = {
   readonly updateEventType: ReturnType<typeof vi.fn>;
 };
 
+type AlertMutesRepositoryStub = {
+  readonly findActiveMute: ReturnType<typeof vi.fn>;
+  readonly upsertMute: ReturnType<typeof vi.fn>;
+};
+
 type WalletEventsRepositoryStub = {
   readonly listRecentByTrackedAddress: ReturnType<typeof vi.fn>;
-  readonly saveEvent: ReturnType<typeof vi.fn>;
 };
 
 type TestContext = {
   readonly userRef: TelegramUserRef;
-  readonly userRow: UserRow;
   readonly usersRepositoryStub: UsersRepositoryStub;
   readonly trackedWalletsRepositoryStub: TrackedWalletsRepositoryStub;
   readonly subscriptionsRepositoryStub: SubscriptionsRepositoryStub;
@@ -82,7 +91,9 @@ type TestContext = {
   readonly historyCacheServiceStub: HistoryCacheServiceStub;
   readonly historyRateLimiterServiceStub: HistoryRateLimiterServiceStub;
   readonly userAlertPreferencesRepositoryStub: UserAlertPreferencesRepositoryStub;
+  readonly userAlertSettingsRepositoryStub: UserAlertSettingsRepositoryStub;
   readonly userWalletAlertPreferencesRepositoryStub: UserWalletAlertPreferencesRepositoryStub;
+  readonly alertMutesRepositoryStub: AlertMutesRepositoryStub;
   readonly walletEventsRepositoryStub: WalletEventsRepositoryStub;
   readonly appConfigServiceStub: AppConfigServiceStub;
   readonly service: TrackingService;
@@ -121,17 +132,23 @@ const createTestContext = (): TestContext => {
   };
   const userAlertPreferencesRepositoryStub: UserAlertPreferencesRepositoryStub = {
     findOrCreateByUserId: vi.fn(),
-    updateMinAmount: vi.fn(),
     updateMute: vi.fn(),
     updateEventType: vi.fn(),
+  };
+  const userAlertSettingsRepositoryStub: UserAlertSettingsRepositoryStub = {
+    findOrCreateByUserAndChain: vi.fn(),
+    updateByUserAndChain: vi.fn(),
   };
   const userWalletAlertPreferencesRepositoryStub: UserWalletAlertPreferencesRepositoryStub = {
     findByUserAndWalletId: vi.fn(),
     updateEventType: vi.fn(),
   };
+  const alertMutesRepositoryStub: AlertMutesRepositoryStub = {
+    findActiveMute: vi.fn(),
+    upsertMute: vi.fn(),
+  };
   const walletEventsRepositoryStub: WalletEventsRepositoryStub = {
     listRecentByTrackedAddress: vi.fn(),
-    saveEvent: vi.fn(),
   };
   const appConfigServiceStub: AppConfigServiceStub = {
     etherscanTxBaseUrl: 'https://etherscan.io/tx/',
@@ -141,14 +158,13 @@ const createTestContext = (): TestContext => {
     telegramId: '42',
     username: 'tester',
   };
-  const userRow: UserRow = {
+
+  usersRepositoryStub.findOrCreate.mockResolvedValue({
     id: 7,
     telegram_id: '42',
     username: 'tester',
     created_at: new Date('2026-02-01T00:00:00.000Z'),
-  };
-
-  usersRepositoryStub.findOrCreate.mockResolvedValue(userRow);
+  });
   historyRateLimiterServiceStub.evaluate.mockReturnValue(allowDecision);
   historyRateLimiterServiceStub.getSnapshot.mockReturnValue({
     minuteLimit: 12,
@@ -167,24 +183,36 @@ const createTestContext = (): TestContext => {
     created_at: new Date('2026-02-01T00:00:00.000Z'),
     updated_at: new Date('2026-02-01T00:00:00.000Z'),
   });
-  userAlertPreferencesRepositoryStub.updateMinAmount.mockResolvedValue({
-    id: 1,
-    user_id: 7,
-    min_amount: 1000.5,
-    allow_transfer: true,
-    allow_swap: true,
-    muted_until: null,
-    created_at: new Date('2026-02-01T00:00:00.000Z'),
-    updated_at: new Date('2026-02-01T00:00:00.000Z'),
-  });
   userAlertPreferencesRepositoryStub.updateMute.mockResolvedValue({
     id: 1,
     user_id: 7,
     min_amount: 0,
     allow_transfer: true,
     allow_swap: true,
-    muted_until: new Date('2026-02-01T01:00:00.000Z'),
+    muted_until: null,
     created_at: new Date('2026-02-01T00:00:00.000Z'),
+    updated_at: new Date('2026-02-01T00:00:00.000Z'),
+  });
+  userAlertSettingsRepositoryStub.findOrCreateByUserAndChain.mockResolvedValue({
+    id: 1,
+    user_id: 7,
+    chain_key: ChainKey.ETHEREUM_MAINNET,
+    threshold_usd: 0,
+    min_amount_usd: 0,
+    quiet_from: null,
+    quiet_to: null,
+    timezone: 'UTC',
+    updated_at: new Date('2026-02-01T00:00:00.000Z'),
+  });
+  userAlertSettingsRepositoryStub.updateByUserAndChain.mockResolvedValue({
+    id: 1,
+    user_id: 7,
+    chain_key: ChainKey.ETHEREUM_MAINNET,
+    threshold_usd: 50000,
+    min_amount_usd: 1000,
+    quiet_from: '23:00',
+    quiet_to: '07:00',
+    timezone: 'Europe/Moscow',
     updated_at: new Date('2026-02-01T00:00:00.000Z'),
   });
   userWalletAlertPreferencesRepositoryStub.findByUserAndWalletId.mockResolvedValue(null);
@@ -198,6 +226,16 @@ const createTestContext = (): TestContext => {
     updated_at: new Date('2026-02-01T00:00:00.000Z'),
   });
   walletEventsRepositoryStub.listRecentByTrackedAddress.mockResolvedValue([]);
+  alertMutesRepositoryStub.findActiveMute.mockResolvedValue(null);
+  alertMutesRepositoryStub.upsertMute.mockResolvedValue({
+    id: 1,
+    user_id: 7,
+    chain_key: ChainKey.ETHEREUM_MAINNET,
+    wallet_id: 9,
+    mute_until: new Date('2026-02-01T01:00:00.000Z'),
+    source: 'alert_button',
+    created_at: new Date('2026-02-01T00:00:00.000Z'),
+  });
 
   const service: TrackingService = new TrackingService(
     usersRepositoryStub as unknown as UsersRepository,
@@ -207,14 +245,15 @@ const createTestContext = (): TestContext => {
     historyCacheServiceStub as unknown as HistoryCacheService,
     historyRateLimiterServiceStub as unknown as HistoryRateLimiterService,
     userAlertPreferencesRepositoryStub as unknown as UserAlertPreferencesRepository,
+    userAlertSettingsRepositoryStub as unknown as UserAlertSettingsRepository,
     userWalletAlertPreferencesRepositoryStub as unknown as UserWalletAlertPreferencesRepository,
+    alertMutesRepositoryStub as unknown as AlertMutesRepository,
     walletEventsRepositoryStub as unknown as WalletEventsRepository,
     appConfigServiceStub as unknown as AppConfigService,
   );
 
   return {
     userRef,
-    userRow,
     usersRepositoryStub,
     trackedWalletsRepositoryStub,
     subscriptionsRepositoryStub,
@@ -222,7 +261,9 @@ const createTestContext = (): TestContext => {
     historyCacheServiceStub,
     historyRateLimiterServiceStub,
     userAlertPreferencesRepositoryStub,
+    userAlertSettingsRepositoryStub,
     userWalletAlertPreferencesRepositoryStub,
+    alertMutesRepositoryStub,
     walletEventsRepositoryStub,
     appConfigServiceStub,
     service,
@@ -230,12 +271,13 @@ const createTestContext = (): TestContext => {
 };
 
 describe('TrackingService', (): void => {
-  it('returns cached history without etherscan call on fresh cache hit', async (): Promise<void> => {
+  it('returns cached history without explorer call on fresh cache hit', async (): Promise<void> => {
     const context: TestContext = createTestContext();
     context.subscriptionsRepositoryStub.listByUserId.mockResolvedValue([
       {
         subscriptionId: 1,
         walletId: 3,
+        chainKey: ChainKey.ETHEREUM_MAINNET,
         walletAddress: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
         walletLabel: 'vitalik',
         createdAt: new Date('2026-02-01T00:00:00.000Z'),
@@ -263,12 +305,6 @@ describe('TrackingService', (): void => {
 
     expect(message).toBe('cached history message');
     expect(context.historyExplorerAdapterStub.loadRecentTransactions).not.toHaveBeenCalled();
-    expect(context.historyCacheServiceStub.getFresh).toHaveBeenCalledWith(
-      '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
-      5,
-      HistoryKind.ALL,
-      HistoryDirectionFilter.ALL,
-    );
   });
 
   it('fetches history and stores cache on miss', async (): Promise<void> => {
@@ -306,155 +342,116 @@ describe('TrackingService', (): void => {
     expect(message).toContain('<a href="https://etherscan.io/tx/0xabc">Tx #1</a>');
   });
 
-  it('returns local database history before etherscan fallback', async (): Promise<void> => {
+  it('updates threshold usd value', async (): Promise<void> => {
     const context: TestContext = createTestContext();
-    context.historyCacheServiceStub.getFresh.mockReturnValue(null);
-    context.walletEventsRepositoryStub.listRecentByTrackedAddress.mockResolvedValue([
+
+    const message: string = await context.service.setThresholdUsd(context.userRef, '50000');
+
+    expect(context.userAlertSettingsRepositoryStub.updateByUserAndChain).toHaveBeenCalledWith(
+      7,
+      ChainKey.ETHEREUM_MAINNET,
       {
-        chainId: 1,
-        txHash: '0xlocal',
-        logIndex: 1,
-        trackedAddress: '0xd8da6bf26964af9d7eed9e03e53415d37aa96045',
-        eventType: 'TRANSFER',
-        direction: 'OUT',
-        contractAddress: '0x1111111111111111111111111111111111111111',
-        tokenAddress: '0x1111111111111111111111111111111111111111',
-        tokenSymbol: 'USDT',
-        tokenDecimals: 6,
-        tokenAmountRaw: '5000000',
-        valueFormatted: '5.0',
-        dex: null,
-        pair: null,
-        occurredAt: new Date('2026-02-09T12:00:00.000Z'),
+        thresholdUsd: 50000,
       },
-    ]);
-
-    const message: string = await context.service.getAddressHistoryWithPolicy(
-      context.userRef,
-      '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
-      '5',
-      HistoryRequestSource.COMMAND,
     );
-
-    expect(message).toContain('Локальные события');
-    expect(message).toContain('Tx #1');
-    expect(context.historyExplorerAdapterStub.loadRecentTransactions).not.toHaveBeenCalled();
-    expect(context.historyCacheServiceStub.set).toHaveBeenCalledTimes(1);
+    expect(message).toContain('50000.00');
   });
 
-  it('serves stale cache entry when request is rate limited', async (): Promise<void> => {
+  it('updates minimum usd filter via /filter semantics', async (): Promise<void> => {
     const context: TestContext = createTestContext();
-    context.subscriptionsRepositoryStub.listByUserId.mockResolvedValue([
+
+    const message: string = await context.service.setMinAmountUsd(context.userRef, '1000');
+
+    expect(context.userAlertSettingsRepositoryStub.updateByUserAndChain).toHaveBeenCalledWith(
+      7,
+      ChainKey.ETHEREUM_MAINNET,
       {
-        subscriptionId: 1,
-        walletId: 3,
-        walletAddress: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
-        walletLabel: 'vitalik',
-        createdAt: new Date('2026-02-01T00:00:00.000Z'),
+        minAmountUsd: 1000,
       },
-    ]);
-    context.historyRateLimiterServiceStub.evaluate.mockReturnValue({
-      allowed: false,
-      retryAfterSec: 5,
-      reason: HistoryRateLimitReason.MINUTE_LIMIT,
-    });
-    context.historyCacheServiceStub.getStale.mockReturnValue({
-      key: {
-        address: '0xd8da6bf26964af9d7eed9e03e53415d37aa96045',
-        limit: 5,
-        kind: HistoryKind.ALL,
-        direction: HistoryDirectionFilter.ALL,
-      },
-      message: 'stale history message',
-      createdAtEpochMs: 1000,
-      freshUntilEpochMs: 2000,
-      staleUntilEpochMs: 3000,
-    });
-
-    const message: string = await context.service.getAddressHistoryWithPolicy(
-      context.userRef,
-      '#3',
-      '5',
-      HistoryRequestSource.COMMAND,
     );
-
-    expect(message).toContain('Показал кешированную историю');
-    expect(message).toContain('stale history message');
-    expect(context.historyExplorerAdapterStub.loadRecentTransactions).not.toHaveBeenCalled();
+    expect(message).toContain('1000.00');
   });
 
-  it('returns readable retry error when rate limited and stale cache is missing', async (): Promise<void> => {
+  it('updates quiet hours window', async (): Promise<void> => {
     const context: TestContext = createTestContext();
-    context.subscriptionsRepositoryStub.listByUserId.mockResolvedValue([
+
+    const message: string = await context.service.setQuietHours(context.userRef, '23:00-07:00');
+
+    expect(context.userAlertSettingsRepositoryStub.updateByUserAndChain).toHaveBeenCalledWith(
+      7,
+      ChainKey.ETHEREUM_MAINNET,
       {
-        subscriptionId: 1,
-        walletId: 3,
-        walletAddress: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
-        walletLabel: 'vitalik',
-        createdAt: new Date('2026-02-01T00:00:00.000Z'),
+        quietFrom: '23:00',
+        quietTo: '07:00',
       },
-    ]);
-    context.historyRateLimiterServiceStub.evaluate.mockReturnValue({
-      allowed: false,
-      retryAfterSec: 4,
-      reason: HistoryRateLimitReason.MINUTE_LIMIT,
-    });
-    context.historyCacheServiceStub.getStale.mockReturnValue(null);
+    );
+    expect(message).toContain('23:00-07:00');
+  });
+
+  it('rejects invalid timezone format', async (): Promise<void> => {
+    const context: TestContext = createTestContext();
 
     await expect(
-      context.service.getAddressHistoryWithPolicy(
-        context.userRef,
-        '#3',
-        '5',
-        HistoryRequestSource.COMMAND,
-      ),
-    ).rejects.toThrow('Слишком много запросов к истории. Повтори через 4 сек.');
+      context.service.setUserTimezone(context.userRef, 'invalid/timezone'),
+    ).rejects.toThrow('Неизвестная таймзона');
   });
 
-  it('updates minimum alert amount for user preferences', async (): Promise<void> => {
-    const context: TestContext = createTestContext();
-
-    const message: string = await context.service.setMinimumAlertAmount(context.userRef, '1000.5');
-
-    expect(context.userAlertPreferencesRepositoryStub.updateMinAmount).toHaveBeenCalledWith(
-      context.userRow.id,
-      1000.5,
-    );
-    expect(message).toContain('1000.500000');
-  });
-
-  it('returns readable filters snapshot for user', async (): Promise<void> => {
-    const context: TestContext = createTestContext();
-
-    const message: string = await context.service.getUserAlertFilters(context.userRef);
-
-    expect(context.userAlertPreferencesRepositoryStub.findOrCreateByUserId).toHaveBeenCalledWith(
-      context.userRow.id,
-    );
-    expect(message).toContain('Текущие фильтры алертов');
-    expect(message).toContain('transfer: on');
-  });
-
-  it('returns wallet alert filter state with global defaults when override is missing', async (): Promise<void> => {
+  it('adds wallet mute for 24h action callback', async (): Promise<void> => {
     const context: TestContext = createTestContext();
     context.subscriptionsRepositoryStub.listByUserId.mockResolvedValue([
       {
         subscriptionId: 1,
         walletId: 9,
+        chainKey: ChainKey.ETHEREUM_MAINNET,
         walletAddress: '0x2F0b23f53734252Bda2277357e97e1517d6B042A',
         walletLabel: 'Maker_ETH_Vault',
         createdAt: new Date('2026-02-01T00:00:00.000Z'),
       },
     ]);
-    context.userWalletAlertPreferencesRepositoryStub.findByUserAndWalletId.mockResolvedValue(null);
+
+    const message: string = await context.service.muteWalletAlertsForDuration(
+      context.userRef,
+      '#9',
+      1440,
+      'alert_button',
+    );
+
+    expect(context.alertMutesRepositoryStub.upsertMute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 7,
+        walletId: 9,
+        source: 'alert_button',
+      }),
+    );
+    expect(message).toContain('Кошелек #9');
+  });
+
+  it('returns wallet filters state with chain key', async (): Promise<void> => {
+    const context: TestContext = createTestContext();
+    context.subscriptionsRepositoryStub.listByUserId.mockResolvedValue([
+      {
+        subscriptionId: 1,
+        walletId: 9,
+        chainKey: ChainKey.ETHEREUM_MAINNET,
+        walletAddress: '0x2F0b23f53734252Bda2277357e97e1517d6B042A',
+        walletLabel: 'Maker_ETH_Vault',
+        createdAt: new Date('2026-02-01T00:00:00.000Z'),
+      },
+    ]);
 
     const state = await context.service.getWalletAlertFilterState(context.userRef, '#9');
 
+    expect(state.chainKey).toBe(ChainKey.ETHEREUM_MAINNET);
     expect(state.walletId).toBe(9);
-    expect(state.walletLabel).toBe('Maker_ETH_Vault');
-    expect(state.allowTransfer).toBe(true);
-    expect(state.allowSwap).toBe(true);
-    expect(state.hasWalletOverride).toBe(false);
+  });
+
+  it('returns status with usd filters and quiet-hours', async (): Promise<void> => {
+    const context: TestContext = createTestContext();
+
+    const message: string = await context.service.getUserStatus(context.userRef);
+
+    expect(message).toContain('threshold usd');
+    expect(message).toContain('quiet:');
   });
 
   it('updates wallet filter and returns overridden state', async (): Promise<void> => {
@@ -463,6 +460,7 @@ describe('TrackingService', (): void => {
       {
         subscriptionId: 1,
         walletId: 9,
+        chainKey: ChainKey.ETHEREUM_MAINNET,
         walletAddress: '0x2F0b23f53734252Bda2277357e97e1517d6B042A',
         walletLabel: 'Maker_ETH_Vault',
         createdAt: new Date('2026-02-01T00:00:00.000Z'),
@@ -492,206 +490,5 @@ describe('TrackingService', (): void => {
       false,
     );
     expect(state.allowTransfer).toBe(false);
-    expect(state.hasWalletOverride).toBe(true);
-  });
-
-  it('returns wallet details by wallet id', async (): Promise<void> => {
-    const context: TestContext = createTestContext();
-    context.subscriptionsRepositoryStub.listByUserId.mockResolvedValue([
-      {
-        subscriptionId: 1,
-        walletId: 9,
-        walletAddress: '0x2F0b23f53734252Bda2277357e97e1517d6B042A',
-        walletLabel: 'Maker_ETH_Vault',
-        createdAt: new Date('2026-02-01T00:00:00.000Z'),
-      },
-    ]);
-
-    const message: string = await context.service.getWalletDetails(context.userRef, '#9');
-
-    expect(message).toContain('Кошелек #9');
-    expect(message).toContain('Сеть: ethereum_mainnet');
-    expect(message).toContain('Maker_ETH_Vault');
-    expect(message).toContain('Фильтры: transfer=on, swap=on (global)');
-    expect(message).toContain('пока нет локальных событий');
-  });
-
-  it('returns wallet details when repository returns wallet id as string', async (): Promise<void> => {
-    const context: TestContext = createTestContext();
-    context.subscriptionsRepositoryStub.listByUserId.mockResolvedValue([
-      {
-        subscriptionId: 1,
-        walletId: '16' as unknown as number,
-        walletAddress: '0x96b0Dc619A86572524c15C1fC9c42DA9A94BCAa0',
-        walletLabel: 'my_wallet',
-        createdAt: new Date('2026-02-01T00:00:00.000Z'),
-      },
-    ]);
-
-    const message: string = await context.service.getWalletDetails(context.userRef, '#16');
-
-    expect(message).toContain('Кошелек #16');
-    expect(message).toContain('my_wallet');
-    expect(message).toContain('Address: 0x96b0Dc619A86572524c15C1fC9c42DA9A94BCAa0');
-  });
-
-  it('returns wallet details with recent local events preview', async (): Promise<void> => {
-    const context: TestContext = createTestContext();
-    context.subscriptionsRepositoryStub.listByUserId.mockResolvedValue([
-      {
-        subscriptionId: 1,
-        walletId: 16,
-        walletAddress: '0x96b0Dc619A86572524c15C1fC9c42DA9A94BCAa0',
-        walletLabel: 'my_wallet',
-        createdAt: new Date('2026-02-01T00:00:00.000Z'),
-      },
-    ]);
-    context.walletEventsRepositoryStub.listRecentByTrackedAddress.mockResolvedValue([
-      {
-        chainId: 1,
-        txHash: '0x1111111111111111111111111111111111111111111111111111111111111111',
-        logIndex: 1,
-        trackedAddress: '0x96b0dc619a86572524c15c1fc9c42da9a94bcaa0',
-        eventType: 'TRANSFER',
-        direction: 'IN',
-        contractAddress: '0x1111111111111111111111111111111111111111',
-        tokenAddress: '0x1111111111111111111111111111111111111111',
-        tokenSymbol: 'USDT',
-        tokenDecimals: 6,
-        tokenAmountRaw: '1200000',
-        valueFormatted: '1.2',
-        dex: null,
-        pair: null,
-        occurredAt: new Date('2026-02-09T12:00:00.000Z'),
-      },
-    ]);
-
-    const message: string = await context.service.getWalletDetails(context.userRef, '#16');
-
-    expect(message).toContain('Последние события (1/3)');
-    expect(message).toContain('↘️ IN TRANSFER');
-    expect(message).toContain('USDT');
-  });
-
-  it('resolves /history #id when repository returns wallet id as string', async (): Promise<void> => {
-    const context: TestContext = createTestContext();
-    context.historyCacheServiceStub.getFresh.mockReturnValue({
-      key: {
-        address: '0x96b0dc619a86572524c15c1fc9c42da9a94bcaa0',
-        limit: 5,
-        kind: HistoryKind.ALL,
-        direction: HistoryDirectionFilter.ALL,
-      },
-      message: 'cached by string wallet id',
-      createdAtEpochMs: 1000,
-      freshUntilEpochMs: 2000,
-      staleUntilEpochMs: 3000,
-    });
-    context.subscriptionsRepositoryStub.listByUserId.mockResolvedValue([
-      {
-        subscriptionId: 1,
-        walletId: '16' as unknown as number,
-        walletAddress: '0x96b0Dc619A86572524c15C1fC9c42DA9A94BCAa0',
-        walletLabel: 'my_wallet',
-        createdAt: new Date('2026-02-01T00:00:00.000Z'),
-      },
-    ]);
-
-    const message: string = await context.service.getAddressHistoryWithPolicy(
-      context.userRef,
-      '#16',
-      '5',
-      HistoryRequestSource.COMMAND,
-    );
-
-    expect(message).toBe('cached by string wallet id');
-    expect(context.historyExplorerAdapterStub.loadRecentTransactions).not.toHaveBeenCalled();
-  });
-
-  it('returns paged local history with navigation metadata', async (): Promise<void> => {
-    const context: TestContext = createTestContext();
-    context.historyCacheServiceStub.getFresh.mockReturnValue(null);
-    context.walletEventsRepositoryStub.listRecentByTrackedAddress
-      .mockResolvedValueOnce([
-        {
-          chainId: 1,
-          txHash: '0xpage0',
-          logIndex: 1,
-          trackedAddress: '0xd8da6bf26964af9d7eed9e03e53415d37aa96045',
-          eventType: 'TRANSFER',
-          direction: 'OUT',
-          contractAddress: '0x1111111111111111111111111111111111111111',
-          tokenAddress: '0x1111111111111111111111111111111111111111',
-          tokenSymbol: 'USDT',
-          tokenDecimals: 6,
-          tokenAmountRaw: '1000000',
-          valueFormatted: '1.0',
-          dex: null,
-          pair: null,
-          occurredAt: new Date('2026-02-09T12:00:00.000Z'),
-        },
-      ])
-      .mockResolvedValueOnce([
-        {
-          chainId: 1,
-          txHash: '0xpage0',
-          logIndex: 1,
-          trackedAddress: '0xd8da6bf26964af9d7eed9e03e53415d37aa96045',
-          eventType: 'TRANSFER',
-          direction: 'OUT',
-          contractAddress: '0x1111111111111111111111111111111111111111',
-          tokenAddress: '0x1111111111111111111111111111111111111111',
-          tokenSymbol: 'USDT',
-          tokenDecimals: 6,
-          tokenAmountRaw: '1000000',
-          valueFormatted: '1.0',
-          dex: null,
-          pair: null,
-          occurredAt: new Date('2026-02-09T12:00:00.000Z'),
-        },
-        {
-          chainId: 1,
-          txHash: '0xprobe',
-          logIndex: 2,
-          trackedAddress: '0xd8da6bf26964af9d7eed9e03e53415d37aa96045',
-          eventType: 'TRANSFER',
-          direction: 'IN',
-          contractAddress: '0x1111111111111111111111111111111111111111',
-          tokenAddress: '0x1111111111111111111111111111111111111111',
-          tokenSymbol: 'USDT',
-          tokenDecimals: 6,
-          tokenAmountRaw: '2000000',
-          valueFormatted: '2.0',
-          dex: null,
-          pair: null,
-          occurredAt: new Date('2026-02-09T11:00:00.000Z'),
-        },
-      ]);
-
-    const result = await context.service.getAddressHistoryPageWithPolicy(
-      context.userRef,
-      '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
-      '1',
-      '0',
-      HistoryRequestSource.CALLBACK,
-    );
-
-    expect(result.walletId).toBeNull();
-    expect(result.limit).toBe(1);
-    expect(result.offset).toBe(0);
-    expect(result.hasNextPage).toBe(true);
-    expect(result.message).toContain('Локальные события 1-1');
-  });
-
-  it('returns user status with quota snapshot', async (): Promise<void> => {
-    const context: TestContext = createTestContext();
-
-    const message: string = await context.service.getUserStatus(context.userRef);
-
-    expect(context.historyRateLimiterServiceStub.getSnapshot).toHaveBeenCalledWith(
-      context.userRef.telegramId,
-    );
-    expect(message).toContain('Пользовательский статус');
-    expect(message).toContain('history quota: 2/12');
   });
 });

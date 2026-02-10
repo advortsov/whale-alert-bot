@@ -14,10 +14,13 @@ export enum SupportedTelegramCommand {
   HISTORY = 'history',
   WALLET = 'wallet',
   STATUS = 'status',
+  FILTER = 'filter',
+  THRESHOLD = 'threshold',
   FILTERS = 'filters',
   WALLET_FILTERS = 'walletfilters',
   WALLET_FILTER = 'wfilter',
-  SETMIN = 'setmin',
+  QUIET = 'quiet',
+  TZ = 'tz',
   MUTE = 'mute',
   TRACK_HINT = 'track_hint',
   HISTORY_HINT = 'history_hint',
@@ -55,6 +58,7 @@ export enum WalletCallbackAction {
   UNTRACK = 'untrack',
   MUTE = 'mute',
   FILTERS = 'filters',
+  IGNORE_24H = 'ignore_24h',
 }
 
 export enum WalletCallbackFilterTarget {

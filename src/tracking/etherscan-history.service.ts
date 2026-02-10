@@ -20,6 +20,7 @@ export class EtherscanHistoryService {
       offset: 0,
       kind: HistoryKind.ALL,
       direction: HistoryDirectionFilter.ALL,
+      minAmountUsd: null,
     });
 
     return page.items.map(

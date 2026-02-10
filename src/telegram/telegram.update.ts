@@ -37,10 +37,13 @@ const SUPPORTED_COMMAND_MAP: Readonly<Record<string, SupportedTelegramCommand>> 
   history: SupportedTelegramCommand.HISTORY,
   wallet: SupportedTelegramCommand.WALLET,
   status: SupportedTelegramCommand.STATUS,
+  filter: SupportedTelegramCommand.FILTER,
+  threshold: SupportedTelegramCommand.THRESHOLD,
   filters: SupportedTelegramCommand.FILTERS,
   walletfilters: SupportedTelegramCommand.WALLET_FILTERS,
   wfilter: SupportedTelegramCommand.WALLET_FILTER,
-  setmin: SupportedTelegramCommand.SETMIN,
+  quiet: SupportedTelegramCommand.QUIET,
+  tz: SupportedTelegramCommand.TZ,
   mute: SupportedTelegramCommand.MUTE,
 };
 
@@ -69,6 +72,7 @@ const WALLET_UNTRACK_CALLBACK_PREFIX: string = 'wallet_untrack:';
 const WALLET_MUTE_CALLBACK_PREFIX: string = 'wallet_mute:';
 const WALLET_FILTERS_CALLBACK_PREFIX: string = 'wallet_filters:';
 const WALLET_FILTER_TOGGLE_CALLBACK_PREFIX: string = 'wallet_filter_toggle:';
+const ALERT_IGNORE_CALLBACK_PREFIX: string = 'alert_ignore_24h:';
 const CALLBACK_HISTORY_LIMIT: number = 10;
 
 @Update()
@@ -232,6 +236,12 @@ export class TelegramUpdate {
         case SupportedTelegramCommand.STATUS:
           message = await this.executeStatusCommand(userRef, commandEntry, updateMeta);
           break;
+        case SupportedTelegramCommand.FILTER:
+          message = await this.executeFilterCommand(userRef, commandEntry, updateMeta);
+          break;
+        case SupportedTelegramCommand.THRESHOLD:
+          message = await this.executeThresholdCommand(userRef, commandEntry, updateMeta);
+          break;
         case SupportedTelegramCommand.FILTERS:
           message = await this.executeFiltersCommand(userRef, commandEntry, updateMeta);
           break;
@@ -251,8 +261,11 @@ export class TelegramUpdate {
             replyOptions = walletFilterResult.replyOptions;
           }
           break;
-        case SupportedTelegramCommand.SETMIN:
-          message = await this.executeSetMinCommand(userRef, commandEntry, updateMeta);
+        case SupportedTelegramCommand.QUIET:
+          message = await this.executeQuietCommand(userRef, commandEntry, updateMeta);
+          break;
+        case SupportedTelegramCommand.TZ:
+          message = await this.executeTimezoneCommand(userRef, commandEntry, updateMeta);
           break;
         case SupportedTelegramCommand.MUTE:
           message = await this.executeMuteCommand(userRef, commandEntry, updateMeta);
@@ -615,6 +628,25 @@ export class TelegramUpdate {
       };
     }
 
+    if (callbackTarget.action === WalletCallbackAction.IGNORE_24H) {
+      if (callbackTarget.walletId === null) {
+        throw new Error('Callback не содержит id кошелька.');
+      }
+
+      const message: string = await this.trackingService.muteWalletAlertsForDuration(
+        userRef,
+        `#${String(callbackTarget.walletId)}`,
+        1440,
+        'alert_button',
+      );
+
+      return {
+        lineNumber: 1,
+        message,
+        replyOptions: null,
+      };
+    }
+
     if (callbackTarget.walletId === null) {
       throw new Error('Callback не содержит id кошелька для фильтров.');
     }
@@ -759,6 +791,7 @@ export class TelegramUpdate {
 
     return [
       `⚙️ Фильтры кошелька #${String(walletFilterState.walletId)} (${labelText})`,
+      `Chain: ${walletFilterState.chainKey}`,
       `Address: ${walletFilterState.walletAddress}`,
       `- transfer: ${walletFilterState.allowTransfer ? 'on' : 'off'}`,
       `- swap: ${walletFilterState.allowSwap ? 'on' : 'off'}`,
@@ -810,6 +843,100 @@ export class TelegramUpdate {
     }
 
     return this.trackingService.setEventTypeFilter(userRef, target, enabled);
+  }
+
+  private async executeFilterCommand(
+    userRef: TelegramUserRef | null,
+    commandEntry: ParsedMessageCommand,
+    updateMeta: UpdateMeta,
+  ): Promise<string> {
+    if (!userRef) {
+      this.logger.warn(
+        `Filter command rejected: user context is missing line=${commandEntry.lineNumber} updateId=${updateMeta.updateId ?? 'n/a'}`,
+      );
+      return 'Не удалось определить пользователя.';
+    }
+
+    const keyArg: string | null = commandEntry.args[0] ?? null;
+    const valueArg: string | null = commandEntry.args[1] ?? null;
+
+    if (!keyArg || !valueArg) {
+      return [
+        'Формат: /filter min_amount_usd <amount|off>',
+        'Пример: /filter min_amount_usd 100000',
+      ].join('\n');
+    }
+
+    const normalizedKey: string = keyArg.trim().toLowerCase();
+
+    if (normalizedKey !== 'min_amount_usd') {
+      return 'Поддерживается только: /filter min_amount_usd <amount|off>.';
+    }
+
+    return this.trackingService.setMinAmountUsd(userRef, valueArg);
+  }
+
+  private async executeThresholdCommand(
+    userRef: TelegramUserRef | null,
+    commandEntry: ParsedMessageCommand,
+    updateMeta: UpdateMeta,
+  ): Promise<string> {
+    if (!userRef) {
+      this.logger.warn(
+        `Threshold command rejected: user context is missing line=${commandEntry.lineNumber} updateId=${updateMeta.updateId ?? 'n/a'}`,
+      );
+      return 'Не удалось определить пользователя.';
+    }
+
+    const valueArg: string | null = commandEntry.args[0] ?? null;
+
+    if (!valueArg) {
+      return ['Формат: /threshold <amount|off>', 'Пример: /threshold 50000'].join('\n');
+    }
+
+    return this.trackingService.setThresholdUsd(userRef, valueArg);
+  }
+
+  private async executeQuietCommand(
+    userRef: TelegramUserRef | null,
+    commandEntry: ParsedMessageCommand,
+    updateMeta: UpdateMeta,
+  ): Promise<string> {
+    if (!userRef) {
+      this.logger.warn(
+        `Quiet command rejected: user context is missing line=${commandEntry.lineNumber} updateId=${updateMeta.updateId ?? 'n/a'}`,
+      );
+      return 'Не удалось определить пользователя.';
+    }
+
+    const windowArg: string | null = commandEntry.args[0] ?? null;
+
+    if (!windowArg) {
+      return ['Формат: /quiet <HH:mm-HH:mm|off>', 'Пример: /quiet 23:00-07:00'].join('\n');
+    }
+
+    return this.trackingService.setQuietHours(userRef, windowArg);
+  }
+
+  private async executeTimezoneCommand(
+    userRef: TelegramUserRef | null,
+    commandEntry: ParsedMessageCommand,
+    updateMeta: UpdateMeta,
+  ): Promise<string> {
+    if (!userRef) {
+      this.logger.warn(
+        `Timezone command rejected: user context is missing line=${commandEntry.lineNumber} updateId=${updateMeta.updateId ?? 'n/a'}`,
+      );
+      return 'Не удалось определить пользователя.';
+    }
+
+    const timezoneArg: string | null = commandEntry.args[0] ?? null;
+
+    if (!timezoneArg) {
+      return ['Формат: /tz <Area/City>', 'Пример: /tz Europe/Moscow'].join('\n');
+    }
+
+    return this.trackingService.setUserTimezone(userRef, timezoneArg);
   }
 
   private async executeWalletFiltersCommand(
@@ -921,31 +1048,6 @@ export class TelegramUpdate {
     return null;
   }
 
-  private async executeSetMinCommand(
-    userRef: TelegramUserRef | null,
-    commandEntry: ParsedMessageCommand,
-    updateMeta: UpdateMeta,
-  ): Promise<string> {
-    if (!userRef) {
-      this.logger.warn(
-        `Setmin command rejected: user context is missing line=${commandEntry.lineNumber} updateId=${updateMeta.updateId ?? 'n/a'}`,
-      );
-      return 'Не удалось определить пользователя.';
-    }
-
-    const amountArg: string | null = commandEntry.args[0] ?? null;
-
-    if (!amountArg) {
-      return [
-        'Передай минимальную сумму.',
-        'Формат: /setmin <amount>',
-        'Пример: /setmin 1000',
-      ].join('\n');
-    }
-
-    return this.trackingService.setMinimumAlertAmount(userRef, amountArg);
-  }
-
   private async executeMuteCommand(
     userRef: TelegramUserRef | null,
     commandEntry: ParsedMessageCommand,
@@ -987,10 +1089,13 @@ export class TelegramUpdate {
       '/wallet #id',
       '/history <address|#id> [limit]',
       '/status',
+      '/threshold <amount|off>',
+      '/filter min_amount_usd <amount|off>',
       '/filters',
       '/walletfilters <#id>',
       '/wfilter <#id> <transfer|swap> <on|off>',
-      '/setmin <amount>',
+      '/quiet <HH:mm-HH:mm|off>',
+      '/tz <Area/City>',
       '/mute <minutes|off>',
       '',
       'Можно отправлять несколько команд одним сообщением, по одной на строку.',
@@ -1007,10 +1112,13 @@ export class TelegramUpdate {
       '/untrack <address|id> - удалить адрес',
       '/history <address|#id> [limit] - последние транзакции',
       '/status - runtime статус watcher и quota',
+      '/threshold <amount|off> - порог по USD',
+      '/filter min_amount_usd <amount|off> - минимальная сумма в USD',
       '/filters - показать/изменить фильтры',
       '/walletfilters <#id> - фильтры конкретного кошелька',
       '/wfilter <#id> <transfer|swap> <on|off> - переключить фильтр кошелька',
-      '/setmin <amount> - минимальная сумма алерта',
+      '/quiet <HH:mm-HH:mm|off> - тихие часы',
+      '/tz <Area/City> - таймзона для quiet-hours',
       '/mute <minutes|off> - пауза алертов',
       '',
       'Примеры:',
@@ -1019,7 +1127,10 @@ export class TelegramUpdate {
       '/filters transfer off',
       '/walletfilters #3',
       '/wfilter #3 transfer off',
-      '/setmin 1000',
+      '/threshold 50000',
+      '/filter min_amount_usd 100000',
+      '/quiet 23:00-07:00',
+      '/tz Europe/Moscow',
       '/mute 30',
       '/untrack #1',
       '',
@@ -1280,6 +1391,30 @@ export class TelegramUpdate {
         walletId: null,
         walletAddress: null,
         muteMinutes: Number.parseInt(rawMinutes, 10),
+        historyOffset: null,
+        historyLimit: null,
+        historyKind: null,
+        historyDirection: null,
+        filterTarget: null,
+        filterEnabled: null,
+      };
+    }
+
+    if (callbackData.startsWith(ALERT_IGNORE_CALLBACK_PREFIX)) {
+      const walletId: number | null = this.parseWalletId(
+        callbackData.slice(ALERT_IGNORE_CALLBACK_PREFIX.length),
+      );
+
+      if (walletId === null) {
+        return null;
+      }
+
+      return {
+        action: WalletCallbackAction.IGNORE_24H,
+        targetType: WalletCallbackTargetType.WALLET_ID,
+        walletId,
+        walletAddress: null,
+        muteMinutes: 1440,
         historyOffset: null,
         historyLimit: null,
         historyKind: null,

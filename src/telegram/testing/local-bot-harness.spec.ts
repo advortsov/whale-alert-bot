@@ -19,7 +19,11 @@ type TrackingServiceStub = {
   readonly getWalletDetails: ReturnType<typeof vi.fn>;
   readonly getUserStatus: ReturnType<typeof vi.fn>;
   readonly getUserAlertFilters: ReturnType<typeof vi.fn>;
-  readonly setMinimumAlertAmount: ReturnType<typeof vi.fn>;
+  readonly setThresholdUsd: ReturnType<typeof vi.fn>;
+  readonly setMinAmountUsd: ReturnType<typeof vi.fn>;
+  readonly setQuietHours: ReturnType<typeof vi.fn>;
+  readonly setUserTimezone: ReturnType<typeof vi.fn>;
+  readonly muteWalletAlertsForDuration: ReturnType<typeof vi.fn>;
   readonly setMuteAlerts: ReturnType<typeof vi.fn>;
   readonly setEventTypeFilter: ReturnType<typeof vi.fn>;
 };
@@ -45,7 +49,11 @@ const createTrackingServiceStub = (): TrackingServiceStub => ({
   getWalletDetails: vi.fn().mockResolvedValue('wallet details'),
   getUserStatus: vi.fn().mockResolvedValue('Пользовательский статус: ok'),
   getUserAlertFilters: vi.fn().mockResolvedValue('filters'),
-  setMinimumAlertAmount: vi.fn().mockResolvedValue('setmin'),
+  setThresholdUsd: vi.fn().mockResolvedValue('threshold'),
+  setMinAmountUsd: vi.fn().mockResolvedValue('min_amount_usd'),
+  setQuietHours: vi.fn().mockResolvedValue('quiet'),
+  setUserTimezone: vi.fn().mockResolvedValue('timezone'),
+  muteWalletAlertsForDuration: vi.fn().mockResolvedValue('muted wallet'),
   setMuteAlerts: vi.fn().mockResolvedValue('mute'),
   setEventTypeFilter: vi.fn().mockResolvedValue('toggle filter'),
 });

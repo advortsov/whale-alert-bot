@@ -19,4 +19,5 @@ export interface HistoryRequestDto {
   readonly offset: number;
   readonly kind: HistoryKind;
   readonly direction: HistoryDirectionFilter;
+  readonly minAmountUsd: number | null;
 }

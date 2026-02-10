@@ -1,17 +1,36 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 
 import { AlertEnrichmentService } from './alert-enrichment.service';
+import { AlertFilterPolicyService } from './alert-filter-policy.service';
 import { AlertMessageFormatter } from './alert-message.formatter';
 import { AlertSuppressionService } from './alert-suppression.service';
-import { type AlertDeliveryResult } from './alert.interfaces';
+import { type AlertMessageContext } from './alert.interfaces';
+import { QuietHoursService } from './quiet-hours.service';
 import { ClassifiedEventType, type ClassifiedEvent } from '../chain/chain.types';
+import { AppConfigService } from '../config/app-config.service';
 import { ChainKey } from '../core/chains/chain-key.interfaces';
-import type { UserAlertPreferenceRow } from '../storage/database.types';
+import { TOKEN_PRICING_PORT } from '../core/ports/token-pricing/token-pricing-port.tokens';
+import type { ITokenPricingPort } from '../core/ports/token-pricing/token-pricing.interfaces';
+import type { AlertFilterPolicy } from '../features/alerts/alert-filter.interfaces';
+import { AlertMutesRepository } from '../storage/repositories/alert-mutes.repository';
 import { SubscriptionsRepository } from '../storage/repositories/subscriptions.repository';
 import type { SubscriberWalletRecipient } from '../storage/repositories/subscriptions.repository.interfaces';
 import { UserAlertPreferencesRepository } from '../storage/repositories/user-alert-preferences.repository';
+import { UserAlertSettingsRepository } from '../storage/repositories/user-alert-settings.repository';
 import { UserWalletAlertPreferencesRepository } from '../storage/repositories/user-wallet-alert-preferences.repository';
+import type { TelegramSendTextOptions } from '../telegram/telegram-sender.service';
 import { TelegramSenderService } from '../telegram/telegram-sender.service';
+
+interface EventUsdContext {
+  readonly usdAmount: number | null;
+  readonly usdUnavailable: boolean;
+}
+
+interface DispatchDecision {
+  readonly skip: boolean;
+  readonly reason: string | null;
+  readonly messageContext: AlertMessageContext;
+}
 
 @Injectable()
 export class AlertDispatcherService {
@@ -21,9 +40,16 @@ export class AlertDispatcherService {
     private readonly subscriptionsRepository: SubscriptionsRepository,
     private readonly alertEnrichmentService: AlertEnrichmentService,
     private readonly alertSuppressionService: AlertSuppressionService,
+    private readonly alertFilterPolicyService: AlertFilterPolicyService,
+    private readonly quietHoursService: QuietHoursService,
     private readonly alertMessageFormatter: AlertMessageFormatter,
+    private readonly appConfigService: AppConfigService,
     private readonly userAlertPreferencesRepository: UserAlertPreferencesRepository,
+    private readonly userAlertSettingsRepository: UserAlertSettingsRepository,
     private readonly userWalletAlertPreferencesRepository: UserWalletAlertPreferencesRepository,
+    private readonly alertMutesRepository: AlertMutesRepository,
+    @Inject(TOKEN_PRICING_PORT)
+    private readonly tokenPricingPort: ITokenPricingPort,
     private readonly telegramSenderService: TelegramSenderService,
   ) {}
 
@@ -31,9 +57,10 @@ export class AlertDispatcherService {
     this.logger.debug(
       `dispatch start eventType=${event.eventType} trackedAddress=${event.trackedAddress} txHash=${event.txHash}`,
     );
+    const chainKey: ChainKey = this.resolveChainKey(event.chainId);
     const subscribers: readonly SubscriberWalletRecipient[] =
       await this.subscriptionsRepository.listSubscriberWalletRecipientsByAddress(
-        this.resolveChainKey(event.chainId),
+        chainKey,
         event.trackedAddress,
       );
 
@@ -54,63 +81,120 @@ export class AlertDispatcherService {
     }
 
     const enrichedEvent: ClassifiedEvent = this.alertEnrichmentService.enrich(event);
-    const message: string = this.alertMessageFormatter.format(enrichedEvent);
-    const deliveryResults: AlertDeliveryResult[] = [];
+    const eventUsdContext: EventUsdContext = await this.resolveUsdContext(enrichedEvent, chainKey);
 
     this.logger.log(
       `dispatch sending eventType=${event.eventType} recipients=${subscribers.length} txHash=${event.txHash}`,
     );
+
+    let successfulDeliveries: number = 0;
+
     for (const subscriber of subscribers) {
-      const shouldSkipByPreferences: boolean = await this.shouldSkipByUserPreferences(
+      const decision: DispatchDecision = await this.evaluateRecipient(
         subscriber,
         enrichedEvent,
+        chainKey,
+        eventUsdContext,
       );
 
-      if (shouldSkipByPreferences) {
+      if (decision.skip) {
         this.logger.debug(
-          `dispatch skipped by user preferences telegramId=${subscriber.telegramId} walletId=${String(subscriber.walletId)} txHash=${event.txHash}`,
+          `dispatch skipped by user policy telegramId=${subscriber.telegramId} walletId=${String(subscriber.walletId)} txHash=${event.txHash} reason=${decision.reason ?? 'n/a'}`,
         );
         continue;
       }
 
+      const message: string = this.alertMessageFormatter.format(
+        enrichedEvent,
+        decision.messageContext,
+      );
+      const sendOptions: TelegramSendTextOptions = this.buildAlertInlineKeyboard(
+        subscriber.walletId,
+        enrichedEvent,
+      );
+
       try {
-        await this.telegramSenderService.sendText(subscriber.telegramId, message);
-        deliveryResults.push({
-          telegramId: subscriber.telegramId,
-          success: true,
-          errorMessage: null,
-        });
+        await this.telegramSenderService.sendText(subscriber.telegramId, message, sendOptions);
+        successfulDeliveries += 1;
       } catch (error: unknown) {
         const errorMessage: string = error instanceof Error ? error.message : String(error);
-        deliveryResults.push({
-          telegramId: subscriber.telegramId,
-          success: false,
-          errorMessage,
-        });
         this.logger.warn(
           `dispatch delivery failed telegramId=${subscriber.telegramId} walletId=${String(subscriber.walletId)} txHash=${event.txHash} reason=${errorMessage}`,
         );
       }
     }
 
-    const successfulDeliveries: number = deliveryResults.filter(
-      (result: AlertDeliveryResult): boolean => result.success,
-    ).length;
     this.logger.debug(
-      `dispatch complete txHash=${event.txHash} successful=${successfulDeliveries} failed=${deliveryResults.length - successfulDeliveries}`,
+      `dispatch complete txHash=${event.txHash} successful=${successfulDeliveries} failed=${subscribers.length - successfulDeliveries}`,
     );
   }
 
-  private async shouldSkipByUserPreferences(
+  private async evaluateRecipient(
     subscriber: SubscriberWalletRecipient,
     event: ClassifiedEvent,
-  ): Promise<boolean> {
-    const preferences: UserAlertPreferenceRow =
-      await this.userAlertPreferencesRepository.findOrCreateByUserId(subscriber.userId);
-    const walletPreferences = await this.userWalletAlertPreferencesRepository.findByUserAndWalletId(
-      subscriber.userId,
-      subscriber.walletId,
+    chainKey: ChainKey,
+    eventUsdContext: EventUsdContext,
+  ): Promise<DispatchDecision> {
+    const recipientChainKey: ChainKey = subscriber.chainKey;
+    const [preferences, settings, walletPreferences, activeMute] = await Promise.all([
+      this.userAlertPreferencesRepository.findOrCreateByUserId(subscriber.userId),
+      this.userAlertSettingsRepository.findOrCreateByUserAndChain(
+        subscriber.userId,
+        recipientChainKey,
+      ),
+      this.userWalletAlertPreferencesRepository.findByUserAndWalletId(
+        subscriber.userId,
+        subscriber.walletId,
+      ),
+      this.alertMutesRepository.findActiveMute(
+        subscriber.userId,
+        recipientChainKey,
+        subscriber.walletId,
+      ),
+    ]);
+
+    if (activeMute !== null) {
+      return {
+        skip: true,
+        reason: 'wallet_muted_24h',
+        messageContext: {
+          usdAmount: null,
+          usdUnavailable: false,
+        },
+      };
+    }
+
+    if (preferences.muted_until !== null && preferences.muted_until.getTime() > Date.now()) {
+      return {
+        skip: true,
+        reason: 'global_mute',
+        messageContext: {
+          usdAmount: null,
+          usdUnavailable: false,
+        },
+      };
+    }
+
+    const quietEvaluation = this.quietHoursService.evaluate(
+      settings.quiet_from,
+      settings.quiet_to,
+      settings.timezone,
     );
+
+    if (quietEvaluation.suppressed) {
+      this.logger.debug(
+        `alert_suppressed_quiet_hours telegramId=${subscriber.telegramId} walletId=${String(subscriber.walletId)} chainKey=${chainKey} timezone=${settings.timezone}`,
+      );
+      return {
+        skip: true,
+        reason: 'quiet_hours',
+        messageContext: {
+          usdAmount: null,
+          usdUnavailable: false,
+        },
+      };
+    }
+
     const allowTransfer: boolean = walletPreferences
       ? walletPreferences.allow_transfer
       : preferences.allow_transfer;
@@ -118,33 +202,168 @@ export class AlertDispatcherService {
       ? walletPreferences.allow_swap
       : preferences.allow_swap;
 
-    if (preferences.muted_until !== null && preferences.muted_until.getTime() > Date.now()) {
-      return true;
-    }
-
     if (event.eventType === ClassifiedEventType.TRANSFER && !allowTransfer) {
-      return true;
+      return {
+        skip: true,
+        reason: 'transfer_disabled',
+        messageContext: {
+          usdAmount: null,
+          usdUnavailable: false,
+        },
+      };
     }
 
     if (event.eventType === ClassifiedEventType.SWAP && !allowSwap) {
-      return true;
+      return {
+        skip: true,
+        reason: 'swap_disabled',
+        messageContext: {
+          usdAmount: null,
+          usdUnavailable: false,
+        },
+      };
     }
 
-    const minAmount: number = Number.parseFloat(String(preferences.min_amount));
+    const legacyMinAmount: number = Number.parseFloat(String(preferences.min_amount));
 
-    if (Number.isNaN(minAmount) || minAmount <= 0) {
-      return false;
+    if (legacyMinAmount > 0) {
+      const value: number | null = event.valueFormatted
+        ? Number.parseFloat(event.valueFormatted)
+        : null;
+
+      if (value === null || Number.isNaN(value) || value < legacyMinAmount) {
+        return {
+          skip: true,
+          reason: 'legacy_min_amount',
+          messageContext: {
+            usdAmount: null,
+            usdUnavailable: false,
+          },
+        };
+      }
     }
 
+    const parsedThreshold: number = Number.parseFloat(String(settings.threshold_usd));
+    const parsedMinAmount: number = Number.parseFloat(String(settings.min_amount_usd));
+    const policy: AlertFilterPolicy = {
+      thresholdUsd: Number.isNaN(parsedThreshold) ? 0 : parsedThreshold,
+      minAmountUsd: Number.isNaN(parsedMinAmount) ? 0 : parsedMinAmount,
+    };
+    const thresholdDecision = this.alertFilterPolicyService.evaluateUsdThreshold(
+      policy,
+      eventUsdContext.usdAmount,
+      eventUsdContext.usdUnavailable,
+    );
+
+    if (!thresholdDecision.allowed) {
+      return {
+        skip: true,
+        reason: thresholdDecision.suppressedReason,
+        messageContext: {
+          usdAmount: thresholdDecision.usdAmount,
+          usdUnavailable: false,
+        },
+      };
+    }
+
+    const usdWarningEnabled: boolean =
+      thresholdDecision.usdUnavailable && (policy.thresholdUsd > 0 || policy.minAmountUsd > 0);
+
+    return {
+      skip: false,
+      reason: null,
+      messageContext: {
+        usdAmount: thresholdDecision.usdAmount,
+        usdUnavailable: usdWarningEnabled,
+      },
+    };
+  }
+
+  private async resolveUsdContext(
+    event: ClassifiedEvent,
+    chainKey: ChainKey,
+  ): Promise<EventUsdContext> {
     const value: number | null = event.valueFormatted
       ? Number.parseFloat(event.valueFormatted)
       : null;
 
-    if (value === null || Number.isNaN(value)) {
-      return true;
+    if (value === null || Number.isNaN(value) || value <= 0) {
+      return {
+        usdAmount: null,
+        usdUnavailable: true,
+      };
     }
 
-    return value < minAmount;
+    const quote = await this.tokenPricingPort.getUsdQuote({
+      chainKey,
+      tokenAddress: event.tokenAddress,
+      tokenSymbol: event.tokenSymbol,
+    });
+
+    if (quote === null || !Number.isFinite(quote.usdPrice) || quote.usdPrice <= 0) {
+      return {
+        usdAmount: null,
+        usdUnavailable: true,
+      };
+    }
+
+    return {
+      usdAmount: value * quote.usdPrice,
+      usdUnavailable: false,
+    };
+  }
+
+  private buildAlertInlineKeyboard(
+    walletId: number,
+    event: ClassifiedEvent,
+  ): TelegramSendTextOptions {
+    const txUrl: string = `${this.appConfigService.etherscanTxBaseUrl}${event.txHash}`;
+    const chartUrl: string = this.buildChartUrl(event);
+    const portfolioUrl: string = `https://debank.com/profile/${event.trackedAddress}`;
+
+    return {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            {
+              text: '📊 Chart',
+              url: chartUrl,
+            },
+            {
+              text: '🔍 Etherscan',
+              url: txUrl,
+            },
+          ],
+          [
+            {
+              text: '💼 Wallet',
+              callback_data: `wallet_menu:${String(walletId)}`,
+            },
+            {
+              text: '🚫 Ignore 24h',
+              callback_data: `alert_ignore_24h:${String(walletId)}`,
+            },
+          ],
+          [
+            {
+              text: '🧾 Portfolio',
+              url: portfolioUrl,
+            },
+          ],
+        ],
+      },
+      link_preview_options: {
+        is_disabled: true,
+      },
+    };
+  }
+
+  private buildChartUrl(event: ClassifiedEvent): string {
+    if (event.tokenAddress !== null && event.tokenAddress.length > 0) {
+      return `https://dexscreener.com/ethereum/${event.tokenAddress}`;
+    }
+
+    return 'https://www.tradingview.com/symbols/ETHUSD/';
   }
 
   private resolveChainKey(chainId: number): ChainKey {
