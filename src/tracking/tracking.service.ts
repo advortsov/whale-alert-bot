@@ -738,6 +738,7 @@ export class TrackingService {
       offset,
       historyKind,
       historyDirection,
+      historyTarget.chainKey,
     );
 
     return {
@@ -836,6 +837,7 @@ export class TrackingService {
           0,
           historyKind,
           historyDirection,
+          historyTarget.chainKey,
         );
         this.historyCacheService.set(
           normalizedAddress,
@@ -1012,14 +1014,14 @@ export class TrackingService {
   }
 
   private assertHistoryChainIsSupported(chainKey: ChainKey): void {
-    if (chainKey === ChainKey.ETHEREUM_MAINNET) {
+    if (chainKey === ChainKey.ETHEREUM_MAINNET || chainKey === ChainKey.SOLANA_MAINNET) {
       return;
     }
 
     throw new Error(
       [
         `История для сети ${chainKey} пока недоступна на этом этапе.`,
-        'Сейчас поддерживается /history только для Ethereum.',
+        'Сейчас поддерживаются /history только для Ethereum и Solana.',
       ].join('\n'),
     );
   }
@@ -1524,7 +1526,7 @@ export class TrackingService {
       const statusIcon: string = tx.isError ? '🔴' : '🟢';
       const directionIcon: string = direction === 'OUT' ? '↗️ OUT' : '↘️ IN';
       const escapedAssetSymbol: string = this.escapeHtml(tx.assetSymbol);
-      const txUrl: string = this.buildTxUrl(tx.txHash);
+      const txUrl: string = tx.txLink ?? this.buildTxUrl(tx.txHash);
       const eventType: string = this.escapeHtml(tx.eventType);
 
       return [
@@ -1548,9 +1550,11 @@ export class TrackingService {
     offset: number = 0,
     historyKind: HistoryKind = HistoryKind.ALL,
     historyDirection: HistoryDirectionFilter = HistoryDirectionFilter.ALL,
+    chainKey: ChainKey = ChainKey.ETHEREUM_MAINNET,
   ): string {
     const rows: string[] = events.map((event, index: number): string => {
-      const txUrl: string = this.buildTxUrl(event.txHash);
+      const txChainKey: ChainKey = this.resolveHistoryTxChainKey(event.chainKey, chainKey);
+      const txUrl: string = this.buildTxUrl(event.txHash, txChainKey);
       const formattedValue: string = this.resolveEventValue(event);
       const directionLabel: string = this.resolveDirectionLabel(event.direction);
       const eventTypeLabel: string = this.escapeHtml(event.eventType);
@@ -1669,8 +1673,27 @@ export class TrackingService {
     return isoTimestamp.replace('T', ' ').replace('.000Z', ' UTC');
   }
 
-  private buildTxUrl(txHash: string): string {
+  private buildTxUrl(txHash: string, chainKey: ChainKey = ChainKey.ETHEREUM_MAINNET): string {
+    if (chainKey === ChainKey.SOLANA_MAINNET) {
+      return `https://solscan.io/tx/${txHash}`;
+    }
+
     return `${this.appConfigService.etherscanTxBaseUrl}${txHash}`;
+  }
+
+  private resolveHistoryTxChainKey(
+    rawChainKey: string | null,
+    fallbackChainKey: ChainKey,
+  ): ChainKey {
+    if (rawChainKey === ChainKey.ETHEREUM_MAINNET) {
+      return ChainKey.ETHEREUM_MAINNET;
+    }
+
+    if (rawChainKey === ChainKey.SOLANA_MAINNET) {
+      return ChainKey.SOLANA_MAINNET;
+    }
+
+    return fallbackChainKey;
   }
 
   private shortHash(txHash: string): string {

@@ -10,6 +10,8 @@ import { AddressCodecRegistry } from '../integrations/address/address-codec.regi
 import { EthereumAddressCodec } from '../integrations/address/ethereum/ethereum-address.codec';
 import { SolanaAddressCodec } from '../integrations/address/solana/solana-address.codec';
 import { EtherscanHistoryAdapter } from '../integrations/explorers/etherscan/etherscan-history.adapter';
+import { HistoryExplorerRouterAdapter } from '../integrations/explorers/history-explorer-router.adapter';
+import { SolanaRpcHistoryAdapter } from '../integrations/explorers/solana/solana-rpc-history.adapter';
 import { StorageModule } from '../storage/storage.module';
 
 @Module({
@@ -23,10 +25,12 @@ import { StorageModule } from '../storage/storage.module';
       useExisting: AddressCodecRegistry,
     },
     EtherscanHistoryAdapter,
+    SolanaRpcHistoryAdapter,
+    HistoryExplorerRouterAdapter,
     EtherscanHistoryService,
     {
       provide: HISTORY_EXPLORER_ADAPTER,
-      useExisting: EtherscanHistoryAdapter,
+      useExisting: HistoryExplorerRouterAdapter,
     },
     HistoryCacheService,
     HistoryRateLimiterService,

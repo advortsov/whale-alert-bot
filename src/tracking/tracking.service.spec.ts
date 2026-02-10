@@ -406,6 +406,53 @@ describe('TrackingService', (): void => {
     expect(message).toContain('<a href="https://etherscan.io/tx/0xabc">Tx #1</a>');
   });
 
+  it('builds Solscan links for local Solana history entries', async (): Promise<void> => {
+    const context: TestContext = createTestContext();
+    context.historyCacheServiceStub.getFresh.mockReturnValue(null);
+    context.subscriptionsRepositoryStub.listByUserId.mockResolvedValue([
+      {
+        subscriptionId: 1,
+        walletId: 16,
+        chainKey: ChainKey.SOLANA_MAINNET,
+        walletAddress: '11111111111111111111111111111111',
+        walletLabel: 'system',
+        createdAt: new Date('2026-02-01T00:00:00.000Z'),
+      },
+    ]);
+    context.walletEventsRepositoryStub.listRecentByTrackedAddress.mockResolvedValue([
+      {
+        chainId: 101,
+        chainKey: ChainKey.SOLANA_MAINNET,
+        txHash: '5M9v4f2wVtQHSPvKzB9nAfD8x7M3s4cKz7w6x5Y4q3h2j1k',
+        logIndex: 0,
+        trackedAddress: '11111111111111111111111111111111',
+        eventType: 'TRANSFER',
+        direction: 'IN',
+        contractAddress: null,
+        tokenAddress: null,
+        tokenSymbol: 'SOL',
+        tokenDecimals: 9,
+        tokenAmountRaw: '1000000000',
+        valueFormatted: '1.0',
+        dex: null,
+        pair: null,
+        occurredAt: new Date('2026-02-10T10:00:00.000Z'),
+      },
+    ]);
+
+    const message: string = await context.service.getAddressHistoryWithPolicy(
+      context.userRef,
+      '#16',
+      '5',
+      HistoryRequestSource.COMMAND,
+    );
+
+    expect(context.historyExplorerAdapterStub.loadRecentTransactions).not.toHaveBeenCalled();
+    expect(message).toContain(
+      '<a href="https://solscan.io/tx/5M9v4f2wVtQHSPvKzB9nAfD8x7M3s4cKz7w6x5Y4q3h2j1k">Tx #1</a>',
+    );
+  });
+
   it('updates threshold usd value', async (): Promise<void> => {
     const context: TestContext = createTestContext();
 

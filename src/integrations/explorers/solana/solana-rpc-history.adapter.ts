@@ -1,0 +1,347 @@
+import { Injectable, Logger } from '@nestjs/common';
+
+import type { SolanaSignatureInfo, SolanaTransactionValue } from './solana-rpc-history.interfaces';
+import { AppConfigService } from '../../../config/app-config.service';
+import { ChainKey } from '../../../core/chains/chain-key.interfaces';
+import type { IHistoryExplorerAdapter } from '../../../core/ports/explorers/history-explorer.interfaces';
+import {
+  HistoryDirection,
+  HistoryItemType,
+  type HistoryItemDto,
+  type HistoryPageDto,
+} from '../../../features/tracking/dto/history-item.dto';
+import {
+  HistoryDirectionFilter,
+  HistoryKind,
+  type HistoryRequestDto,
+} from '../../../features/tracking/dto/history-request.dto';
+
+@Injectable()
+export class SolanaRpcHistoryAdapter implements IHistoryExplorerAdapter {
+  private static readonly SPL_TOKEN_PROGRAM_SUBSTRING: string = 'tokenkeg';
+  private static readonly SOLSCAN_TX_BASE_URL: string = 'https://solscan.io/tx/';
+  private static readonly REQUEST_TIMEOUT_MS: number = 10_000;
+
+  private readonly logger: Logger = new Logger(SolanaRpcHistoryAdapter.name);
+
+  public constructor(private readonly appConfigService: AppConfigService) {}
+
+  public async loadRecentTransactions(request: HistoryRequestDto): Promise<HistoryPageDto> {
+    if (request.chainKey !== ChainKey.SOLANA_MAINNET) {
+      throw new Error(`Solana history adapter does not support chain ${request.chainKey}.`);
+    }
+
+    const endpointUrls: readonly string[] = this.resolveSolanaRpcEndpoints();
+    const signaturesLimit: number = Math.max(request.offset + request.limit, request.limit);
+    const signatures: readonly SolanaSignatureInfo[] = await this.callWithFallback(
+      endpointUrls,
+      async (endpointUrl: string): Promise<readonly SolanaSignatureInfo[]> =>
+        this.getSignatures(endpointUrl, request.address, signaturesLimit),
+    );
+
+    const pageSignatures: readonly SolanaSignatureInfo[] = signatures.slice(
+      request.offset,
+      request.offset + request.limit,
+    );
+
+    if (pageSignatures.length === 0) {
+      return {
+        items: [],
+        nextOffset: null,
+      };
+    }
+
+    const items: HistoryItemDto[] = [];
+
+    for (const signatureInfo of pageSignatures) {
+      const item: HistoryItemDto | null = await this.callWithFallback(
+        endpointUrls,
+        async (endpointUrl: string): Promise<HistoryItemDto | null> =>
+          this.mapSignatureToHistoryItem(endpointUrl, request.address, signatureInfo),
+      );
+
+      if (item === null) {
+        continue;
+      }
+
+      if (!this.matchKindFilter(item, request.kind)) {
+        continue;
+      }
+
+      if (!this.matchDirectionFilter(item, request.direction)) {
+        continue;
+      }
+
+      items.push(item);
+    }
+
+    const hasNextPage: boolean = signatures.length > request.offset + request.limit;
+
+    return {
+      items,
+      nextOffset: hasNextPage ? request.offset + request.limit : null,
+    };
+  }
+
+  private resolveSolanaRpcEndpoints(): readonly string[] {
+    const endpointCandidates: readonly (string | null)[] = [
+      this.appConfigService.solanaHeliusHttpUrl,
+      this.appConfigService.solanaPublicHttpUrl,
+    ];
+    const endpointUrls: string[] = [];
+
+    for (const endpointCandidate of endpointCandidates) {
+      if (endpointCandidate === null || endpointCandidate.trim().length === 0) {
+        continue;
+      }
+
+      if (!endpointUrls.includes(endpointCandidate)) {
+        endpointUrls.push(endpointCandidate);
+      }
+    }
+
+    if (endpointUrls.length === 0) {
+      throw new Error('SOLANA_HELIUS_HTTP_URL or SOLANA_PUBLIC_HTTP_URL is required.');
+    }
+
+    return endpointUrls;
+  }
+
+  private async getSignatures(
+    endpointUrl: string,
+    address: string,
+    limit: number,
+  ): Promise<readonly SolanaSignatureInfo[]> {
+    const payload: unknown = await this.callRpc(endpointUrl, 'getSignaturesForAddress', [
+      address,
+      {
+        limit,
+      },
+    ]);
+
+    if (!Array.isArray(payload)) {
+      throw new Error('Solana getSignaturesForAddress returned invalid payload.');
+    }
+
+    return payload.map((value: unknown): SolanaSignatureInfo => this.parseSignatureInfo(value));
+  }
+
+  private parseSignatureInfo(value: unknown): SolanaSignatureInfo {
+    if (!value || typeof value !== 'object') {
+      throw new Error('Solana signature info item is invalid.');
+    }
+
+    const item = value as {
+      readonly signature?: unknown;
+      readonly blockTime?: unknown;
+      readonly err?: unknown;
+    };
+
+    if (typeof item.signature !== 'string' || item.signature.trim().length === 0) {
+      throw new Error('Solana signature info does not contain signature.');
+    }
+
+    const blockTime: number | null = typeof item.blockTime === 'number' ? item.blockTime : null;
+
+    return {
+      signature: item.signature,
+      blockTime,
+      err: item.err ?? null,
+    };
+  }
+
+  private async mapSignatureToHistoryItem(
+    endpointUrl: string,
+    address: string,
+    signatureInfo: SolanaSignatureInfo,
+  ): Promise<HistoryItemDto | null> {
+    const payload: unknown = await this.callRpc(endpointUrl, 'getTransaction', [
+      signatureInfo.signature,
+      {
+        commitment: 'confirmed',
+        encoding: 'jsonParsed',
+        maxSupportedTransactionVersion: 0,
+      },
+    ]);
+
+    if (payload === null) {
+      return null;
+    }
+
+    if (typeof payload !== 'object') {
+      throw new Error('Solana getTransaction returned invalid payload.');
+    }
+
+    const value: SolanaTransactionValue = payload as SolanaTransactionValue;
+    const accountKeys: readonly string[] = this.extractAccountKeys(value);
+    const [fromAddress, toAddress] = this.resolveFromTo(accountKeys);
+    const normalizedAddress: string = address.trim();
+    const addressIndex: number = accountKeys.findIndex(
+      (accountKey: string): boolean => accountKey === normalizedAddress,
+    );
+    const preBalance: number =
+      addressIndex >= 0 ? (value.meta?.preBalances?.[addressIndex] ?? 0) : 0;
+    const postBalance: number =
+      addressIndex >= 0 ? (value.meta?.postBalances?.[addressIndex] ?? 0) : 0;
+    const deltaLamports: number = postBalance - preBalance;
+    const direction: HistoryDirection =
+      deltaLamports >= 0 ? HistoryDirection.IN : HistoryDirection.OUT;
+    const isSplTransfer: boolean = this.detectSplTransfer(value);
+    const timestampSec: number = this.resolveTimestampSec(value, signatureInfo);
+    const metaError: unknown = value.meta?.err;
+    const hasError: boolean = metaError !== undefined && metaError !== null;
+    const signatureError: boolean = signatureInfo.err !== null && signatureInfo.err !== undefined;
+
+    return {
+      txHash: signatureInfo.signature,
+      timestampSec,
+      from: fromAddress,
+      to: toAddress,
+      valueRaw: Math.abs(deltaLamports).toString(),
+      isError: hasError || signatureError,
+      assetSymbol: isSplTransfer ? 'SPL' : 'SOL',
+      assetDecimals: isSplTransfer ? 6 : 9,
+      eventType: HistoryItemType.TRANSFER,
+      direction,
+      txLink: `${SolanaRpcHistoryAdapter.SOLSCAN_TX_BASE_URL}${signatureInfo.signature}`,
+    };
+  }
+
+  private detectSplTransfer(value: SolanaTransactionValue): boolean {
+    const logMessages: readonly string[] = value.meta?.logMessages ?? [];
+
+    return logMessages.some((message: string): boolean =>
+      message.toLowerCase().includes(SolanaRpcHistoryAdapter.SPL_TOKEN_PROGRAM_SUBSTRING),
+    );
+  }
+
+  private extractAccountKeys(value: SolanaTransactionValue): readonly string[] {
+    const rawAccountKeys: readonly (string | { readonly pubkey?: string })[] =
+      value.transaction?.message?.accountKeys ?? [];
+
+    return rawAccountKeys
+      .map((accountKey): string | null => {
+        if (typeof accountKey === 'string') {
+          return accountKey;
+        }
+
+        if (typeof accountKey.pubkey === 'string') {
+          return accountKey.pubkey;
+        }
+
+        return null;
+      })
+      .filter((accountKey: string | null): accountKey is string => accountKey !== null);
+  }
+
+  private resolveFromTo(accountKeys: readonly string[]): readonly [string, string] {
+    const fromAddress: string = accountKeys[0] ?? 'unknown';
+    const toAddress: string = accountKeys[1] ?? 'unknown';
+
+    return [fromAddress, toAddress];
+  }
+
+  private resolveTimestampSec(
+    value: SolanaTransactionValue,
+    signatureInfo: SolanaSignatureInfo,
+  ): number {
+    if (typeof value.blockTime === 'number') {
+      return value.blockTime;
+    }
+
+    if (typeof signatureInfo.blockTime === 'number') {
+      return signatureInfo.blockTime;
+    }
+
+    return Math.floor(Date.now() / 1000);
+  }
+
+  private matchKindFilter(item: HistoryItemDto, kind: HistoryKind): boolean {
+    if (kind === HistoryKind.ALL) {
+      return true;
+    }
+
+    if (kind === HistoryKind.ETH) {
+      return item.assetSymbol === 'SOL';
+    }
+
+    return item.assetSymbol === 'SPL';
+  }
+
+  private matchDirectionFilter(item: HistoryItemDto, direction: HistoryDirectionFilter): boolean {
+    if (direction === HistoryDirectionFilter.ALL) {
+      return true;
+    }
+
+    if (direction === HistoryDirectionFilter.IN) {
+      return item.direction === HistoryDirection.IN;
+    }
+
+    return item.direction === HistoryDirection.OUT;
+  }
+
+  private async callWithFallback<TResult>(
+    endpointUrls: readonly string[],
+    operation: (endpointUrl: string) => Promise<TResult>,
+  ): Promise<TResult> {
+    let lastError: Error | null = null;
+
+    for (const endpointUrl of endpointUrls) {
+      try {
+        return await operation(endpointUrl);
+      } catch (error: unknown) {
+        const errorMessage: string = error instanceof Error ? error.message : String(error);
+        this.logger.warn(
+          `solana history endpoint failed endpoint=${endpointUrl} reason=${errorMessage}`,
+        );
+        lastError = error instanceof Error ? error : new Error(errorMessage);
+      }
+    }
+
+    if (lastError !== null) {
+      throw lastError;
+    }
+
+    throw new Error('Solana history endpoint list is empty.');
+  }
+
+  private async callRpc(
+    endpointUrl: string,
+    method: string,
+    params: readonly unknown[],
+  ): Promise<unknown> {
+    const response: Response = await fetch(endpointUrl, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: Date.now(),
+        method,
+        params,
+      }),
+      signal: AbortSignal.timeout(SolanaRpcHistoryAdapter.REQUEST_TIMEOUT_MS),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Solana RPC HTTP ${response.status}`);
+    }
+
+    const payload = (await response.json()) as {
+      readonly result?: unknown;
+      readonly error?: {
+        readonly code?: number;
+        readonly message?: string;
+      };
+    };
+
+    if (payload.error !== undefined) {
+      const errorCode: string = String(payload.error.code ?? 'unknown');
+      const errorMessage: string = payload.error.message ?? 'unknown error';
+      throw new Error(`Solana RPC error code=${errorCode} message=${errorMessage}`);
+    }
+
+    return payload.result ?? null;
+  }
+}
