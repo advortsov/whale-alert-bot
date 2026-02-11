@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { DatabaseService } from './database.service';
+import { MigrationService } from './migration.service';
 import { AlertMutesRepository } from './repositories/alert-mutes.repository';
 import { ChainCheckpointsRepository } from './repositories/chain-checkpoints.repository';
 import { ProcessedEventsRepository } from './repositories/processed-events.repository';
@@ -14,6 +15,7 @@ import { WalletEventsRepository } from './repositories/wallet-events.repository'
 
 @Module({
   providers: [
+    MigrationService,
     DatabaseService,
     ChainCheckpointsRepository,
     AlertMutesRepository,
