@@ -16,6 +16,14 @@ export enum EventDirection {
   UNKNOWN = 'UNKNOWN',
 }
 
+export enum AssetStandard {
+  NATIVE = 'NATIVE',
+  ERC20 = 'ERC20',
+  SPL = 'SPL',
+  TRC20 = 'TRC20',
+  TRC10 = 'TRC10',
+}
+
 export type ObservedTransaction = {
   readonly chainId: ChainId;
   readonly txHash: string;
@@ -37,6 +45,7 @@ export type ClassifiedEvent = {
   readonly trackedAddress: string;
   readonly eventType: ClassifiedEventType;
   readonly direction: EventDirection;
+  readonly assetStandard: AssetStandard;
   readonly contractAddress: string | null;
   readonly tokenAddress: string | null;
   readonly tokenSymbol: string | null;

@@ -107,6 +107,7 @@ export interface WalletEventsTable {
   tracked_address: string;
   event_type: string;
   direction: string;
+  asset_standard: string;
   contract_address: string | null;
   token_address: string | null;
   token_symbol: string | null;

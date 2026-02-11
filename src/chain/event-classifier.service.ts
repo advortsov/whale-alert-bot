@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import {
+  AssetStandard,
   ChainId,
   ClassifiedEventType,
   EventDirection,
@@ -58,6 +59,7 @@ export class EventClassifierService {
             trackedAddress,
             eventType: ClassifiedEventType.TRANSFER,
             direction: transferDirection,
+            assetStandard: AssetStandard.ERC20,
             contractAddress: log.address,
             tokenAddress: log.address,
             tokenSymbol: null,
@@ -89,6 +91,7 @@ export class EventClassifierService {
           trackedAddress,
           eventType: ClassifiedEventType.SWAP,
           direction: swapDirection,
+          assetStandard: AssetStandard.NATIVE,
           contractAddress: log.address,
           tokenAddress: null,
           tokenSymbol: null,
@@ -109,6 +112,7 @@ export class EventClassifierService {
       trackedAddress,
       eventType: ClassifiedEventType.UNKNOWN,
       direction: EventDirection.UNKNOWN,
+      assetStandard: AssetStandard.NATIVE,
       contractAddress: null,
       tokenAddress: null,
       tokenSymbol: null,

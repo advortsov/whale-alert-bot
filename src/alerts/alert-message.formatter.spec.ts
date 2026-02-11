@@ -1,6 +1,7 @@
 import { AlertMessageFormatter } from './alert-message.formatter';
 import { applyTestEnv } from '../../test/helpers/test-env';
 import {
+  AssetStandard,
   ClassifiedEventType,
   ChainId,
   EventDirection,
@@ -23,6 +24,7 @@ describe('AlertMessageFormatter', (): void => {
       trackedAddress: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       eventType: ClassifiedEventType.TRANSFER,
       direction: EventDirection.OUT,
+      assetStandard: AssetStandard.ERC20,
       contractAddress: '0xcccccccccccccccccccccccccccccccccccccccc',
       tokenAddress: '0xcccccccccccccccccccccccccccccccccccccccc',
       tokenSymbol: 'USDT',

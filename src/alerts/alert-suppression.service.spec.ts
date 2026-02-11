@@ -4,6 +4,7 @@ import { AlertSuppressionService } from './alert-suppression.service';
 import { AlertSuppressionReason } from './alert.interfaces';
 import { applyTestEnv } from '../../test/helpers/test-env';
 import {
+  AssetStandard,
   ChainId,
   ClassifiedEventType,
   EventDirection,
@@ -19,6 +20,7 @@ const buildTransferEvent = (tokenAmountRaw: string): ClassifiedEvent => {
     trackedAddress: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     eventType: ClassifiedEventType.TRANSFER,
     direction: EventDirection.OUT,
+    assetStandard: AssetStandard.ERC20,
     contractAddress: '0xdac17f958d2ee523a2206206994597c13d831ec7',
     tokenAddress: '0xdac17f958d2ee523a2206206994597c13d831ec7',
     tokenSymbol: 'USDT',

@@ -77,6 +77,9 @@ const envSchema = z.object({
   CHAIN_TRON_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(2000),
   CHAIN_HEARTBEAT_INTERVAL_SEC: z.coerce.number().int().positive().default(60),
   CHAIN_REORG_CONFIRMATIONS: z.coerce.number().int().min(0).default(2),
+  CHAIN_MAX_LAG_WARN: z.coerce.number().int().min(0).default(50),
+  CHAIN_MAX_QUEUE_WARN: z.coerce.number().int().min(0).default(80),
+  CHAIN_MAX_BACKOFF_WARN_MS: z.coerce.number().int().min(0).default(10000),
   BOT_TOKEN: optionalNonEmptyStringSchema,
   DATABASE_URL: z.url(),
   ETH_ALCHEMY_WSS_URL: z.url().optional(),
@@ -141,6 +144,9 @@ export class AppConfigService {
       chainTronPollIntervalMs: parsedEnv.CHAIN_TRON_POLL_INTERVAL_MS,
       chainHeartbeatIntervalSec: parsedEnv.CHAIN_HEARTBEAT_INTERVAL_SEC,
       chainReorgConfirmations: parsedEnv.CHAIN_REORG_CONFIRMATIONS,
+      chainMaxLagWarn: parsedEnv.CHAIN_MAX_LAG_WARN,
+      chainMaxQueueWarn: parsedEnv.CHAIN_MAX_QUEUE_WARN,
+      chainMaxBackoffWarnMs: parsedEnv.CHAIN_MAX_BACKOFF_WARN_MS,
       botToken: parsedEnv.BOT_TOKEN ?? null,
       databaseUrl: parsedEnv.DATABASE_URL,
       ethAlchemyWssUrl: parsedEnv.ETH_ALCHEMY_WSS_URL ?? null,
@@ -259,6 +265,18 @@ export class AppConfigService {
 
   public get chainReorgConfirmations(): number {
     return this.config.chainReorgConfirmations;
+  }
+
+  public get chainMaxLagWarn(): number {
+    return this.config.chainMaxLagWarn;
+  }
+
+  public get chainMaxQueueWarn(): number {
+    return this.config.chainMaxQueueWarn;
+  }
+
+  public get chainMaxBackoffWarnMs(): number {
+    return this.config.chainMaxBackoffWarnMs;
   }
 
   public get botToken(): string | null {

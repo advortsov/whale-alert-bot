@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { SolanaChainStreamService } from './solana-chain-stream.service';
+import { SolanaEventClassifierService } from './solana-event-classifier.service';
 import type { AlertDispatcherService } from '../../alerts/alert-dispatcher.service';
 import {
   ChainId,
@@ -154,6 +155,8 @@ describe('SolanaChainStreamService', (): void => {
       chainSolanaQueueMax: 20,
       chainSolanaCatchupBatch: 10,
     } as unknown as AppConfigService;
+    const solanaEventClassifierService: SolanaEventClassifierService =
+      new SolanaEventClassifierService();
 
     const service: SolanaChainStreamService = new SolanaChainStreamService(
       appConfigService,
@@ -163,6 +166,7 @@ describe('SolanaChainStreamService', (): void => {
       processedEventsRepository,
       walletEventsRepository,
       alertDispatcherService,
+      solanaEventClassifierService,
     );
 
     await service.onModuleInit();
@@ -238,6 +242,8 @@ describe('SolanaChainStreamService', (): void => {
       chainSolanaQueueMax: 20,
       chainSolanaCatchupBatch: 10,
     } as unknown as AppConfigService;
+    const solanaEventClassifierService: SolanaEventClassifierService =
+      new SolanaEventClassifierService();
 
     const service: SolanaChainStreamService = new SolanaChainStreamService(
       appConfigService,
@@ -247,6 +253,7 @@ describe('SolanaChainStreamService', (): void => {
       processedEventsRepository,
       walletEventsRepository,
       alertDispatcherService,
+      solanaEventClassifierService,
     );
 
     await service.onModuleInit();
@@ -323,6 +330,8 @@ describe('SolanaChainStreamService', (): void => {
       chainSolanaQueueMax: 120,
       chainSolanaCatchupBatch: 10,
     } as unknown as AppConfigService;
+    const solanaEventClassifierService: SolanaEventClassifierService =
+      new SolanaEventClassifierService();
 
     const service: SolanaChainStreamService = new SolanaChainStreamService(
       appConfigService,
@@ -332,6 +341,7 @@ describe('SolanaChainStreamService', (): void => {
       processedEventsRepository,
       walletEventsRepository,
       alertDispatcherService,
+      solanaEventClassifierService,
     );
 
     await service.onModuleInit();

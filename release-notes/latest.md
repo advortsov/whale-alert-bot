@@ -1,4 +1,13 @@
-# Последний релиз
+## v0.1.4
+
+- Извлечён абстрактный `BaseChainStreamService` — общая логика stream orchestration (checkpoint recovery, block queue, heartbeat, degradation, backpressure) вынесена из ETH/SOL/TRON сервисов, устранено дублирование.
+- Добавлен порт `IChainEventClassifier` и chain-specific реализации: `SolanaEventClassifierService` (SPL/SOL), `TronEventClassifierService` (TRC20/TRC10/TRX native).
+- Добавлен `AssetStandard` enum (NATIVE, ERC20, SPL, TRC20, TRC10) и миграция БД с полем `asset_standard` в `wallet_events` (backfill по chain+token).
+- TRON RPC adapter строит синтетические hint-логи для TRC10/native transfers, позволяя классификатору унифицированно обрабатывать все типы активов.
+- `RuntimeStatusService` собирает per-chain snapshots (lag, queue, backoff, degradation) и SLO-пороги с rate-limited warnings.
+- Health endpoint переструктурирован на вложенную `ChainStreamHealth` (rpcPrimary, rpcFallback, runtime).
+
+## v0.1.3
 
 - Добавлены chain-префиксы в stream-логах: `[ETH]`, `[SOL]`, `[TRON]`.
 - Для Solana/TRON добавлены heartbeat-логи в `info` (observed/processed/lag/queue/backoff).

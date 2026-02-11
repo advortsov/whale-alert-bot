@@ -48,6 +48,9 @@ export type AppConfig = {
   readonly priceCacheMaxEntries: number;
   readonly priceCacheFreshTtlSec: number;
   readonly priceCacheStaleTtlSec: number;
+  readonly chainMaxLagWarn: number;
+  readonly chainMaxQueueWarn: number;
+  readonly chainMaxBackoffWarnMs: number;
   readonly alertMinSendIntervalSec: number;
   readonly tokenMetaCacheTtlSec: number;
   readonly historyCacheTtlSec: number;

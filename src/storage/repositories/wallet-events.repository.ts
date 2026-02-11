@@ -22,6 +22,7 @@ export class WalletEventsRepository {
       tracked_address: event.trackedAddress.toLowerCase(),
       event_type: event.eventType,
       direction: event.direction,
+      asset_standard: event.assetStandard,
       contract_address: event.contractAddress,
       token_address: event.tokenAddress,
       token_symbol: event.tokenSymbol,
@@ -57,6 +58,7 @@ export class WalletEventsRepository {
       tracked_address: string;
       event_type: string;
       direction: string;
+      asset_standard: string;
       contract_address: string | null;
       token_address: string | null;
       token_symbol: string | null;
@@ -77,6 +79,7 @@ export class WalletEventsRepository {
         'tracked_address',
         'event_type',
         'direction',
+        'asset_standard',
         'contract_address',
         'token_address',
         'token_symbol',
@@ -103,6 +106,7 @@ export class WalletEventsRepository {
         trackedAddress: row.tracked_address,
         eventType: row.event_type,
         direction: row.direction,
+        assetStandard: row.asset_standard,
         contractAddress: row.contract_address,
         tokenAddress: row.token_address,
         tokenSymbol: row.token_symbol,

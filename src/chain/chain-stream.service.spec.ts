@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { ChainStreamService } from './chain-stream.service';
 import {
+  AssetStandard,
   ChainId,
   ClassifiedEventType,
   EventDirection,
@@ -156,6 +157,7 @@ describe('ChainStreamService', (): void => {
         trackedAddress: event.trackedAddress,
         eventType: ClassifiedEventType.TRANSFER,
         direction: EventDirection.OUT,
+        assetStandard: AssetStandard.NATIVE,
         contractAddress: '0x9999999999999999999999999999999999999999',
         tokenAddress: '0x9999999999999999999999999999999999999999',
         tokenSymbol: null,
@@ -277,6 +279,7 @@ describe('ChainStreamService', (): void => {
         trackedAddress: event.trackedAddress,
         eventType: ClassifiedEventType.TRANSFER,
         direction: EventDirection.OUT,
+        assetStandard: AssetStandard.NATIVE,
         contractAddress: '0x9999999999999999999999999999999999999999',
         tokenAddress: '0x9999999999999999999999999999999999999999',
         tokenSymbol: null,
@@ -417,6 +420,7 @@ describe('ChainStreamService', (): void => {
         trackedAddress: event.trackedAddress,
         eventType: ClassifiedEventType.TRANSFER,
         direction: EventDirection.OUT,
+        assetStandard: AssetStandard.NATIVE,
         contractAddress: '0x9999999999999999999999999999999999999999',
         tokenAddress: '0x9999999999999999999999999999999999999999',
         tokenSymbol: null,

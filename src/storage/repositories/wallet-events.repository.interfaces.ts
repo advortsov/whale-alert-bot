@@ -8,6 +8,7 @@ export type WalletEventHistoryView = {
   readonly trackedAddress: string;
   readonly eventType: string;
   readonly direction: string;
+  readonly assetStandard: string;
   readonly contractAddress: string | null;
   readonly tokenAddress: string | null;
   readonly tokenSymbol: string | null;

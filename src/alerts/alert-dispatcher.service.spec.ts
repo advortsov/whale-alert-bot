@@ -8,6 +8,7 @@ import type { AlertSuppressionService } from './alert-suppression.service';
 import type { CexAddressBookService } from './cex-address-book.service';
 import type { QuietHoursService } from './quiet-hours.service';
 import {
+  AssetStandard,
   ChainId,
   ClassifiedEventType,
   EventDirection,
@@ -89,6 +90,7 @@ const buildEvent = (valueFormatted: string): ClassifiedEvent => {
     trackedAddress: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     eventType: ClassifiedEventType.TRANSFER,
     direction: EventDirection.IN,
+    assetStandard: AssetStandard.ERC20,
     contractAddress: '0xdac17f958d2ee523a2206206994597c13d831ec7',
     tokenAddress: '0xdac17f958d2ee523a2206206994597c13d831ec7',
     tokenSymbol: 'USDT',

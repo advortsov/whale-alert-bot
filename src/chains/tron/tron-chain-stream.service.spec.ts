@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { TronChainStreamService } from './tron-chain-stream.service';
+import { TronEventClassifierService } from './tron-event-classifier.service';
 import type { AlertDispatcherService } from '../../alerts/alert-dispatcher.service';
 import {
   ChainId,
@@ -17,6 +18,7 @@ import type {
   ProviderHealth,
   ProviderOperation,
 } from '../../core/ports/rpc/rpc-adapter.interfaces';
+import { TronAddressCodec } from '../../integrations/address/tron/tron-address.codec';
 import type { ChainCheckpointsRepository } from '../../storage/repositories/chain-checkpoints.repository';
 import type { ProcessedEventsRepository } from '../../storage/repositories/processed-events.repository';
 import type { SubscriptionsRepository } from '../../storage/repositories/subscriptions.repository';
@@ -140,6 +142,9 @@ describe('TronChainStreamService', (): void => {
       chainTronQueueMax: 20,
       chainTronCatchupBatch: 10,
     } as unknown as AppConfigService;
+    const tronEventClassifierService: TronEventClassifierService = new TronEventClassifierService(
+      new TronAddressCodec(),
+    );
 
     const service: TronChainStreamService = new TronChainStreamService(
       appConfigService,
@@ -149,6 +154,7 @@ describe('TronChainStreamService', (): void => {
       processedEventsRepository,
       walletEventsRepository,
       alertDispatcherService,
+      tronEventClassifierService,
     );
 
     await service.onModuleInit();
@@ -224,6 +230,9 @@ describe('TronChainStreamService', (): void => {
       chainTronQueueMax: 20,
       chainTronCatchupBatch: 10,
     } as unknown as AppConfigService;
+    const tronEventClassifierService: TronEventClassifierService = new TronEventClassifierService(
+      new TronAddressCodec(),
+    );
 
     const service: TronChainStreamService = new TronChainStreamService(
       appConfigService,
@@ -233,6 +242,7 @@ describe('TronChainStreamService', (): void => {
       processedEventsRepository,
       walletEventsRepository,
       alertDispatcherService,
+      tronEventClassifierService,
     );
 
     await service.onModuleInit();
@@ -305,6 +315,9 @@ describe('TronChainStreamService', (): void => {
       chainTronQueueMax: 120,
       chainTronCatchupBatch: 10,
     } as unknown as AppConfigService;
+    const tronEventClassifierService: TronEventClassifierService = new TronEventClassifierService(
+      new TronAddressCodec(),
+    );
 
     const service: TronChainStreamService = new TronChainStreamService(
       appConfigService,
@@ -314,6 +327,7 @@ describe('TronChainStreamService', (): void => {
       processedEventsRepository,
       walletEventsRepository,
       alertDispatcherService,
+      tronEventClassifierService,
     );
 
     await service.onModuleInit();

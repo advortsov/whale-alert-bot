@@ -59,11 +59,32 @@ type TronGetTransactionInfoResponse = {
   readonly log?: readonly TronTransactionInfoLog[];
 };
 
+type TronTransactionByIdContractValue = {
+  readonly amount?: number | string;
+  readonly asset_name?: string;
+  readonly asset_id?: string;
+};
+
+type TronTransactionByIdContract = {
+  readonly type?: string;
+  readonly parameter?: {
+    readonly value?: TronTransactionByIdContractValue;
+  };
+};
+
+type TronGetTransactionByIdResponse = {
+  readonly raw_data?: {
+    readonly contract?: readonly TronTransactionByIdContract[];
+  };
+};
+
 const DEFAULT_TIMEOUT_MS: number = 8000;
 const DEFAULT_BLOCK_POLL_INTERVAL_MS: number = 1500;
 const DEFAULT_MAX_BLOCK_CATCHUP_PER_POLL: number = 8;
 const DEFAULT_POLL_JITTER_MS: number = 300;
 const HEX_40_SYMBOL_PATTERN: RegExp = /^[0-9a-fA-F]{40}$/;
+const TRC10_HINT_TOPIC: string = 'tron:trc10';
+const TRON_NATIVE_HINT_TOPIC: string = 'tron:native';
 
 type TronStreamOptions = {
   readonly pollIntervalMs: number;
@@ -207,12 +228,17 @@ export abstract class BaseTronRpcAdapter implements IRpcAdapter {
         value: txHash,
         visible: true,
       });
+    const txPayload: TronGetTransactionByIdResponse =
+      await this.callEndpoint<TronGetTransactionByIdResponse>('/wallet/gettransactionbyid', {
+        value: txHash,
+        visible: true,
+      });
 
     if (!this.isObject(payload)) {
       return null;
     }
 
-    const logs: readonly ReceiptLogEnvelope[] = (payload.log ?? []).map(
+    const baseLogs: ReceiptLogEnvelope[] = (payload.log ?? []).map(
       (log: TronTransactionInfoLog, index: number): ReceiptLogEnvelope => ({
         address: this.resolveLogAddress(log.address),
         topics: this.resolveTopics(log.topics),
@@ -220,6 +246,12 @@ export abstract class BaseTronRpcAdapter implements IRpcAdapter {
         logIndex: index,
       }),
     );
+    const hintLog: ReceiptLogEnvelope | null = this.buildContractHintLog(
+      txPayload,
+      baseLogs.length,
+    );
+    const logs: readonly ReceiptLogEnvelope[] =
+      hintLog === null ? baseLogs : [...baseLogs, hintLog];
 
     return {
       txHash,
@@ -396,6 +428,83 @@ export abstract class BaseTronRpcAdapter implements IRpcAdapter {
 
     const normalizedData: string = rawData.trim();
     return normalizedData.startsWith('0x') ? normalizedData : `0x${normalizedData}`;
+  }
+
+  private buildContractHintLog(
+    transactionPayload: TronGetTransactionByIdResponse,
+    logIndex: number,
+  ): ReceiptLogEnvelope | null {
+    const contracts: readonly TronTransactionByIdContract[] =
+      transactionPayload.raw_data?.contract ?? [];
+    const firstContract: TronTransactionByIdContract | undefined = contracts[0];
+
+    if (typeof firstContract?.type !== 'string') {
+      return null;
+    }
+
+    const contractValue: TronTransactionByIdContractValue | undefined =
+      firstContract.parameter?.value;
+    const amountRaw: string = this.normalizeAmount(contractValue?.amount);
+
+    if (firstContract.type === 'TransferAssetContract') {
+      const assetId: string = this.normalizeAssetId(contractValue);
+      return {
+        address: 'tron-system',
+        topics: [TRC10_HINT_TOPIC, assetId],
+        data: this.toHexAmount(amountRaw),
+        logIndex,
+      };
+    }
+
+    if (firstContract.type === 'TransferContract') {
+      return {
+        address: 'tron-system',
+        topics: [TRON_NATIVE_HINT_TOPIC],
+        data: this.toHexAmount(amountRaw),
+        logIndex,
+      };
+    }
+
+    return null;
+  }
+
+  private normalizeAmount(rawAmount: number | string | undefined): string {
+    if (typeof rawAmount === 'number' && Number.isFinite(rawAmount)) {
+      return Math.max(0, Math.floor(rawAmount)).toString();
+    }
+
+    if (typeof rawAmount === 'string') {
+      const normalizedRawAmount: string = rawAmount.trim();
+
+      if (/^\d+$/.test(normalizedRawAmount)) {
+        return normalizedRawAmount;
+      }
+    }
+
+    return '0';
+  }
+
+  private normalizeAssetId(contractValue: TronTransactionByIdContractValue | undefined): string {
+    if (
+      typeof contractValue?.asset_name === 'string' &&
+      contractValue.asset_name.trim().length > 0
+    ) {
+      return contractValue.asset_name.trim();
+    }
+
+    if (typeof contractValue?.asset_id === 'string' && contractValue.asset_id.trim().length > 0) {
+      return contractValue.asset_id.trim();
+    }
+
+    return 'TRC10';
+  }
+
+  private toHexAmount(amountRaw: string): string {
+    try {
+      return `0x${BigInt(amountRaw).toString(16)}`;
+    } catch {
+      return '0x0';
+    }
   }
 
   private isObject(value: unknown): value is Record<string, unknown> {

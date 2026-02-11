@@ -1,9 +1,10 @@
 import { Injectable } from '@nestjs/common';
 
-import type { AppHealthStatus, ComponentHealth } from './health.types';
+import type { AppHealthStatus, ChainStreamHealth, ComponentHealth } from './health.types';
 import { ProviderFactory } from '../chain/providers/provider.factory';
 import { AppConfigService } from '../config/app-config.service';
 import { ChainKey } from '../core/chains/chain-key.interfaces';
+import { RuntimeStatusService } from '../runtime/runtime-status.service';
 import { DatabaseService } from '../storage/database.service';
 
 @Injectable()
@@ -12,6 +13,7 @@ export class HealthService {
     private readonly appConfigService: AppConfigService,
     private readonly databaseService: DatabaseService,
     private readonly providerFactory: ProviderFactory,
+    private readonly runtimeStatusService: RuntimeStatusService,
   ) {}
 
   public async getHealthStatus(): Promise<AppHealthStatus> {
@@ -118,15 +120,30 @@ export class HealthService {
     const isHealthy: boolean =
       database.ok && ethereumChainHealthy && solanaChainHealthy && tronChainHealthy;
 
+    const ethereum: ChainStreamHealth = {
+      rpcPrimary: ethereumRpcPrimary,
+      rpcFallback: ethereumRpcFallback,
+      runtime: this.runtimeStatusService.getChainSnapshot(ChainKey.ETHEREUM_MAINNET),
+    };
+
+    const solana: ChainStreamHealth = {
+      rpcPrimary: solanaPrimaryHealth,
+      rpcFallback: solanaFallbackHealth,
+      runtime: this.runtimeStatusService.getChainSnapshot(ChainKey.SOLANA_MAINNET),
+    };
+
+    const tron: ChainStreamHealth = {
+      rpcPrimary: tronPrimaryHealth,
+      rpcFallback: tronFallbackHealth,
+      runtime: this.runtimeStatusService.getChainSnapshot(ChainKey.TRON_MAINNET),
+    };
+
     return {
       status: isHealthy ? 'ok' : 'degraded',
       database,
-      ethereumRpcPrimary,
-      ethereumRpcFallback,
-      solanaRpcPrimary: solanaPrimaryHealth,
-      solanaRpcFallback: solanaFallbackHealth,
-      tronRpcPrimary: tronPrimaryHealth,
-      tronRpcFallback: tronFallbackHealth,
+      ethereum,
+      solana,
+      tron,
       telegram,
     };
   }

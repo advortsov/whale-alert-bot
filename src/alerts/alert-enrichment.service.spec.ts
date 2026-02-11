@@ -4,6 +4,7 @@ import { AlertEnrichmentService } from './alert-enrichment.service';
 import { TokenMetadataService } from './token-metadata.service';
 import { applyTestEnv } from '../../test/helpers/test-env';
 import {
+  AssetStandard,
   ChainId,
   ClassifiedEventType,
   EventDirection,
@@ -29,6 +30,7 @@ describe('AlertEnrichmentService', (): void => {
       trackedAddress: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       eventType: ClassifiedEventType.TRANSFER,
       direction: EventDirection.IN,
+      assetStandard: AssetStandard.ERC20,
       contractAddress: '0xdac17f958d2ee523a2206206994597c13d831ec7',
       tokenAddress: null,
       tokenSymbol: null,
