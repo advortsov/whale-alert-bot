@@ -888,7 +888,9 @@ export class TrackingService {
         return this.buildStaleMessage(staleEntry.message);
       }
 
-      throw new Error(this.buildHistoryRetryMessage(rateLimitDecision));
+      throw new Error(
+        'Внешний API временно ограничил доступ (429). Повтори через несколько секунд.',
+      );
     }
   }
 

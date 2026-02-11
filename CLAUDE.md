@@ -57,6 +57,7 @@ Core + Ports + Adapters:
 - **Unused vars**: допускается `_` префикс
 - **Prettier**: single quotes, trailing commas, semicolons, 100 chars width, LF
 - **No floating promises** — все async вызовы должны быть awaited или обработаны
+- **Exception messages** — текст в `throw new Error(...)` и логах только на английском. Русский допускается только в user-facing сообщениях (Telegram-ответы пользователю).
 
 ## Команды качества
 
