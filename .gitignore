@@ -12,3 +12,5 @@ target/
 .DS_Store
 .mcp.json
 .claude.json
+/graph.png
+/madge-report.json
