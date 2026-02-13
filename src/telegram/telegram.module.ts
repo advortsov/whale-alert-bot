@@ -2,7 +2,23 @@ import { Module } from '@nestjs/common';
 import { TelegrafModule } from 'nestjs-telegraf';
 import type { TelegrafModuleOptions } from 'nestjs-telegraf/dist/interfaces/telegraf-options.interface';
 
+import {
+  TelegramBasicCommandsService,
+  TelegramBasicCommandsServiceDependencies,
+} from './telegram-basic-commands.service';
+import {
+  TelegramCallbackCommandsService,
+  TelegramCallbackCommandsServiceDependencies,
+} from './telegram-callback-commands.service';
+import { TelegramCallbackParserService } from './telegram-callback-parser.service';
+import { TelegramCommandOrchestratorService } from './telegram-command-orchestrator.service';
+import {
+  TelegramFilterCommandsService,
+  TelegramFilterCommandsServiceDependencies,
+} from './telegram-filter-commands.service';
+import { TelegramParserService } from './telegram-parser.service';
 import { TelegramSenderService } from './telegram-sender.service';
+import { TelegramUiService } from './telegram-ui.service';
 import { TelegramUpdate } from './telegram.update';
 import { AppConfigService } from '../config/app-config.service';
 import { RuntimeModule } from '../runtime/runtime.module';
@@ -30,7 +46,20 @@ const createTelegrafOptions = (appConfigService: AppConfigService): TelegrafModu
       useFactory: createTelegrafOptions,
     }),
   ],
-  providers: [TelegramUpdate, TelegramSenderService],
+  providers: [
+    TelegramParserService,
+    TelegramCallbackParserService,
+    TelegramUiService,
+    TelegramBasicCommandsServiceDependencies,
+    TelegramBasicCommandsService,
+    TelegramFilterCommandsServiceDependencies,
+    TelegramFilterCommandsService,
+    TelegramCallbackCommandsServiceDependencies,
+    TelegramCallbackCommandsService,
+    TelegramCommandOrchestratorService,
+    TelegramUpdate,
+    TelegramSenderService,
+  ],
   exports: [TelegramSenderService],
 })
 export class TelegramModule {}

@@ -1,12 +1,13 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 
 import { TronEventClassifierService } from './tron-event-classifier.service';
 import { AlertDispatcherService } from '../../alerts/alert-dispatcher.service';
 import {
-  BaseChainStreamService,
+  type IBaseChainStreamDependencies,
   type IChainStreamConfig,
   type IMatchedTransaction,
-} from '../../chain/base-chain-stream.service';
+} from '../../chain/base-chain-stream.interfaces';
+import { BaseChainStreamService } from '../../chain/base-chain-stream.service';
 import { ChainId, type ClassifiedEvent } from '../../chain/chain.types';
 import { ProviderFailoverService } from '../../chain/providers/provider-failover.service';
 import { AppConfigService } from '../../config/app-config.service';
@@ -23,6 +24,33 @@ import { SubscriptionsRepository } from '../../storage/repositories/subscription
 import { WalletEventsRepository } from '../../storage/repositories/wallet-events.repository';
 
 @Injectable()
+export class TronChainStreamServiceDependencies implements IBaseChainStreamDependencies {
+  @Inject(AppConfigService)
+  public readonly appConfigService!: AppConfigService;
+
+  @Inject(ProviderFailoverService)
+  public readonly providerFailoverService!: ProviderFailoverService;
+
+  @Inject(ChainCheckpointsRepository)
+  public readonly chainCheckpointsRepository!: ChainCheckpointsRepository;
+
+  @Inject(SubscriptionsRepository)
+  public readonly subscriptionsRepository!: SubscriptionsRepository;
+
+  @Inject(ProcessedEventsRepository)
+  public readonly processedEventsRepository!: ProcessedEventsRepository;
+
+  @Inject(WalletEventsRepository)
+  public readonly walletEventsRepository!: WalletEventsRepository;
+
+  @Inject(AlertDispatcherService)
+  public readonly alertDispatcherService!: AlertDispatcherService;
+
+  @Inject(TronEventClassifierService)
+  public readonly tronEventClassifierService!: TronEventClassifierService;
+}
+
+@Injectable()
 export class TronChainStreamService extends BaseChainStreamService {
   private static readonly CHAIN_CONFIG: IChainStreamConfig = {
     logPrefix: '[TRON]',
@@ -31,25 +59,22 @@ export class TronChainStreamService extends BaseChainStreamService {
     defaultHeartbeatIntervalSec: 60,
   };
 
-  public constructor(
-    private readonly appConfigService: AppConfigService,
-    providerFailoverService: ProviderFailoverService,
-    chainCheckpointsRepository: ChainCheckpointsRepository,
-    subscriptionsRepository: SubscriptionsRepository,
-    processedEventsRepository: ProcessedEventsRepository,
-    walletEventsRepository: WalletEventsRepository,
-    alertDispatcherService: AlertDispatcherService,
-    private readonly tronEventClassifierService: TronEventClassifierService,
-  ) {
-    super(
-      providerFailoverService,
-      chainCheckpointsRepository,
-      subscriptionsRepository,
-      processedEventsRepository,
-      walletEventsRepository,
-      alertDispatcherService,
-    );
+  public constructor(dependencies: TronChainStreamServiceDependencies) {
+    const baseDependencies: IBaseChainStreamDependencies = {
+      providerFailoverService: dependencies.providerFailoverService,
+      chainCheckpointsRepository: dependencies.chainCheckpointsRepository,
+      subscriptionsRepository: dependencies.subscriptionsRepository,
+      processedEventsRepository: dependencies.processedEventsRepository,
+      walletEventsRepository: dependencies.walletEventsRepository,
+      alertDispatcherService: dependencies.alertDispatcherService,
+    };
+    super(baseDependencies);
+    this.appConfigService = dependencies.appConfigService;
+    this.tronEventClassifierService = dependencies.tronEventClassifierService;
   }
+
+  private readonly appConfigService: AppConfigService;
+  private readonly tronEventClassifierService: TronEventClassifierService;
 
   protected getConfig(): IChainStreamConfig {
     return TronChainStreamService.CHAIN_CONFIG;

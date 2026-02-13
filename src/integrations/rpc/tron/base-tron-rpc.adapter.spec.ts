@@ -5,7 +5,12 @@ import { TronAddressCodec } from '../../address/tron/tron-address.codec';
 
 class TestTronAdapter extends BaseTronRpcAdapter {
   public constructor(httpUrl: string, tronApiKey: string | null) {
-    super(httpUrl, 'tron-test-adapter', tronApiKey, new TronAddressCodec());
+    super({
+      httpUrl,
+      providerName: 'tron-test-adapter',
+      tronApiKey,
+      tronAddressCodec: new TronAddressCodec(),
+    });
   }
 }
 

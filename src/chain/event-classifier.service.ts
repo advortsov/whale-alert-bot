@@ -33,7 +33,6 @@ export class EventClassifierService {
   }
 
   public classify(event: ObservedTransaction): ClassifiedEvent {
-    const trackedAddress: string = event.trackedAddress;
     const normalizedTrackedAddress: string = event.trackedAddress.toLowerCase();
 
     for (const log of event.logs) {
@@ -43,90 +42,30 @@ export class EventClassifierService {
         continue;
       }
 
-      if (topic0 === ERC20_TRANSFER_TOPIC) {
-        const fromAddress: string | null = this.topicToAddress(log.topics[1]);
-        const toAddress: string | null = this.topicToAddress(log.topics[2]);
+      const transferEvent: ClassifiedEvent | null = this.classifyTransferLog(
+        event,
+        log,
+        topic0,
+        normalizedTrackedAddress,
+      );
 
-        const isTrackedTransfer: boolean =
-          fromAddress === normalizedTrackedAddress || toAddress === normalizedTrackedAddress;
-
-        if (isTrackedTransfer) {
-          const transferDirection: EventDirection =
-            fromAddress === normalizedTrackedAddress ? EventDirection.OUT : EventDirection.IN;
-          const counterpartyAddress: string | null =
-            transferDirection === EventDirection.OUT ? toAddress : fromAddress;
-
-          return {
-            chainId: ChainId.ETHEREUM_MAINNET,
-            txHash: event.txHash,
-            logIndex: log.logIndex,
-            trackedAddress,
-            eventType: ClassifiedEventType.TRANSFER,
-            direction: transferDirection,
-            assetStandard: AssetStandard.ERC20,
-            contractAddress: log.address,
-            tokenAddress: log.address,
-            tokenSymbol: null,
-            tokenDecimals: null,
-            tokenAmountRaw: this.tryDecodeUint256(log.data),
-            valueFormatted: null,
-            counterpartyAddress,
-            dex: null,
-            pair: null,
-          };
-        }
+      if (transferEvent !== null) {
+        return transferEvent;
       }
 
-      const isSwapTopic: boolean = SUPPORTED_SWAP_TOPICS.includes(topic0);
-      const isAllowedPool: boolean =
-        this.swapAllowlist.size === 0 || this.swapAllowlist.has(log.address);
+      const swapEvent: ClassifiedEvent | null = this.classifySwapLog(
+        event,
+        log,
+        topic0,
+        normalizedTrackedAddress,
+      );
 
-      if (isSwapTopic && isAllowedPool) {
-        const swapDirection: EventDirection = this.resolveSwapDirection(
-          event.txFrom.toLowerCase(),
-          event.txTo?.toLowerCase() ?? null,
-          normalizedTrackedAddress,
-        );
-
-        return {
-          chainId: event.chainId,
-          txHash: event.txHash,
-          logIndex: log.logIndex,
-          trackedAddress,
-          eventType: ClassifiedEventType.SWAP,
-          direction: swapDirection,
-          assetStandard: AssetStandard.NATIVE,
-          contractAddress: log.address,
-          tokenAddress: null,
-          tokenSymbol: null,
-          tokenDecimals: null,
-          tokenAmountRaw: null,
-          valueFormatted: null,
-          counterpartyAddress: null,
-          dex: this.mapDex(topic0),
-          pair: null,
-        };
+      if (swapEvent !== null) {
+        return swapEvent;
       }
     }
 
-    return {
-      chainId: event.chainId,
-      txHash: event.txHash,
-      logIndex: 0,
-      trackedAddress,
-      eventType: ClassifiedEventType.UNKNOWN,
-      direction: EventDirection.UNKNOWN,
-      assetStandard: AssetStandard.NATIVE,
-      contractAddress: null,
-      tokenAddress: null,
-      tokenSymbol: null,
-      tokenDecimals: null,
-      tokenAmountRaw: null,
-      valueFormatted: null,
-      counterpartyAddress: null,
-      dex: null,
-      pair: null,
-    };
+    return this.buildUnknownEvent(event);
   }
 
   private topicToAddress(topic: string | undefined): string | null {
@@ -175,5 +114,128 @@ export class EventClassifierService {
     }
 
     return EventDirection.UNKNOWN;
+  }
+
+  private classifyTransferLog(
+    event: ObservedTransaction,
+    log: ObservedTransaction['logs'][number],
+    topic0: string,
+    normalizedTrackedAddress: string,
+  ): ClassifiedEvent | null {
+    if (topic0 !== ERC20_TRANSFER_TOPIC) {
+      return null;
+    }
+
+    const fromAddress: string | null = this.topicToAddress(log.topics[1]);
+    const toAddress: string | null = this.topicToAddress(log.topics[2]);
+    const isTrackedTransfer: boolean =
+      fromAddress === normalizedTrackedAddress || toAddress === normalizedTrackedAddress;
+
+    if (!isTrackedTransfer) {
+      return null;
+    }
+
+    const transferDirection: EventDirection =
+      fromAddress === normalizedTrackedAddress ? EventDirection.OUT : EventDirection.IN;
+    const counterpartyAddress: string | null =
+      transferDirection === EventDirection.OUT ? toAddress : fromAddress;
+
+    return this.buildTransferEvent(event, log, transferDirection, counterpartyAddress);
+  }
+
+  private classifySwapLog(
+    event: ObservedTransaction,
+    log: ObservedTransaction['logs'][number],
+    topic0: string,
+    normalizedTrackedAddress: string,
+  ): ClassifiedEvent | null {
+    const isSwapTopic: boolean = SUPPORTED_SWAP_TOPICS.includes(topic0);
+    const isAllowedPool: boolean =
+      this.swapAllowlist.size === 0 || this.swapAllowlist.has(log.address);
+
+    if (!isSwapTopic || !isAllowedPool) {
+      return null;
+    }
+
+    const swapDirection: EventDirection = this.resolveSwapDirection(
+      event.txFrom.toLowerCase(),
+      event.txTo?.toLowerCase() ?? null,
+      normalizedTrackedAddress,
+    );
+
+    return this.buildSwapEvent(event, log, topic0, swapDirection);
+  }
+
+  private buildTransferEvent(
+    event: ObservedTransaction,
+    log: ObservedTransaction['logs'][number],
+    direction: EventDirection,
+    counterpartyAddress: string | null,
+  ): ClassifiedEvent {
+    return {
+      chainId: ChainId.ETHEREUM_MAINNET,
+      txHash: event.txHash,
+      logIndex: log.logIndex,
+      trackedAddress: event.trackedAddress,
+      eventType: ClassifiedEventType.TRANSFER,
+      direction,
+      assetStandard: AssetStandard.ERC20,
+      contractAddress: log.address,
+      tokenAddress: log.address,
+      tokenSymbol: null,
+      tokenDecimals: null,
+      tokenAmountRaw: this.tryDecodeUint256(log.data),
+      valueFormatted: null,
+      counterpartyAddress,
+      dex: null,
+      pair: null,
+    };
+  }
+
+  private buildSwapEvent(
+    event: ObservedTransaction,
+    log: ObservedTransaction['logs'][number],
+    topic0: string,
+    direction: EventDirection,
+  ): ClassifiedEvent {
+    return {
+      chainId: event.chainId,
+      txHash: event.txHash,
+      logIndex: log.logIndex,
+      trackedAddress: event.trackedAddress,
+      eventType: ClassifiedEventType.SWAP,
+      direction,
+      assetStandard: AssetStandard.NATIVE,
+      contractAddress: log.address,
+      tokenAddress: null,
+      tokenSymbol: null,
+      tokenDecimals: null,
+      tokenAmountRaw: null,
+      valueFormatted: null,
+      counterpartyAddress: null,
+      dex: this.mapDex(topic0),
+      pair: null,
+    };
+  }
+
+  private buildUnknownEvent(event: ObservedTransaction): ClassifiedEvent {
+    return {
+      chainId: event.chainId,
+      txHash: event.txHash,
+      logIndex: 0,
+      trackedAddress: event.trackedAddress,
+      eventType: ClassifiedEventType.UNKNOWN,
+      direction: EventDirection.UNKNOWN,
+      assetStandard: AssetStandard.NATIVE,
+      contractAddress: null,
+      tokenAddress: null,
+      tokenSymbol: null,
+      tokenDecimals: null,
+      tokenAmountRaw: null,
+      valueFormatted: null,
+      counterpartyAddress: null,
+      dex: null,
+      pair: null,
+    };
   }
 }

@@ -1,9 +1,13 @@
 import { Module } from '@nestjs/common';
 
-import { AlertDispatcherService } from './alert-dispatcher.service';
+import { AlertDispatcherDependencies, AlertDispatcherService } from './alert-dispatcher.service';
 import { AlertEnrichmentService } from './alert-enrichment.service';
 import { AlertFilterPolicyService } from './alert-filter-policy.service';
 import { AlertMessageFormatter } from './alert-message.formatter';
+import {
+  AlertRecipientEvaluatorDependencies,
+  AlertRecipientEvaluatorService,
+} from './alert-recipient-evaluator.service';
 import { AlertSuppressionService } from './alert-suppression.service';
 import { CexAddressBookService } from './cex-address-book.service';
 import { QuietHoursService } from './quiet-hours.service';
@@ -35,6 +39,9 @@ import { TelegramModule } from '../telegram/telegram.module';
     CexAddressBookService,
     QuietHoursService,
     AlertMessageFormatter,
+    AlertRecipientEvaluatorDependencies,
+    AlertRecipientEvaluatorService,
+    AlertDispatcherDependencies,
     AlertDispatcherService,
   ],
   exports: [
@@ -45,6 +52,7 @@ import { TelegramModule } from '../telegram/telegram.module';
     CexAddressBookService,
     QuietHoursService,
     AlertMessageFormatter,
+    AlertRecipientEvaluatorService,
     AlertDispatcherService,
   ],
 })

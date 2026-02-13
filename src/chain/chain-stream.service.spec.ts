@@ -195,7 +195,7 @@ describe('ChainStreamService', (): void => {
       }),
     } as unknown as RuntimeStatusService;
 
-    const service: ChainStreamService = new ChainStreamService(
+    const service: ChainStreamService = new ChainStreamService({
       appConfigService,
       providerFactory,
       providerFailoverService,
@@ -206,7 +206,7 @@ describe('ChainStreamService', (): void => {
       walletEventsRepository,
       eventClassifierService,
       alertDispatcherService,
-    );
+    });
 
     await service.onModuleInit();
 
@@ -314,7 +314,7 @@ describe('ChainStreamService', (): void => {
       }),
     } as unknown as RuntimeStatusService;
 
-    const service: ChainStreamService = new ChainStreamService(
+    const service: ChainStreamService = new ChainStreamService({
       appConfigService,
       providerFactory,
       providerFailoverService,
@@ -325,7 +325,7 @@ describe('ChainStreamService', (): void => {
       walletEventsRepository,
       eventClassifierService,
       alertDispatcherService,
-    );
+    });
 
     await service.onModuleInit();
 
@@ -455,7 +455,7 @@ describe('ChainStreamService', (): void => {
       }),
     } as unknown as RuntimeStatusService;
 
-    const service: ChainStreamService = new ChainStreamService(
+    const service: ChainStreamService = new ChainStreamService({
       appConfigService,
       providerFactory,
       providerFailoverService,
@@ -466,7 +466,7 @@ describe('ChainStreamService', (): void => {
       walletEventsRepository,
       eventClassifierService,
       alertDispatcherService,
-    );
+    });
 
     await service.onModuleInit();
 

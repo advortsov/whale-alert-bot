@@ -16,6 +16,15 @@ import {
 
 const HTTP_STATUS_TOO_MANY_REQUESTS = 429;
 
+type CoinGeckoCacheEntryInput = {
+  readonly key: string;
+  readonly chainKey: ChainKey;
+  readonly tokenAddress: string | null;
+  readonly tokenSymbol: string | null;
+  readonly usdPrice: number;
+  readonly nowEpochMs: number;
+};
+
 @Injectable()
 export class CoinGeckoPricingAdapter implements ITokenPricingPort {
   private readonly logger: Logger = new Logger(CoinGeckoPricingAdapter.name);
@@ -49,14 +58,14 @@ export class CoinGeckoPricingAdapter implements ITokenPricingPort {
     const quoteResult: ICoinGeckoQuoteResult = await this.fetchUsdQuote(request);
 
     if (quoteResult.usdPrice !== null) {
-      const cacheEntry: ICoinGeckoPriceCacheEntry = this.setCacheEntry(
+      const cacheEntry: ICoinGeckoPriceCacheEntry = this.setCacheEntry({
         key,
-        request.chainKey,
-        request.tokenAddress,
-        request.tokenSymbol,
-        quoteResult.usdPrice,
+        chainKey: request.chainKey,
+        tokenAddress: request.tokenAddress,
+        tokenSymbol: request.tokenSymbol,
+        usdPrice: quoteResult.usdPrice,
         nowEpochMs,
-      );
+      });
       return this.mapCacheEntryToQuote(cacheEntry, false);
     }
 
@@ -188,32 +197,25 @@ export class CoinGeckoPricingAdapter implements ITokenPricingPort {
       );
   }
 
-  private setCacheEntry(
-    key: string,
-    chainKey: ChainKey,
-    tokenAddress: string | null,
-    tokenSymbol: string | null,
-    usdPrice: number,
-    nowEpochMs: number,
-  ): ICoinGeckoPriceCacheEntry {
+  private setCacheEntry(input: CoinGeckoCacheEntryInput): ICoinGeckoPriceCacheEntry {
     const freshTtlMs: number = this.appConfigService.priceCacheFreshTtlSec * 1000;
     const staleTtlMs: number = this.appConfigService.priceCacheStaleTtlSec * 1000;
     const cacheEntry: ICoinGeckoPriceCacheEntry = {
-      key,
-      chainKey,
-      tokenAddress,
-      tokenSymbol,
-      usdPrice,
-      fetchedAtEpochMs: nowEpochMs,
-      freshUntilEpochMs: nowEpochMs + freshTtlMs,
-      staleUntilEpochMs: nowEpochMs + staleTtlMs,
+      key: input.key,
+      chainKey: input.chainKey,
+      tokenAddress: input.tokenAddress,
+      tokenSymbol: input.tokenSymbol,
+      usdPrice: input.usdPrice,
+      fetchedAtEpochMs: input.nowEpochMs,
+      freshUntilEpochMs: input.nowEpochMs + freshTtlMs,
+      staleUntilEpochMs: input.nowEpochMs + staleTtlMs,
     };
 
-    if (this.cache.has(key)) {
-      this.cache.delete(key);
+    if (this.cache.has(input.key)) {
+      this.cache.delete(input.key);
     }
 
-    this.cache.set(key, cacheEntry);
+    this.cache.set(input.key, cacheEntry);
     this.evictIfNeeded();
     return cacheEntry;
   }

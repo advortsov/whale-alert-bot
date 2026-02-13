@@ -1,11 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 
 import {
-  BaseChainStreamService,
+  type IBaseChainStreamDependencies,
   type IChainRuntimeSnapshot,
   type IChainStreamConfig,
   type IMatchedTransaction,
-} from './base-chain-stream.service';
+} from './base-chain-stream.interfaces';
+import { BaseChainStreamService } from './base-chain-stream.service';
 import {
   ChainId,
   ClassifiedEventType,
@@ -27,6 +28,39 @@ import { SubscriptionsRepository } from '../storage/repositories/subscriptions.r
 import { WalletEventsRepository } from '../storage/repositories/wallet-events.repository';
 
 @Injectable()
+export class ChainStreamServiceDependencies implements IBaseChainStreamDependencies {
+  @Inject(AppConfigService)
+  public readonly appConfigService!: AppConfigService;
+
+  @Inject(ProviderFactory)
+  public readonly providerFactory!: ProviderFactory;
+
+  @Inject(ProviderFailoverService)
+  public readonly providerFailoverService!: ProviderFailoverService;
+
+  @Inject(RuntimeStatusService)
+  public readonly runtimeStatusService!: RuntimeStatusService;
+
+  @Inject(ChainCheckpointsRepository)
+  public readonly chainCheckpointsRepository!: ChainCheckpointsRepository;
+
+  @Inject(SubscriptionsRepository)
+  public readonly subscriptionsRepository!: SubscriptionsRepository;
+
+  @Inject(ProcessedEventsRepository)
+  public readonly processedEventsRepository!: ProcessedEventsRepository;
+
+  @Inject(WalletEventsRepository)
+  public readonly walletEventsRepository!: WalletEventsRepository;
+
+  @Inject(EventClassifierService)
+  public readonly eventClassifierService!: EventClassifierService;
+
+  @Inject(AlertDispatcherService)
+  public readonly alertDispatcherService!: AlertDispatcherService;
+}
+
+@Injectable()
 export class ChainStreamService extends BaseChainStreamService {
   private static readonly CHAIN_CONFIG: IChainStreamConfig = {
     logPrefix: '[ETH]',
@@ -35,27 +69,26 @@ export class ChainStreamService extends BaseChainStreamService {
     defaultHeartbeatIntervalSec: 60,
   };
 
-  public constructor(
-    private readonly appConfigService: AppConfigService,
-    private readonly providerFactory: ProviderFactory,
-    providerFailoverService: ProviderFailoverService,
-    private readonly runtimeStatusService: RuntimeStatusService,
-    chainCheckpointsRepository: ChainCheckpointsRepository,
-    subscriptionsRepository: SubscriptionsRepository,
-    processedEventsRepository: ProcessedEventsRepository,
-    walletEventsRepository: WalletEventsRepository,
-    private readonly eventClassifierService: EventClassifierService,
-    alertDispatcherService: AlertDispatcherService,
-  ) {
-    super(
-      providerFailoverService,
-      chainCheckpointsRepository,
-      subscriptionsRepository,
-      processedEventsRepository,
-      walletEventsRepository,
-      alertDispatcherService,
-    );
+  public constructor(dependencies: ChainStreamServiceDependencies) {
+    const baseDependencies: IBaseChainStreamDependencies = {
+      providerFailoverService: dependencies.providerFailoverService,
+      chainCheckpointsRepository: dependencies.chainCheckpointsRepository,
+      subscriptionsRepository: dependencies.subscriptionsRepository,
+      processedEventsRepository: dependencies.processedEventsRepository,
+      walletEventsRepository: dependencies.walletEventsRepository,
+      alertDispatcherService: dependencies.alertDispatcherService,
+    };
+    super(baseDependencies);
+    this.appConfigService = dependencies.appConfigService;
+    this.providerFactory = dependencies.providerFactory;
+    this.runtimeStatusService = dependencies.runtimeStatusService;
+    this.eventClassifierService = dependencies.eventClassifierService;
   }
+
+  private readonly appConfigService: AppConfigService;
+  private readonly providerFactory: ProviderFactory;
+  private readonly runtimeStatusService: RuntimeStatusService;
+  private readonly eventClassifierService: EventClassifierService;
 
   protected getConfig(): IChainStreamConfig {
     return ChainStreamService.CHAIN_CONFIG;

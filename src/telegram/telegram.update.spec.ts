@@ -38,7 +38,11 @@ const createUpdate = (trackingServiceStub: TrackingService): TelegramUpdate => {
     appVersion: '0.1.0-test',
   } as unknown as AppConfigService;
 
-  return new TelegramUpdate(trackingServiceStub, runtimeStatusServiceStub, appConfigServiceStub);
+  return TelegramUpdate.createForTesting(
+    trackingServiceStub,
+    runtimeStatusServiceStub,
+    appConfigServiceStub,
+  );
 };
 
 describe('TelegramUpdate', (): void => {
@@ -197,12 +201,14 @@ describe('TelegramUpdate', (): void => {
         telegramId: '42',
         username: 'tester',
       },
-      '#16',
-      '10',
-      '0',
-      HistoryRequestSource.CALLBACK,
-      HistoryKind.ALL,
-      HistoryDirectionFilter.ALL,
+      {
+        rawAddress: '#16',
+        rawLimit: '10',
+        rawOffset: '0',
+        source: HistoryRequestSource.CALLBACK,
+        rawKind: HistoryKind.ALL,
+        rawDirection: HistoryDirectionFilter.ALL,
+      },
     );
     expect(answerCbQueryMock).toHaveBeenCalledWith('Выполняю действие...');
     expect(replyMock).toHaveBeenCalledWith(

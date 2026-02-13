@@ -152,7 +152,7 @@ describe('TronChainStreamService', (): void => {
       new TronAddressCodec(),
     );
 
-    const service: TronChainStreamService = new TronChainStreamService(
+    const service: TronChainStreamService = new TronChainStreamService({
       appConfigService,
       providerFailoverService,
       chainCheckpointsRepository,
@@ -161,7 +161,7 @@ describe('TronChainStreamService', (): void => {
       walletEventsRepository,
       alertDispatcherService,
       tronEventClassifierService,
-    );
+    });
 
     await service.onModuleInit();
 
@@ -240,7 +240,7 @@ describe('TronChainStreamService', (): void => {
       new TronAddressCodec(),
     );
 
-    const service: TronChainStreamService = new TronChainStreamService(
+    const service: TronChainStreamService = new TronChainStreamService({
       appConfigService,
       providerFailoverService,
       chainCheckpointsRepository,
@@ -249,7 +249,7 @@ describe('TronChainStreamService', (): void => {
       walletEventsRepository,
       alertDispatcherService,
       tronEventClassifierService,
-    );
+    });
 
     await service.onModuleInit();
 
@@ -325,7 +325,7 @@ describe('TronChainStreamService', (): void => {
       new TronAddressCodec(),
     );
 
-    const service: TronChainStreamService = new TronChainStreamService(
+    const service: TronChainStreamService = new TronChainStreamService({
       appConfigService,
       providerFailoverService,
       chainCheckpointsRepository,
@@ -334,7 +334,7 @@ describe('TronChainStreamService', (): void => {
       walletEventsRepository,
       alertDispatcherService,
       tronEventClassifierService,
-    );
+    });
 
     await service.onModuleInit();
     await sleep(80);

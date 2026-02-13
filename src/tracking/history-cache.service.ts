@@ -4,6 +4,12 @@ import type { HistoryCacheEntry, HistoryCacheKey } from './history-cache.interfa
 import { AppConfigService } from '../config/app-config.service';
 import { HistoryDirectionFilter, HistoryKind } from '../features/tracking/dto/history-request.dto';
 
+type HistoryCacheLookupOptions = {
+  readonly kind?: HistoryKind;
+  readonly direction?: HistoryDirectionFilter;
+  readonly nowEpochMs?: number;
+};
+
 @Injectable()
 export class HistoryCacheService {
   private readonly cache: Map<string, HistoryCacheEntry> = new Map<string, HistoryCacheEntry>();
@@ -13,10 +19,11 @@ export class HistoryCacheService {
   public getFresh(
     address: string,
     limit: number,
-    kind: HistoryKind = HistoryKind.ALL,
-    direction: HistoryDirectionFilter = HistoryDirectionFilter.ALL,
-    nowEpochMs: number = Date.now(),
+    options: HistoryCacheLookupOptions = {},
   ): HistoryCacheEntry | null {
+    const kind: HistoryKind = options.kind ?? HistoryKind.ALL;
+    const direction: HistoryDirectionFilter = options.direction ?? HistoryDirectionFilter.ALL;
+    const nowEpochMs: number = options.nowEpochMs ?? Date.now();
     const key: string = this.buildMapKey(address, limit, kind, direction);
     const entry: HistoryCacheEntry | undefined = this.cache.get(key);
 
@@ -34,10 +41,11 @@ export class HistoryCacheService {
   public getStale(
     address: string,
     limit: number,
-    kind: HistoryKind = HistoryKind.ALL,
-    direction: HistoryDirectionFilter = HistoryDirectionFilter.ALL,
-    nowEpochMs: number = Date.now(),
+    options: HistoryCacheLookupOptions = {},
   ): HistoryCacheEntry | null {
+    const kind: HistoryKind = options.kind ?? HistoryKind.ALL;
+    const direction: HistoryDirectionFilter = options.direction ?? HistoryDirectionFilter.ALL;
+    const nowEpochMs: number = options.nowEpochMs ?? Date.now();
     const key: string = this.buildMapKey(address, limit, kind, direction);
     const entry: HistoryCacheEntry | undefined = this.cache.get(key);
 
@@ -57,10 +65,11 @@ export class HistoryCacheService {
     address: string,
     limit: number,
     message: string,
-    kind: HistoryKind = HistoryKind.ALL,
-    direction: HistoryDirectionFilter = HistoryDirectionFilter.ALL,
-    nowEpochMs: number = Date.now(),
+    options: HistoryCacheLookupOptions = {},
   ): HistoryCacheEntry {
+    const kind: HistoryKind = options.kind ?? HistoryKind.ALL;
+    const direction: HistoryDirectionFilter = options.direction ?? HistoryDirectionFilter.ALL;
+    const nowEpochMs: number = options.nowEpochMs ?? Date.now();
     const key: HistoryCacheKey = {
       address: address.toLowerCase(),
       limit,

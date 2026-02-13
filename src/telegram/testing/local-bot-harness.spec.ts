@@ -278,12 +278,14 @@ describe('LocalBotHarness', (): void => {
         telegramId: '42',
         username: 'tester',
       },
-      '#16',
-      '10',
-      '0',
-      HistoryRequestSource.CALLBACK,
-      HistoryKind.ALL,
-      HistoryDirectionFilter.ALL,
+      {
+        rawAddress: '#16',
+        rawLimit: '10',
+        rawOffset: '0',
+        source: HistoryRequestSource.CALLBACK,
+        rawKind: HistoryKind.ALL,
+        rawDirection: HistoryDirectionFilter.ALL,
+      },
     );
     expect(result.replies[0]?.options).toMatchObject({
       parse_mode: 'HTML',

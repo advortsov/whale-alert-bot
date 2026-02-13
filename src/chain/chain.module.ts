@@ -1,11 +1,17 @@
 import { Module } from '@nestjs/common';
 
-import { ChainStreamService } from './chain-stream.service';
+import { ChainStreamService, ChainStreamServiceDependencies } from './chain-stream.service';
 import { EventClassifierService } from './event-classifier.service';
 import { AlertsModule } from '../alerts/alerts.module';
-import { SolanaChainStreamService } from '../chains/solana/solana-chain-stream.service';
+import {
+  SolanaChainStreamService,
+  SolanaChainStreamServiceDependencies,
+} from '../chains/solana/solana-chain-stream.service';
 import { SolanaEventClassifierService } from '../chains/solana/solana-event-classifier.service';
-import { TronChainStreamService } from '../chains/tron/tron-chain-stream.service';
+import {
+  TronChainStreamService,
+  TronChainStreamServiceDependencies,
+} from '../chains/tron/tron-chain-stream.service';
 import { TronEventClassifierService } from '../chains/tron/tron-event-classifier.service';
 import {
   ETHEREUM_FALLBACK_RPC_ADAPTER,
@@ -68,6 +74,9 @@ import { RpcThrottlerService } from './providers/rpc-throttler.service';
     EventClassifierService,
     SolanaEventClassifierService,
     TronEventClassifierService,
+    ChainStreamServiceDependencies,
+    SolanaChainStreamServiceDependencies,
+    TronChainStreamServiceDependencies,
     ChainStreamService,
     SolanaChainStreamService,
     TronChainStreamService,

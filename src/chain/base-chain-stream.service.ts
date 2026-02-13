@@ -1,34 +1,18 @@
 import { Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 
+import type {
+  IBaseChainStreamDependencies,
+  IChainRuntimeSnapshot,
+  IChainStreamConfig,
+  IMatchedTransaction,
+} from './base-chain-stream.interfaces';
 import { ClassifiedEventType, type ClassifiedEvent } from './chain.types';
-import type { ProviderFailoverService } from './providers/provider-failover.service';
-import type { AlertDispatcherService } from '../alerts/alert-dispatcher.service';
-import type { ChainKey } from '../core/chains/chain-key.interfaces';
 import type {
   IBlockEnvelope,
   ITransactionEnvelope,
 } from '../core/ports/rpc/block-stream.interfaces';
 import type { ISubscriptionHandle } from '../core/ports/rpc/rpc-adapter.interfaces';
 import { QueueOverflowPolicy } from '../core/ports/rpc/stream-policy.interfaces';
-import type { ChainCheckpointsRepository } from '../storage/repositories/chain-checkpoints.repository';
-import type { ProcessedEventsRepository } from '../storage/repositories/processed-events.repository';
-import type { SubscriptionsRepository } from '../storage/repositories/subscriptions.repository';
-import type { WalletEventsRepository } from '../storage/repositories/wallet-events.repository';
-
-export interface IChainStreamConfig {
-  readonly logPrefix: string;
-  readonly chainKey: ChainKey;
-  readonly chainId: number;
-  readonly defaultHeartbeatIntervalSec: number;
-}
-
-export interface IMatchedTransaction {
-  readonly txHash: string;
-  readonly txFrom: string;
-  readonly txTo: string | null;
-  readonly trackedAddress: string;
-  readonly blockTimestampSec: number | null;
-}
 
 const QUEUE_RETAIN_RATIO = 0.3;
 const QUEUE_RETAIN_MIN = 10;
@@ -36,10 +20,6 @@ const DEGRADATION_EXIT_USAGE_RATIO = 0.25;
 const DEGRADATION_EXIT_LAG_RATIO = 0.5;
 const PERCENT_MULTIPLIER = 100;
 
-/**
- * Базовый оркестратор для chain stream pipeline.
- * Chain-specific адаптеры наследуют и реализуют abstract-методы.
- */
 export abstract class BaseChainStreamService implements OnModuleInit, OnModuleDestroy {
   protected readonly logger: Logger;
   protected readonly blockQueue: number[] = [];
@@ -50,14 +30,20 @@ export abstract class BaseChainStreamService implements OnModuleInit, OnModuleDe
   private heartbeatTimer: NodeJS.Timeout | null = null;
   private isDegradationMode: boolean = false;
 
-  protected constructor(
-    protected readonly providerFailoverService: ProviderFailoverService,
-    protected readonly chainCheckpointsRepository: ChainCheckpointsRepository,
-    protected readonly subscriptionsRepository: SubscriptionsRepository,
-    protected readonly processedEventsRepository: ProcessedEventsRepository,
-    protected readonly walletEventsRepository: WalletEventsRepository,
-    protected readonly alertDispatcherService: AlertDispatcherService,
-  ) {
+  protected readonly providerFailoverService: IBaseChainStreamDependencies['providerFailoverService'];
+  protected readonly chainCheckpointsRepository: IBaseChainStreamDependencies['chainCheckpointsRepository'];
+  protected readonly subscriptionsRepository: IBaseChainStreamDependencies['subscriptionsRepository'];
+  protected readonly processedEventsRepository: IBaseChainStreamDependencies['processedEventsRepository'];
+  protected readonly walletEventsRepository: IBaseChainStreamDependencies['walletEventsRepository'];
+  protected readonly alertDispatcherService: IBaseChainStreamDependencies['alertDispatcherService'];
+
+  protected constructor(dependencies: IBaseChainStreamDependencies) {
+    this.providerFailoverService = dependencies.providerFailoverService;
+    this.chainCheckpointsRepository = dependencies.chainCheckpointsRepository;
+    this.subscriptionsRepository = dependencies.subscriptionsRepository;
+    this.processedEventsRepository = dependencies.processedEventsRepository;
+    this.walletEventsRepository = dependencies.walletEventsRepository;
+    this.alertDispatcherService = dependencies.alertDispatcherService;
     this.logger = new Logger(this.constructor.name);
   }
 
@@ -73,44 +59,30 @@ export abstract class BaseChainStreamService implements OnModuleInit, OnModuleDe
 
   protected abstract getReorgConfirmations(): number;
 
-  /** Fetch block envelope via provider failover for this chain. */
   protected abstract fetchBlockEnvelope(blockNumber: number): Promise<IBlockEnvelope | null>;
 
-  /** Fetch latest block number via provider failover for this chain. */
   protected abstract fetchLatestBlockNumber(): Promise<number>;
 
-  /** Subscribe to new blocks via provider failover for this chain. */
   protected abstract subscribeToBlocks(
     handler: (blockNumber: number) => Promise<void>,
   ): Promise<ISubscriptionHandle>;
 
-  /**
-   * Classify a matched transaction and return a ClassifiedEvent, or null if UNKNOWN.
-   * Chain adapters fetch receipts and run their classifier inside this method.
-   */
   protected abstract classifyTransaction(
     matched: IMatchedTransaction,
   ): Promise<ClassifiedEvent | null>;
 
-  /** Resolve tracked addresses for this chain. Returns addresses in canonical form. */
   protected abstract resolveTrackedAddresses(): Promise<readonly string[]>;
 
-  /**
-   * Match transaction against tracked addresses.
-   * Returns the tracked address if matched, null otherwise.
-   */
   protected abstract matchTransaction(
     txFrom: string,
     txTo: string | null,
     trackedAddresses: readonly string[],
   ): string | null;
 
-  /** Hook called after successful init. Override to add chain-specific startup logic. */
   protected async onChainInit(): Promise<void> {
     // default no-op
   }
 
-  /** Hook called on each runtime snapshot update. Override to publish telemetry. */
   protected onSnapshotUpdated(_snapshot: IChainRuntimeSnapshot): void {
     // default no-op
   }
@@ -511,13 +483,9 @@ export abstract class BaseChainStreamService implements OnModuleInit, OnModuleDe
   }
 }
 
-export interface IChainRuntimeSnapshot {
-  readonly chainKey: ChainKey;
-  readonly observedBlock: number | null;
-  readonly processedBlock: number | null;
-  readonly lag: number | null;
-  readonly queueSize: number;
-  readonly backoffMs: number;
-  readonly isDegradationMode: boolean;
-  readonly updatedAtIso: string;
-}
+export type {
+  IBaseChainStreamDependencies,
+  IChainRuntimeSnapshot,
+  IChainStreamConfig,
+  IMatchedTransaction,
+} from './base-chain-stream.interfaces';

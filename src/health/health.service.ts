@@ -7,6 +7,17 @@ import { ChainKey } from '../core/chains/chain-key.interfaces';
 import { RuntimeStatusService } from '../runtime/runtime-status.service';
 import { DatabaseService } from '../storage/database.service';
 
+interface IProviderHealthResult {
+  readonly provider: string;
+  readonly ok: boolean;
+  readonly details: string;
+}
+
+interface IChainHealthSnapshot {
+  readonly chainHealthy: boolean;
+  readonly stream: ChainStreamHealth;
+}
+
 @Injectable()
 export class HealthService {
   public constructor(
@@ -18,133 +29,118 @@ export class HealthService {
 
   public async getHealthStatus(): Promise<AppHealthStatus> {
     const databaseOk: boolean = await this.databaseService.healthCheck();
+    const ethereum: IChainHealthSnapshot = await this.buildChainHealthSnapshot({
+      chainKey: ChainKey.ETHEREUM_MAINNET,
+      enabled: this.appConfigService.chainWatcherEnabled,
+      primaryProviderName: 'alchemy-primary',
+      fallbackProviderName: 'infura-fallback',
+      disabledReason: 'disabled by CHAIN_WATCHER_ENABLED=false',
+    });
+    const solana: IChainHealthSnapshot = await this.buildChainHealthSnapshot({
+      chainKey: ChainKey.SOLANA_MAINNET,
+      enabled: this.appConfigService.solanaWatcherEnabled,
+      primaryProviderName: 'solana-helius-primary',
+      fallbackProviderName: 'solana-public-fallback',
+      disabledReason: 'disabled by SOLANA_WATCHER_ENABLED=false',
+    });
+    const tron: IChainHealthSnapshot = await this.buildChainHealthSnapshot({
+      chainKey: ChainKey.TRON_MAINNET,
+      enabled: this.appConfigService.tronWatcherEnabled,
+      primaryProviderName: 'tron-grid-primary',
+      fallbackProviderName: 'tron-public-fallback',
+      disabledReason: 'disabled by TRON_WATCHER_ENABLED=false',
+    });
+    const database: ComponentHealth = this.buildDatabaseHealth(databaseOk);
+    const telegram: ComponentHealth = this.buildTelegramHealth();
+    const isHealthy: boolean =
+      database.ok && ethereum.chainHealthy && solana.chainHealthy && tron.chainHealthy;
 
-    const ethereumRpcChecksEnabled: boolean = this.appConfigService.chainWatcherEnabled;
+    return {
+      status: isHealthy ? 'ok' : 'degraded',
+      database,
+      ethereum: ethereum.stream,
+      solana: solana.stream,
+      tron: tron.stream,
+      telegram,
+    };
+  }
 
-    const ethereumPrimaryProviderHealth = ethereumRpcChecksEnabled
-      ? await this.providerFactory.createPrimary(ChainKey.ETHEREUM_MAINNET).healthCheck()
-      : {
-          provider: 'alchemy-primary',
-          ok: true,
-          details: 'disabled by CHAIN_WATCHER_ENABLED=false',
-        };
-    const ethereumFallbackProviderHealth = ethereumRpcChecksEnabled
-      ? await this.providerFactory.createFallback(ChainKey.ETHEREUM_MAINNET).healthCheck()
-      : {
-          provider: 'infura-fallback',
-          ok: true,
-          details: 'disabled by CHAIN_WATCHER_ENABLED=false',
-        };
-    const solanaRpcChecksEnabled: boolean = this.appConfigService.solanaWatcherEnabled;
-
-    const solanaPrimaryProviderHealth = solanaRpcChecksEnabled
-      ? await this.providerFactory.createPrimary(ChainKey.SOLANA_MAINNET).healthCheck()
-      : {
-          provider: 'solana-helius-primary',
-          ok: true,
-          details: 'disabled by SOLANA_WATCHER_ENABLED=false',
-        };
-
-    const solanaFallbackProviderHealth = solanaRpcChecksEnabled
-      ? await this.providerFactory.createFallback(ChainKey.SOLANA_MAINNET).healthCheck()
-      : {
-          provider: 'solana-public-fallback',
-          ok: true,
-          details: 'disabled by SOLANA_WATCHER_ENABLED=false',
-        };
-    const tronRpcChecksEnabled: boolean = this.appConfigService.tronWatcherEnabled;
-
-    const tronPrimaryProviderHealth = tronRpcChecksEnabled
-      ? await this.providerFactory.createPrimary(ChainKey.TRON_MAINNET).healthCheck()
-      : {
-          provider: 'tron-grid-primary',
-          ok: true,
-          details: 'disabled by TRON_WATCHER_ENABLED=false',
-        };
-
-    const tronFallbackProviderHealth = tronRpcChecksEnabled
-      ? await this.providerFactory.createFallback(ChainKey.TRON_MAINNET).healthCheck()
-      : {
-          provider: 'tron-public-fallback',
-          ok: true,
-          details: 'disabled by TRON_WATCHER_ENABLED=false',
-        };
-
-    const database: ComponentHealth = {
+  private buildDatabaseHealth(databaseOk: boolean): ComponentHealth {
+    return {
       ok: databaseOk,
       details: databaseOk ? 'reachable' : 'unreachable',
     };
+  }
 
-    const ethereumRpcPrimary: ComponentHealth = {
-      ok: ethereumPrimaryProviderHealth.ok,
-      details: ethereumPrimaryProviderHealth.details,
-    };
-
-    const ethereumRpcFallback: ComponentHealth = {
-      ok: ethereumFallbackProviderHealth.ok,
-      details: ethereumFallbackProviderHealth.details,
-    };
-
-    const telegram: ComponentHealth = {
+  private buildTelegramHealth(): ComponentHealth {
+    return {
       ok: this.appConfigService.telegramEnabled,
       details: this.appConfigService.telegramEnabled
         ? 'enabled'
         : 'disabled by TELEGRAM_ENABLED=false',
     };
+  }
 
-    const solanaPrimaryHealth: ComponentHealth = {
-      ok: solanaPrimaryProviderHealth.ok,
-      details: solanaPrimaryProviderHealth.details,
-    };
-
-    const solanaFallbackHealth: ComponentHealth = {
-      ok: solanaFallbackProviderHealth.ok,
-      details: solanaFallbackProviderHealth.details,
-    };
-    const tronPrimaryHealth: ComponentHealth = {
-      ok: tronPrimaryProviderHealth.ok,
-      details: tronPrimaryProviderHealth.details,
-    };
-
-    const tronFallbackHealth: ComponentHealth = {
-      ok: tronFallbackProviderHealth.ok,
-      details: tronFallbackProviderHealth.details,
-    };
-
-    const ethereumChainHealthy: boolean =
-      !ethereumRpcChecksEnabled || ethereumRpcPrimary.ok || ethereumRpcFallback.ok;
-    const solanaChainHealthy: boolean =
-      !solanaRpcChecksEnabled || solanaPrimaryHealth.ok || solanaFallbackHealth.ok;
-    const tronChainHealthy: boolean =
-      !tronRpcChecksEnabled || tronPrimaryHealth.ok || tronFallbackHealth.ok;
-    const isHealthy: boolean =
-      database.ok && ethereumChainHealthy && solanaChainHealthy && tronChainHealthy;
-
-    const ethereum: ChainStreamHealth = {
-      rpcPrimary: ethereumRpcPrimary,
-      rpcFallback: ethereumRpcFallback,
-      runtime: this.runtimeStatusService.getChainSnapshot(ChainKey.ETHEREUM_MAINNET),
-    };
-
-    const solana: ChainStreamHealth = {
-      rpcPrimary: solanaPrimaryHealth,
-      rpcFallback: solanaFallbackHealth,
-      runtime: this.runtimeStatusService.getChainSnapshot(ChainKey.SOLANA_MAINNET),
-    };
-
-    const tron: ChainStreamHealth = {
-      rpcPrimary: tronPrimaryHealth,
-      rpcFallback: tronFallbackHealth,
-      runtime: this.runtimeStatusService.getChainSnapshot(ChainKey.TRON_MAINNET),
-    };
+  private async buildChainHealthSnapshot(input: {
+    readonly chainKey: ChainKey;
+    readonly enabled: boolean;
+    readonly primaryProviderName: string;
+    readonly fallbackProviderName: string;
+    readonly disabledReason: string;
+  }): Promise<IChainHealthSnapshot> {
+    const primaryResult: IProviderHealthResult = await this.resolveProviderHealth({
+      enabled: input.enabled,
+      chainKey: input.chainKey,
+      providerName: input.primaryProviderName,
+      disabledReason: input.disabledReason,
+      primary: true,
+    });
+    const fallbackResult: IProviderHealthResult = await this.resolveProviderHealth({
+      enabled: input.enabled,
+      chainKey: input.chainKey,
+      providerName: input.fallbackProviderName,
+      disabledReason: input.disabledReason,
+      primary: false,
+    });
+    const rpcPrimary: ComponentHealth = this.toComponentHealth(primaryResult);
+    const rpcFallback: ComponentHealth = this.toComponentHealth(fallbackResult);
 
     return {
-      status: isHealthy ? 'ok' : 'degraded',
-      database,
-      ethereum,
-      solana,
-      tron,
-      telegram,
+      chainHealthy: !input.enabled || rpcPrimary.ok || rpcFallback.ok,
+      stream: {
+        rpcPrimary,
+        rpcFallback,
+        runtime: this.runtimeStatusService.getChainSnapshot(input.chainKey),
+      },
+    };
+  }
+
+  private async resolveProviderHealth(input: {
+    readonly enabled: boolean;
+    readonly chainKey: ChainKey;
+    readonly providerName: string;
+    readonly disabledReason: string;
+    readonly primary: boolean;
+  }): Promise<IProviderHealthResult> {
+    if (!input.enabled) {
+      return {
+        provider: input.providerName,
+        ok: true,
+        details: input.disabledReason,
+      };
+    }
+
+    if (input.primary) {
+      return this.providerFactory.createPrimary(input.chainKey).healthCheck();
+    }
+
+    return this.providerFactory.createFallback(input.chainKey).healthCheck();
+  }
+
+  private toComponentHealth(result: IProviderHealthResult): ComponentHealth {
+    return {
+      ok: result.ok,
+      details: result.details,
     };
   }
 }

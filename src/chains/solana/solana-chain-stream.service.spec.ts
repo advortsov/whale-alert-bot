@@ -161,7 +161,7 @@ describe('SolanaChainStreamService', (): void => {
     const solanaEventClassifierService: SolanaEventClassifierService =
       new SolanaEventClassifierService();
 
-    const service: SolanaChainStreamService = new SolanaChainStreamService(
+    const service: SolanaChainStreamService = new SolanaChainStreamService({
       appConfigService,
       providerFailoverService,
       chainCheckpointsRepository,
@@ -170,7 +170,7 @@ describe('SolanaChainStreamService', (): void => {
       walletEventsRepository,
       alertDispatcherService,
       solanaEventClassifierService,
-    );
+    });
 
     await service.onModuleInit();
 
@@ -248,7 +248,7 @@ describe('SolanaChainStreamService', (): void => {
     const solanaEventClassifierService: SolanaEventClassifierService =
       new SolanaEventClassifierService();
 
-    const service: SolanaChainStreamService = new SolanaChainStreamService(
+    const service: SolanaChainStreamService = new SolanaChainStreamService({
       appConfigService,
       providerFailoverService,
       chainCheckpointsRepository,
@@ -257,7 +257,7 @@ describe('SolanaChainStreamService', (): void => {
       walletEventsRepository,
       alertDispatcherService,
       solanaEventClassifierService,
-    );
+    });
 
     await service.onModuleInit();
 
@@ -336,7 +336,7 @@ describe('SolanaChainStreamService', (): void => {
     const solanaEventClassifierService: SolanaEventClassifierService =
       new SolanaEventClassifierService();
 
-    const service: SolanaChainStreamService = new SolanaChainStreamService(
+    const service: SolanaChainStreamService = new SolanaChainStreamService({
       appConfigService,
       providerFailoverService,
       chainCheckpointsRepository,
@@ -345,7 +345,7 @@ describe('SolanaChainStreamService', (): void => {
       walletEventsRepository,
       alertDispatcherService,
       solanaEventClassifierService,
-    );
+    });
 
     await service.onModuleInit();
     await sleep(80);

@@ -1,5 +1,15 @@
 const COMPACT_PATTERN: RegExp = /[\s_-]+/g;
 const NON_ALNUM_PATTERN: RegExp = /[^a-z0-9]/g;
+const DEX_HINTS: readonly { readonly hint: string; readonly value: string }[] = [
+  { hint: 'uniswap', value: 'uniswap' },
+  { hint: 'sushiswap', value: 'sushiswap' },
+  { hint: 'pancakeswap', value: 'pancakeswap' },
+  { hint: '1inch', value: '1inch' },
+  { hint: 'curve', value: 'curve' },
+  { hint: 'balancer', value: 'balancer' },
+  { hint: 'dodo', value: 'dodo' },
+  { hint: 'unknown', value: 'unknown' },
+];
 
 export const normalizeDexKey = (rawValue: string | null): string | null => {
   if (rawValue === null) {
@@ -13,37 +23,10 @@ export const normalizeDexKey = (rawValue: string | null): string | null => {
   }
 
   const compactValue: string = trimmedValue.replace(COMPACT_PATTERN, '');
+  const matchedHint = DEX_HINTS.find((item): boolean => compactValue.includes(item.hint));
 
-  if (compactValue.includes('uniswap')) {
-    return 'uniswap';
-  }
-
-  if (compactValue.includes('sushiswap')) {
-    return 'sushiswap';
-  }
-
-  if (compactValue.includes('pancakeswap')) {
-    return 'pancakeswap';
-  }
-
-  if (compactValue.includes('1inch')) {
-    return '1inch';
-  }
-
-  if (compactValue.includes('curve')) {
-    return 'curve';
-  }
-
-  if (compactValue.includes('balancer')) {
-    return 'balancer';
-  }
-
-  if (compactValue.includes('dodo')) {
-    return 'dodo';
-  }
-
-  if (compactValue.includes('unknown')) {
-    return 'unknown';
+  if (typeof matchedHint !== 'undefined') {
+    return matchedHint.value;
   }
 
   const sanitizedValue: string = compactValue.replace(NON_ALNUM_PATTERN, '');

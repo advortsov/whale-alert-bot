@@ -1,9 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { AlertDispatcherService } from './alert-dispatcher.service';
+import { AlertDispatcherDependencies, AlertDispatcherService } from './alert-dispatcher.service';
 import type { AlertEnrichmentService } from './alert-enrichment.service';
 import type { AlertFilterPolicyService } from './alert-filter-policy.service';
 import type { AlertMessageFormatter } from './alert-message.formatter';
+import {
+  AlertRecipientEvaluatorDependencies,
+  AlertRecipientEvaluatorService,
+} from './alert-recipient-evaluator.service';
 import type { AlertSuppressionService } from './alert-suppression.service';
 import type { CexAddressBookService } from './cex-address-book.service';
 import type { QuietHoursService } from './quiet-hours.service';
@@ -236,22 +240,61 @@ const createService = (): {
     stale: false,
   });
 
-  const service: AlertDispatcherService = new AlertDispatcherService(
-    subscriptionsRepositoryStub as unknown as SubscriptionsRepository,
-    alertEnrichmentServiceStub as unknown as AlertEnrichmentService,
-    alertSuppressionServiceStub as unknown as AlertSuppressionService,
-    alertFilterPolicyServiceStub as unknown as AlertFilterPolicyService,
-    cexAddressBookServiceStub as unknown as CexAddressBookService,
-    quietHoursServiceStub as unknown as QuietHoursService,
-    alertMessageFormatterStub as unknown as AlertMessageFormatter,
-    appConfigServiceStub as unknown as AppConfigService,
-    userAlertPreferencesRepositoryStub as unknown as UserAlertPreferencesRepository,
-    userAlertSettingsRepositoryStub as unknown as UserAlertSettingsRepository,
-    userWalletAlertPreferencesRepositoryStub as unknown as UserWalletAlertPreferencesRepository,
-    alertMutesRepositoryStub as unknown as AlertMutesRepository,
-    tokenPricingPortStub as unknown as ITokenPricingPort,
-    telegramSenderServiceStub as unknown as TelegramSenderService,
-  );
+  const dependencies: AlertDispatcherDependencies = new AlertDispatcherDependencies();
+  (dependencies as { subscriptionsRepository: SubscriptionsRepository }).subscriptionsRepository =
+    subscriptionsRepositoryStub as unknown as SubscriptionsRepository;
+  (dependencies as { alertEnrichmentService: AlertEnrichmentService }).alertEnrichmentService =
+    alertEnrichmentServiceStub as unknown as AlertEnrichmentService;
+  (dependencies as { alertSuppressionService: AlertSuppressionService }).alertSuppressionService =
+    alertSuppressionServiceStub as unknown as AlertSuppressionService;
+  (dependencies as { appConfigService: AppConfigService }).appConfigService =
+    appConfigServiceStub as unknown as AppConfigService;
+  (dependencies as { tokenPricingPort: ITokenPricingPort }).tokenPricingPort =
+    tokenPricingPortStub as unknown as ITokenPricingPort;
+  (dependencies as { alertMessageFormatter: AlertMessageFormatter }).alertMessageFormatter =
+    alertMessageFormatterStub as unknown as AlertMessageFormatter;
+  (dependencies as { telegramSenderService: TelegramSenderService }).telegramSenderService =
+    telegramSenderServiceStub as unknown as TelegramSenderService;
+  const recipientEvaluatorDependencies: AlertRecipientEvaluatorDependencies =
+    new AlertRecipientEvaluatorDependencies();
+  (
+    recipientEvaluatorDependencies as {
+      userAlertPreferencesRepository: UserAlertPreferencesRepository;
+    }
+  ).userAlertPreferencesRepository =
+    userAlertPreferencesRepositoryStub as unknown as UserAlertPreferencesRepository;
+  (
+    recipientEvaluatorDependencies as {
+      userAlertSettingsRepository: UserAlertSettingsRepository;
+    }
+  ).userAlertSettingsRepository =
+    userAlertSettingsRepositoryStub as unknown as UserAlertSettingsRepository;
+  (
+    recipientEvaluatorDependencies as {
+      userWalletAlertPreferencesRepository: UserWalletAlertPreferencesRepository;
+    }
+  ).userWalletAlertPreferencesRepository =
+    userWalletAlertPreferencesRepositoryStub as unknown as UserWalletAlertPreferencesRepository;
+  (
+    recipientEvaluatorDependencies as { alertMutesRepository: AlertMutesRepository }
+  ).alertMutesRepository = alertMutesRepositoryStub as unknown as AlertMutesRepository;
+  (recipientEvaluatorDependencies as { quietHoursService: QuietHoursService }).quietHoursService =
+    quietHoursServiceStub as unknown as QuietHoursService;
+  (
+    recipientEvaluatorDependencies as {
+      alertFilterPolicyService: AlertFilterPolicyService;
+    }
+  ).alertFilterPolicyService = alertFilterPolicyServiceStub as unknown as AlertFilterPolicyService;
+  (
+    recipientEvaluatorDependencies as { cexAddressBookService: CexAddressBookService }
+  ).cexAddressBookService = cexAddressBookServiceStub as unknown as CexAddressBookService;
+  const recipientEvaluatorService: AlertRecipientEvaluatorService =
+    new AlertRecipientEvaluatorService(recipientEvaluatorDependencies);
+  (
+    dependencies as { recipientEvaluatorService: AlertRecipientEvaluatorService }
+  ).recipientEvaluatorService = recipientEvaluatorService;
+
+  const service: AlertDispatcherService = new AlertDispatcherService(dependencies);
 
   return {
     service,

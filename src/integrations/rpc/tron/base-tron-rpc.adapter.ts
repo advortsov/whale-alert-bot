@@ -1,7 +1,19 @@
 import { Logger } from '@nestjs/common';
-
 const RADIX_HEX = 16;
 
+import type {
+  ITronRpcAdapterOptions,
+  ITronStreamOptions,
+  TronBlockHeader,
+  TronGetBlockByNumResponse,
+  TronGetNowBlockResponse,
+  TronGetTransactionByIdResponse,
+  TronGetTransactionInfoResponse,
+  TronTransaction,
+  TronTransactionByIdContract,
+  TronTransactionByIdContractValue,
+  TronTransactionInfoLog,
+} from './base-tron-rpc.interfaces';
 import type {
   IBlockEnvelope,
   IReceiptEnvelope,
@@ -14,71 +26,6 @@ import type {
   ISubscriptionHandle,
   IProviderHealth,
 } from '../../../core/ports/rpc/rpc-adapter.interfaces';
-import type { TronAddressCodec } from '../../address/tron/tron-address.codec';
-
-type TronBlockHeader = {
-  readonly raw_data?: {
-    readonly number?: number;
-    readonly timestamp?: number;
-  };
-};
-
-type TronContractValue = {
-  readonly owner_address?: string;
-  readonly to_address?: string;
-};
-
-type TronContract = {
-  readonly parameter?: {
-    readonly value?: TronContractValue;
-  };
-};
-
-type TronTransaction = {
-  readonly txID?: string;
-  readonly raw_data?: {
-    readonly contract?: readonly TronContract[];
-  };
-};
-
-type TronGetNowBlockResponse = {
-  readonly block_header?: TronBlockHeader;
-};
-
-type TronGetBlockByNumResponse = {
-  readonly block_header?: TronBlockHeader;
-  readonly transactions?: readonly TronTransaction[];
-};
-
-type TronTransactionInfoLog = {
-  readonly address?: string;
-  readonly topics?: readonly string[];
-  readonly data?: string;
-};
-
-type TronGetTransactionInfoResponse = {
-  readonly id?: string;
-  readonly log?: readonly TronTransactionInfoLog[];
-};
-
-type TronTransactionByIdContractValue = {
-  readonly amount?: number | string;
-  readonly asset_name?: string;
-  readonly asset_id?: string;
-};
-
-type TronTransactionByIdContract = {
-  readonly type?: string;
-  readonly parameter?: {
-    readonly value?: TronTransactionByIdContractValue;
-  };
-};
-
-type TronGetTransactionByIdResponse = {
-  readonly raw_data?: {
-    readonly contract?: readonly TronTransactionByIdContract[];
-  };
-};
 
 const DEFAULT_TIMEOUT_MS: number = 8000;
 const DEFAULT_BLOCK_POLL_INTERVAL_MS: number = 1500;
@@ -88,29 +35,25 @@ const HEX_40_SYMBOL_PATTERN: RegExp = /^[0-9a-fA-F]{40}$/;
 const TRC10_HINT_TOPIC: string = 'tron:trc10';
 const TRON_NATIVE_HINT_TOPIC: string = 'tron:native';
 
-type TronStreamOptions = {
-  readonly pollIntervalMs: number;
-  readonly maxBlockCatchupPerPoll: number;
-  readonly pollJitterMs: number;
-};
-
 export abstract class BaseTronRpcAdapter implements IRpcAdapter {
   private readonly logger: Logger;
-  private readonly streamOptions: TronStreamOptions;
+  private readonly streamOptions: ITronStreamOptions;
+  private readonly httpUrl: string | null;
+  private readonly providerName: string;
+  private readonly tronApiKey: string | null;
+  private readonly tronAddressCodec: ITronRpcAdapterOptions['tronAddressCodec'];
 
-  protected constructor(
-    private readonly httpUrl: string | null,
-    private readonly providerName: string,
-    private readonly tronApiKey: string | null,
-    private readonly tronAddressCodec: TronAddressCodec,
-    streamOptions?: Partial<TronStreamOptions>,
-  ) {
-    this.logger = new Logger(providerName);
+  protected constructor(options: ITronRpcAdapterOptions) {
+    this.httpUrl = options.httpUrl;
+    this.providerName = options.providerName;
+    this.tronApiKey = options.tronApiKey;
+    this.tronAddressCodec = options.tronAddressCodec;
+    this.logger = new Logger(options.providerName);
     this.streamOptions = {
-      pollIntervalMs: streamOptions?.pollIntervalMs ?? DEFAULT_BLOCK_POLL_INTERVAL_MS,
+      pollIntervalMs: options.streamOptions?.pollIntervalMs ?? DEFAULT_BLOCK_POLL_INTERVAL_MS,
       maxBlockCatchupPerPoll:
-        streamOptions?.maxBlockCatchupPerPoll ?? DEFAULT_MAX_BLOCK_CATCHUP_PER_POLL,
-      pollJitterMs: streamOptions?.pollJitterMs ?? DEFAULT_POLL_JITTER_MS,
+        options.streamOptions?.maxBlockCatchupPerPoll ?? DEFAULT_MAX_BLOCK_CATCHUP_PER_POLL,
+      pollJitterMs: options.streamOptions?.pollJitterMs ?? DEFAULT_POLL_JITTER_MS,
     };
   }
 
@@ -195,26 +138,8 @@ export abstract class BaseTronRpcAdapter implements IRpcAdapter {
     const timestampSec: number | null =
       typeof timestampMs === 'number' ? Math.floor(timestampMs / 1000) : null;
     const transactions: readonly ITransactionEnvelope[] = (payload.transactions ?? []).map(
-      (transaction: TronTransaction, index: number): ITransactionEnvelope => {
-        const txHash: string =
-          typeof transaction.txID === 'string' && transaction.txID.length > 0
-            ? transaction.txID
-            : `tron-${String(resolvedBlockNumber)}-${String(index)}`;
-        const fromAddress: string =
-          this.resolveTronAddress(
-            transaction.raw_data?.contract?.[0]?.parameter?.value?.owner_address,
-          ) ?? 'unknown';
-        const toAddress: string | null = this.resolveTronAddress(
-          transaction.raw_data?.contract?.[0]?.parameter?.value?.to_address,
-        );
-
-        return {
-          hash: txHash,
-          from: fromAddress,
-          to: toAddress,
-          blockTimestampSec: timestampSec,
-        };
-      },
+      (transaction: TronTransaction, index: number): ITransactionEnvelope =>
+        this.mapTransactionEnvelope(transaction, index, resolvedBlockNumber, timestampSec),
     );
 
     return {
@@ -387,6 +312,50 @@ export abstract class BaseTronRpcAdapter implements IRpcAdapter {
     }
 
     return blockHeader.raw_data.timestamp;
+  }
+
+  private mapTransactionEnvelope(
+    transaction: TronTransaction,
+    index: number,
+    resolvedBlockNumber: number,
+    timestampSec: number | null,
+  ): ITransactionEnvelope {
+    const txHash: string = this.resolveTransactionHash(transaction, index, resolvedBlockNumber);
+    const fromAddress: string = this.resolveTransactionFromAddress(transaction);
+    const toAddress: string | null = this.resolveTransactionToAddress(transaction);
+
+    return {
+      hash: txHash,
+      from: fromAddress,
+      to: toAddress,
+      blockTimestampSec: timestampSec,
+    };
+  }
+
+  private resolveTransactionHash(
+    transaction: TronTransaction,
+    index: number,
+    resolvedBlockNumber: number,
+  ): string {
+    if (typeof transaction.txID === 'string' && transaction.txID.length > 0) {
+      return transaction.txID;
+    }
+
+    return `tron-${String(resolvedBlockNumber)}-${String(index)}`;
+  }
+
+  private resolveTransactionFromAddress(transaction: TronTransaction): string {
+    const fromAddress: string | null = this.resolveTronAddress(
+      transaction.raw_data?.contract?.[0]?.parameter?.value?.owner_address,
+    );
+
+    return fromAddress ?? 'unknown';
+  }
+
+  private resolveTransactionToAddress(transaction: TronTransaction): string | null {
+    return this.resolveTronAddress(
+      transaction.raw_data?.contract?.[0]?.parameter?.value?.to_address,
+    );
   }
 
   private resolveTronAddress(rawAddress: unknown): string | null {

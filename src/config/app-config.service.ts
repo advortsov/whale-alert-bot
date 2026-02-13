@@ -1,170 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { z } from 'zod';
 
+import { type ParsedEnv, envSchema } from './app-config.schema';
 import type { AppConfig } from './app-config.types';
-
-const booleanSchema = z
-  .union([z.boolean(), z.string()])
-  .transform((value: string | boolean): boolean => {
-    if (typeof value === 'boolean') {
-      return value;
-    }
-
-    const normalizedValue: string = value.trim().toLowerCase();
-
-    return normalizedValue === 'true' || normalizedValue === '1' || normalizedValue === 'yes';
-  });
-
-const resolvePackageVersion = (): string => {
-  try {
-    const packageJsonPath: string = resolve(process.cwd(), 'package.json');
-    const packageJsonRaw: string = readFileSync(packageJsonPath, 'utf8');
-    const packageJsonParsed: unknown = JSON.parse(packageJsonRaw);
-
-    if (
-      typeof packageJsonParsed === 'object' &&
-      packageJsonParsed !== null &&
-      'version' in packageJsonParsed
-    ) {
-      const versionValue: unknown = packageJsonParsed.version;
-
-      if (typeof versionValue === 'string' && versionValue.trim().length > 0) {
-        return versionValue.trim();
-      }
-    }
-  } catch {
-    // Fallback is handled below.
-  }
-
-  return '0.0.0';
-};
-
-const DEFAULT_APP_VERSION: string = resolvePackageVersion();
-
-// Дефолтные значения конфигурации
-const DEFAULT_PORT = 3000;
-const DEFAULT_RPC_MIN_INTERVAL_MS = 350;
-const DEFAULT_SOLANA_BACKOFF_BASE_MS = 5000;
-const DEFAULT_BACKOFF_MAX_MS = 60_000;
-const DEFAULT_BLOCK_QUEUE_MAX = 120;
-const DEFAULT_CATCHUP_BATCH = 40;
-const DEFAULT_POLL_INTERVAL_MS = 2000;
-const DEFAULT_MAX_LAG_WARN = 50;
-const DEFAULT_MAX_QUEUE_WARN = 80;
-const DEFAULT_MAX_BACKOFF_WARN_MS = 10_000;
-const DEFAULT_COINGECKO_TIMEOUT_MS = 8000;
-const DEFAULT_PRICE_CACHE_FRESH_TTL_SEC = 120;
-const DEFAULT_PRICE_CACHE_STALE_TTL_SEC = 600;
-const DEFAULT_ALERT_MIN_SEND_INTERVAL_SEC = 10;
-const DEFAULT_HISTORY_CACHE_TTL_SEC = 120;
-const DEFAULT_HISTORY_RATE_LIMIT_PER_MINUTE = 12;
-const DEFAULT_HISTORY_BUTTON_COOLDOWN_SEC = 3;
-const DEFAULT_HISTORY_STALE_ON_ERROR_SEC = 600;
-
-const optionalNonEmptyStringSchema = z
-  .string()
-  .trim()
-  .optional()
-  .transform((value: string | undefined): string | undefined => {
-    if (typeof value !== 'string') {
-      return undefined;
-    }
-
-    return value.length > 0 ? value : undefined;
-  });
-
-const envSchema = z.object({
-  APP_VERSION: z.string().trim().min(1).default(DEFAULT_APP_VERSION),
-  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  PORT: z.coerce.number().int().positive().default(DEFAULT_PORT),
-  LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
-  TELEGRAM_ENABLED: booleanSchema.default(false),
-  CHAIN_WATCHER_ENABLED: booleanSchema.default(false),
-  SOLANA_WATCHER_ENABLED: booleanSchema.default(false),
-  TRON_WATCHER_ENABLED: booleanSchema.default(false),
-  CHAIN_RECEIPT_CONCURRENCY: z.coerce.number().int().positive().default(2),
-  CHAIN_RPC_MIN_INTERVAL_MS: z.coerce.number().int().min(0).default(DEFAULT_RPC_MIN_INTERVAL_MS),
-  CHAIN_BACKOFF_BASE_MS: z.coerce.number().int().positive().default(1000),
-  CHAIN_SOLANA_BACKOFF_BASE_MS: z.coerce
-    .number()
-    .int()
-    .positive()
-    .default(DEFAULT_SOLANA_BACKOFF_BASE_MS),
-  CHAIN_BACKOFF_MAX_MS: z.coerce.number().int().positive().default(DEFAULT_BACKOFF_MAX_MS),
-  CHAIN_BLOCK_QUEUE_MAX: z.coerce.number().int().positive().default(DEFAULT_BLOCK_QUEUE_MAX),
-  CHAIN_SOLANA_QUEUE_MAX: z.coerce.number().int().positive().default(DEFAULT_BLOCK_QUEUE_MAX),
-  CHAIN_TRON_QUEUE_MAX: z.coerce.number().int().positive().default(DEFAULT_BLOCK_QUEUE_MAX),
-  CHAIN_SOLANA_CATCHUP_BATCH: z.coerce.number().int().positive().default(DEFAULT_CATCHUP_BATCH),
-  CHAIN_TRON_CATCHUP_BATCH: z.coerce.number().int().positive().default(DEFAULT_CATCHUP_BATCH),
-  CHAIN_SOLANA_POLL_INTERVAL_MS: z.coerce
-    .number()
-    .int()
-    .positive()
-    .default(DEFAULT_POLL_INTERVAL_MS),
-  CHAIN_TRON_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(DEFAULT_POLL_INTERVAL_MS),
-  CHAIN_HEARTBEAT_INTERVAL_SEC: z.coerce.number().int().positive().default(60),
-  CHAIN_REORG_CONFIRMATIONS: z.coerce.number().int().min(0).default(2),
-  CHAIN_MAX_LAG_WARN: z.coerce.number().int().min(0).default(DEFAULT_MAX_LAG_WARN),
-  CHAIN_MAX_QUEUE_WARN: z.coerce.number().int().min(0).default(DEFAULT_MAX_QUEUE_WARN),
-  CHAIN_MAX_BACKOFF_WARN_MS: z.coerce.number().int().min(0).default(DEFAULT_MAX_BACKOFF_WARN_MS),
-  BOT_TOKEN: optionalNonEmptyStringSchema,
-  DATABASE_URL: z.url(),
-  ETH_ALCHEMY_WSS_URL: z.url().optional(),
-  ETH_INFURA_WSS_URL: z.url().optional(),
-  SOLANA_HELIUS_HTTP_URL: z.url().optional(),
-  SOLANA_HELIUS_WSS_URL: z.url().optional(),
-  SOLANA_PUBLIC_HTTP_URL: z.url().optional(),
-  SOLANA_PUBLIC_WSS_URL: z.url().optional(),
-  TRON_PRIMARY_HTTP_URL: z.url().optional(),
-  TRON_FALLBACK_HTTP_URL: z.url().optional(),
-  UNISWAP_SWAP_ALLOWLIST: z.string().trim().optional(),
-  ETH_CEX_ADDRESS_ALLOWLIST: z.string().trim().optional(),
-  ETHERSCAN_TX_BASE_URL: z.url().default('https://etherscan.io/tx/'),
-  ETHERSCAN_API_BASE_URL: z.url().default('https://api.etherscan.io/v2/api'),
-  ETHERSCAN_API_KEY: optionalNonEmptyStringSchema,
-  TRON_GRID_API_BASE_URL: z.url().default('https://api.trongrid.io'),
-  TRON_GRID_API_KEY: optionalNonEmptyStringSchema,
-  TRONSCAN_TX_BASE_URL: z.url().default('https://tronscan.org/#/transaction/'),
-  COINGECKO_API_BASE_URL: z.url().default('https://api.coingecko.com/api/v3'),
-  COINGECKO_TIMEOUT_MS: z.coerce.number().int().positive().default(DEFAULT_COINGECKO_TIMEOUT_MS),
-  PRICE_CACHE_MAX_ENTRIES: z.coerce.number().int().positive().default(1000),
-  PRICE_CACHE_FRESH_TTL_SEC: z.coerce
-    .number()
-    .int()
-    .positive()
-    .default(DEFAULT_PRICE_CACHE_FRESH_TTL_SEC),
-  PRICE_CACHE_STALE_TTL_SEC: z.coerce
-    .number()
-    .int()
-    .positive()
-    .default(DEFAULT_PRICE_CACHE_STALE_TTL_SEC),
-  ALERT_MIN_SEND_INTERVAL_SEC: z.coerce
-    .number()
-    .int()
-    .min(0)
-    .default(DEFAULT_ALERT_MIN_SEND_INTERVAL_SEC),
-  TOKEN_META_CACHE_TTL_SEC: z.coerce.number().int().positive().default(3600),
-  HISTORY_CACHE_TTL_SEC: z.coerce.number().int().positive().default(DEFAULT_HISTORY_CACHE_TTL_SEC),
-  HISTORY_RATE_LIMIT_PER_MINUTE: z.coerce
-    .number()
-    .int()
-    .positive()
-    .default(DEFAULT_HISTORY_RATE_LIMIT_PER_MINUTE),
-  HISTORY_BUTTON_COOLDOWN_SEC: z.coerce
-    .number()
-    .int()
-    .min(0)
-    .default(DEFAULT_HISTORY_BUTTON_COOLDOWN_SEC),
-  HISTORY_STALE_ON_ERROR_SEC: z.coerce
-    .number()
-    .int()
-    .positive()
-    .default(DEFAULT_HISTORY_STALE_ON_ERROR_SEC),
-});
-
-type ParsedEnv = z.infer<typeof envSchema>;
 
 @Injectable()
 export class AppConfigService {
@@ -173,63 +10,7 @@ export class AppConfigService {
   public constructor() {
     const parsedEnv: ParsedEnv = envSchema.parse(process.env);
     this.assertWatcherConfig(parsedEnv);
-
-    this.config = {
-      appVersion: parsedEnv.APP_VERSION,
-      nodeEnv: parsedEnv.NODE_ENV,
-      port: parsedEnv.PORT,
-      logLevel: parsedEnv.LOG_LEVEL,
-      telegramEnabled: parsedEnv.TELEGRAM_ENABLED,
-      chainWatcherEnabled: parsedEnv.CHAIN_WATCHER_ENABLED,
-      solanaWatcherEnabled: parsedEnv.SOLANA_WATCHER_ENABLED,
-      tronWatcherEnabled: parsedEnv.TRON_WATCHER_ENABLED,
-      chainReceiptConcurrency: parsedEnv.CHAIN_RECEIPT_CONCURRENCY,
-      chainRpcMinIntervalMs: parsedEnv.CHAIN_RPC_MIN_INTERVAL_MS,
-      chainBackoffBaseMs: parsedEnv.CHAIN_BACKOFF_BASE_MS,
-      chainSolanaBackoffBaseMs: parsedEnv.CHAIN_SOLANA_BACKOFF_BASE_MS,
-      chainBackoffMaxMs: parsedEnv.CHAIN_BACKOFF_MAX_MS,
-      chainBlockQueueMax: parsedEnv.CHAIN_BLOCK_QUEUE_MAX,
-      chainSolanaQueueMax: parsedEnv.CHAIN_SOLANA_QUEUE_MAX,
-      chainTronQueueMax: parsedEnv.CHAIN_TRON_QUEUE_MAX,
-      chainSolanaCatchupBatch: parsedEnv.CHAIN_SOLANA_CATCHUP_BATCH,
-      chainTronCatchupBatch: parsedEnv.CHAIN_TRON_CATCHUP_BATCH,
-      chainSolanaPollIntervalMs: parsedEnv.CHAIN_SOLANA_POLL_INTERVAL_MS,
-      chainTronPollIntervalMs: parsedEnv.CHAIN_TRON_POLL_INTERVAL_MS,
-      chainHeartbeatIntervalSec: parsedEnv.CHAIN_HEARTBEAT_INTERVAL_SEC,
-      chainReorgConfirmations: parsedEnv.CHAIN_REORG_CONFIRMATIONS,
-      chainMaxLagWarn: parsedEnv.CHAIN_MAX_LAG_WARN,
-      chainMaxQueueWarn: parsedEnv.CHAIN_MAX_QUEUE_WARN,
-      chainMaxBackoffWarnMs: parsedEnv.CHAIN_MAX_BACKOFF_WARN_MS,
-      botToken: parsedEnv.BOT_TOKEN ?? null,
-      databaseUrl: parsedEnv.DATABASE_URL,
-      ethAlchemyWssUrl: parsedEnv.ETH_ALCHEMY_WSS_URL ?? null,
-      ethInfuraWssUrl: parsedEnv.ETH_INFURA_WSS_URL ?? null,
-      solanaHeliusHttpUrl: parsedEnv.SOLANA_HELIUS_HTTP_URL ?? null,
-      solanaHeliusWssUrl: parsedEnv.SOLANA_HELIUS_WSS_URL ?? null,
-      solanaPublicHttpUrl: parsedEnv.SOLANA_PUBLIC_HTTP_URL ?? null,
-      solanaPublicWssUrl: parsedEnv.SOLANA_PUBLIC_WSS_URL ?? null,
-      tronPrimaryHttpUrl: parsedEnv.TRON_PRIMARY_HTTP_URL ?? null,
-      tronFallbackHttpUrl: parsedEnv.TRON_FALLBACK_HTTP_URL ?? null,
-      uniswapSwapAllowlist: this.parseAllowlist(parsedEnv.UNISWAP_SWAP_ALLOWLIST),
-      ethCexAddressAllowlist: this.parseAllowlist(parsedEnv.ETH_CEX_ADDRESS_ALLOWLIST),
-      etherscanTxBaseUrl: parsedEnv.ETHERSCAN_TX_BASE_URL,
-      etherscanApiBaseUrl: parsedEnv.ETHERSCAN_API_BASE_URL,
-      etherscanApiKey: parsedEnv.ETHERSCAN_API_KEY ?? null,
-      tronGridApiBaseUrl: parsedEnv.TRON_GRID_API_BASE_URL,
-      tronGridApiKey: parsedEnv.TRON_GRID_API_KEY ?? null,
-      tronscanTxBaseUrl: parsedEnv.TRONSCAN_TX_BASE_URL,
-      coingeckoApiBaseUrl: parsedEnv.COINGECKO_API_BASE_URL,
-      coingeckoTimeoutMs: parsedEnv.COINGECKO_TIMEOUT_MS,
-      priceCacheMaxEntries: parsedEnv.PRICE_CACHE_MAX_ENTRIES,
-      priceCacheFreshTtlSec: parsedEnv.PRICE_CACHE_FRESH_TTL_SEC,
-      priceCacheStaleTtlSec: parsedEnv.PRICE_CACHE_STALE_TTL_SEC,
-      alertMinSendIntervalSec: parsedEnv.ALERT_MIN_SEND_INTERVAL_SEC,
-      tokenMetaCacheTtlSec: parsedEnv.TOKEN_META_CACHE_TTL_SEC,
-      historyCacheTtlSec: parsedEnv.HISTORY_CACHE_TTL_SEC,
-      historyRateLimitPerMinute: parsedEnv.HISTORY_RATE_LIMIT_PER_MINUTE,
-      historyButtonCooldownSec: parsedEnv.HISTORY_BUTTON_COOLDOWN_SEC,
-      historyStaleOnErrorSec: parsedEnv.HISTORY_STALE_ON_ERROR_SEC,
-    };
+    this.config = this.mapConfig(parsedEnv);
   }
 
   public get nodeEnv(): AppConfig['nodeEnv'] {
@@ -448,7 +229,163 @@ export class AppConfigService {
     return this.config.historyStaleOnErrorSec;
   }
 
+  private mapConfig(parsedEnv: ParsedEnv): AppConfig {
+    return {
+      ...this.mapCoreConfig(parsedEnv),
+      ...this.mapWatcherConfig(parsedEnv),
+      ...this.mapApiConfig(parsedEnv),
+      ...this.mapHistoryConfig(parsedEnv),
+    };
+  }
+
+  private mapCoreConfig(
+    parsedEnv: ParsedEnv,
+  ): Pick<
+    AppConfig,
+    'appVersion' | 'nodeEnv' | 'port' | 'logLevel' | 'telegramEnabled' | 'databaseUrl' | 'botToken'
+  > {
+    return {
+      appVersion: parsedEnv.APP_VERSION,
+      nodeEnv: parsedEnv.NODE_ENV,
+      port: parsedEnv.PORT,
+      logLevel: parsedEnv.LOG_LEVEL,
+      telegramEnabled: parsedEnv.TELEGRAM_ENABLED,
+      databaseUrl: parsedEnv.DATABASE_URL,
+      botToken: parsedEnv.BOT_TOKEN ?? null,
+    };
+  }
+
+  private mapWatcherConfig(
+    parsedEnv: ParsedEnv,
+  ): Pick<
+    AppConfig,
+    | 'chainWatcherEnabled'
+    | 'solanaWatcherEnabled'
+    | 'tronWatcherEnabled'
+    | 'chainReceiptConcurrency'
+    | 'chainRpcMinIntervalMs'
+    | 'chainBackoffBaseMs'
+    | 'chainSolanaBackoffBaseMs'
+    | 'chainBackoffMaxMs'
+    | 'chainBlockQueueMax'
+    | 'chainSolanaQueueMax'
+    | 'chainTronQueueMax'
+    | 'chainSolanaCatchupBatch'
+    | 'chainTronCatchupBatch'
+    | 'chainSolanaPollIntervalMs'
+    | 'chainTronPollIntervalMs'
+    | 'chainHeartbeatIntervalSec'
+    | 'chainReorgConfirmations'
+    | 'chainMaxLagWarn'
+    | 'chainMaxQueueWarn'
+    | 'chainMaxBackoffWarnMs'
+    | 'ethAlchemyWssUrl'
+    | 'ethInfuraWssUrl'
+    | 'solanaHeliusHttpUrl'
+    | 'solanaHeliusWssUrl'
+    | 'solanaPublicHttpUrl'
+    | 'solanaPublicWssUrl'
+    | 'tronPrimaryHttpUrl'
+    | 'tronFallbackHttpUrl'
+  > {
+    return {
+      chainWatcherEnabled: parsedEnv.CHAIN_WATCHER_ENABLED,
+      solanaWatcherEnabled: parsedEnv.SOLANA_WATCHER_ENABLED,
+      tronWatcherEnabled: parsedEnv.TRON_WATCHER_ENABLED,
+      chainReceiptConcurrency: parsedEnv.CHAIN_RECEIPT_CONCURRENCY,
+      chainRpcMinIntervalMs: parsedEnv.CHAIN_RPC_MIN_INTERVAL_MS,
+      chainBackoffBaseMs: parsedEnv.CHAIN_BACKOFF_BASE_MS,
+      chainSolanaBackoffBaseMs: parsedEnv.CHAIN_SOLANA_BACKOFF_BASE_MS,
+      chainBackoffMaxMs: parsedEnv.CHAIN_BACKOFF_MAX_MS,
+      chainBlockQueueMax: parsedEnv.CHAIN_BLOCK_QUEUE_MAX,
+      chainSolanaQueueMax: parsedEnv.CHAIN_SOLANA_QUEUE_MAX,
+      chainTronQueueMax: parsedEnv.CHAIN_TRON_QUEUE_MAX,
+      chainSolanaCatchupBatch: parsedEnv.CHAIN_SOLANA_CATCHUP_BATCH,
+      chainTronCatchupBatch: parsedEnv.CHAIN_TRON_CATCHUP_BATCH,
+      chainSolanaPollIntervalMs: parsedEnv.CHAIN_SOLANA_POLL_INTERVAL_MS,
+      chainTronPollIntervalMs: parsedEnv.CHAIN_TRON_POLL_INTERVAL_MS,
+      chainHeartbeatIntervalSec: parsedEnv.CHAIN_HEARTBEAT_INTERVAL_SEC,
+      chainReorgConfirmations: parsedEnv.CHAIN_REORG_CONFIRMATIONS,
+      chainMaxLagWarn: parsedEnv.CHAIN_MAX_LAG_WARN,
+      chainMaxQueueWarn: parsedEnv.CHAIN_MAX_QUEUE_WARN,
+      chainMaxBackoffWarnMs: parsedEnv.CHAIN_MAX_BACKOFF_WARN_MS,
+      ethAlchemyWssUrl: parsedEnv.ETH_ALCHEMY_WSS_URL ?? null,
+      ethInfuraWssUrl: parsedEnv.ETH_INFURA_WSS_URL ?? null,
+      solanaHeliusHttpUrl: parsedEnv.SOLANA_HELIUS_HTTP_URL ?? null,
+      solanaHeliusWssUrl: parsedEnv.SOLANA_HELIUS_WSS_URL ?? null,
+      solanaPublicHttpUrl: parsedEnv.SOLANA_PUBLIC_HTTP_URL ?? null,
+      solanaPublicWssUrl: parsedEnv.SOLANA_PUBLIC_WSS_URL ?? null,
+      tronPrimaryHttpUrl: parsedEnv.TRON_PRIMARY_HTTP_URL ?? null,
+      tronFallbackHttpUrl: parsedEnv.TRON_FALLBACK_HTTP_URL ?? null,
+    };
+  }
+
+  private mapApiConfig(
+    parsedEnv: ParsedEnv,
+  ): Pick<
+    AppConfig,
+    | 'uniswapSwapAllowlist'
+    | 'ethCexAddressAllowlist'
+    | 'etherscanTxBaseUrl'
+    | 'etherscanApiBaseUrl'
+    | 'etherscanApiKey'
+    | 'tronGridApiBaseUrl'
+    | 'tronGridApiKey'
+    | 'tronscanTxBaseUrl'
+    | 'coingeckoApiBaseUrl'
+    | 'coingeckoTimeoutMs'
+    | 'priceCacheMaxEntries'
+    | 'priceCacheFreshTtlSec'
+    | 'priceCacheStaleTtlSec'
+    | 'alertMinSendIntervalSec'
+    | 'tokenMetaCacheTtlSec'
+  > {
+    return {
+      uniswapSwapAllowlist: this.parseAllowlist(parsedEnv.UNISWAP_SWAP_ALLOWLIST),
+      ethCexAddressAllowlist: this.parseAllowlist(parsedEnv.ETH_CEX_ADDRESS_ALLOWLIST),
+      etherscanTxBaseUrl: parsedEnv.ETHERSCAN_TX_BASE_URL,
+      etherscanApiBaseUrl: parsedEnv.ETHERSCAN_API_BASE_URL,
+      etherscanApiKey: parsedEnv.ETHERSCAN_API_KEY ?? null,
+      tronGridApiBaseUrl: parsedEnv.TRON_GRID_API_BASE_URL,
+      tronGridApiKey: parsedEnv.TRON_GRID_API_KEY ?? null,
+      tronscanTxBaseUrl: parsedEnv.TRONSCAN_TX_BASE_URL,
+      coingeckoApiBaseUrl: parsedEnv.COINGECKO_API_BASE_URL,
+      coingeckoTimeoutMs: parsedEnv.COINGECKO_TIMEOUT_MS,
+      priceCacheMaxEntries: parsedEnv.PRICE_CACHE_MAX_ENTRIES,
+      priceCacheFreshTtlSec: parsedEnv.PRICE_CACHE_FRESH_TTL_SEC,
+      priceCacheStaleTtlSec: parsedEnv.PRICE_CACHE_STALE_TTL_SEC,
+      alertMinSendIntervalSec: parsedEnv.ALERT_MIN_SEND_INTERVAL_SEC,
+      tokenMetaCacheTtlSec: parsedEnv.TOKEN_META_CACHE_TTL_SEC,
+    };
+  }
+
+  private mapHistoryConfig(
+    parsedEnv: ParsedEnv,
+  ): Pick<
+    AppConfig,
+    | 'historyCacheTtlSec'
+    | 'historyRateLimitPerMinute'
+    | 'historyButtonCooldownSec'
+    | 'historyStaleOnErrorSec'
+  > {
+    return {
+      historyCacheTtlSec: parsedEnv.HISTORY_CACHE_TTL_SEC,
+      historyRateLimitPerMinute: parsedEnv.HISTORY_RATE_LIMIT_PER_MINUTE,
+      historyButtonCooldownSec: parsedEnv.HISTORY_BUTTON_COOLDOWN_SEC,
+      historyStaleOnErrorSec: parsedEnv.HISTORY_STALE_ON_ERROR_SEC,
+    };
+  }
+
   private assertWatcherConfig(parsedEnv: ParsedEnv): void {
+    this.assertBackoffConfig(parsedEnv);
+    this.assertCatchupConfig(parsedEnv);
+    this.assertCacheConfig(parsedEnv);
+    this.assertEthereumWatcherConfig(parsedEnv);
+    this.assertSolanaWatcherConfig(parsedEnv);
+    this.assertTronWatcherConfig(parsedEnv);
+  }
+
+  private assertBackoffConfig(parsedEnv: ParsedEnv): void {
     if (parsedEnv.CHAIN_BACKOFF_MAX_MS < parsedEnv.CHAIN_BACKOFF_BASE_MS) {
       throw new Error('CHAIN_BACKOFF_MAX_MS must be >= CHAIN_BACKOFF_BASE_MS');
     }
@@ -456,7 +393,9 @@ export class AppConfigService {
     if (parsedEnv.CHAIN_BACKOFF_MAX_MS < parsedEnv.CHAIN_SOLANA_BACKOFF_BASE_MS) {
       throw new Error('CHAIN_BACKOFF_MAX_MS must be >= CHAIN_SOLANA_BACKOFF_BASE_MS');
     }
+  }
 
+  private assertCatchupConfig(parsedEnv: ParsedEnv): void {
     if (parsedEnv.CHAIN_SOLANA_CATCHUP_BATCH > parsedEnv.CHAIN_SOLANA_QUEUE_MAX) {
       throw new Error('CHAIN_SOLANA_CATCHUP_BATCH must be <= CHAIN_SOLANA_QUEUE_MAX');
     }
@@ -464,11 +403,15 @@ export class AppConfigService {
     if (parsedEnv.CHAIN_TRON_CATCHUP_BATCH > parsedEnv.CHAIN_TRON_QUEUE_MAX) {
       throw new Error('CHAIN_TRON_CATCHUP_BATCH must be <= CHAIN_TRON_QUEUE_MAX');
     }
+  }
 
+  private assertCacheConfig(parsedEnv: ParsedEnv): void {
     if (parsedEnv.PRICE_CACHE_STALE_TTL_SEC < parsedEnv.PRICE_CACHE_FRESH_TTL_SEC) {
       throw new Error('PRICE_CACHE_STALE_TTL_SEC must be >= PRICE_CACHE_FRESH_TTL_SEC');
     }
+  }
 
+  private assertEthereumWatcherConfig(parsedEnv: ParsedEnv): void {
     if (parsedEnv.CHAIN_WATCHER_ENABLED) {
       if (!parsedEnv.ETH_ALCHEMY_WSS_URL) {
         throw new Error('ETH_ALCHEMY_WSS_URL is required when CHAIN_WATCHER_ENABLED=true');
@@ -478,7 +421,9 @@ export class AppConfigService {
         throw new Error('ETH_INFURA_WSS_URL is required when CHAIN_WATCHER_ENABLED=true');
       }
     }
+  }
 
+  private assertSolanaWatcherConfig(parsedEnv: ParsedEnv): void {
     if (parsedEnv.SOLANA_WATCHER_ENABLED) {
       if (!parsedEnv.SOLANA_HELIUS_HTTP_URL) {
         throw new Error('SOLANA_HELIUS_HTTP_URL is required when SOLANA_WATCHER_ENABLED=true');
@@ -496,7 +441,9 @@ export class AppConfigService {
         throw new Error('SOLANA_PUBLIC_WSS_URL is required when SOLANA_WATCHER_ENABLED=true');
       }
     }
+  }
 
+  private assertTronWatcherConfig(parsedEnv: ParsedEnv): void {
     if (parsedEnv.TRON_WATCHER_ENABLED) {
       if (!parsedEnv.TRON_PRIMARY_HTTP_URL) {
         throw new Error('TRON_PRIMARY_HTTP_URL is required when TRON_WATCHER_ENABLED=true');

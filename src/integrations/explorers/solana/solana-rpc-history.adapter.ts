@@ -172,30 +172,14 @@ export class SolanaRpcHistoryAdapter implements IHistoryExplorerAdapter {
     if (payload === null) {
       return null;
     }
-
-    if (typeof payload !== 'object') {
-      throw new Error('Solana getTransaction returned invalid payload.');
-    }
-
-    const value: ISolanaTransactionValue = payload as ISolanaTransactionValue;
+    const value: ISolanaTransactionValue = this.parseTransactionValue(payload);
     const accountKeys: readonly string[] = this.extractAccountKeys(value);
     const [fromAddress, toAddress] = this.resolveFromTo(accountKeys);
-    const normalizedAddress: string = address.trim();
-    const addressIndex: number = accountKeys.findIndex(
-      (accountKey: string): boolean => accountKey === normalizedAddress,
-    );
-    const preBalance: number =
-      addressIndex >= 0 ? (value.meta?.preBalances?.[addressIndex] ?? 0) : 0;
-    const postBalance: number =
-      addressIndex >= 0 ? (value.meta?.postBalances?.[addressIndex] ?? 0) : 0;
-    const deltaLamports: number = postBalance - preBalance;
-    const direction: HistoryDirection =
-      deltaLamports >= 0 ? HistoryDirection.IN : HistoryDirection.OUT;
+    const deltaLamports: number = this.resolveLamportsDelta(accountKeys, value, address);
+    const direction: HistoryDirection = this.resolveDirectionByLamportsDelta(deltaLamports);
     const isSplTransfer: boolean = this.detectSplTransfer(value);
     const timestampSec: number = this.resolveTimestampSec(value, signatureInfo);
-    const metaError: unknown = value.meta?.err;
-    const hasError: boolean = metaError !== undefined && metaError !== null;
-    const signatureError: boolean = signatureInfo.err !== null && signatureInfo.err !== undefined;
+    const hasError: boolean = this.resolveErrorFlag(value, signatureInfo);
 
     return {
       txHash: signatureInfo.signature,
@@ -203,13 +187,56 @@ export class SolanaRpcHistoryAdapter implements IHistoryExplorerAdapter {
       from: fromAddress,
       to: toAddress,
       valueRaw: Math.abs(deltaLamports).toString(),
-      isError: hasError || signatureError,
+      isError: hasError,
       assetSymbol: isSplTransfer ? 'SPL' : 'SOL',
       assetDecimals: isSplTransfer ? SPL_TOKEN_DECIMALS : SOL_NATIVE_DECIMALS,
       eventType: HistoryItemType.TRANSFER,
       direction,
       txLink: `${SOLSCAN_TX_BASE_URL}${signatureInfo.signature}`,
     };
+  }
+
+  private parseTransactionValue(payload: unknown): ISolanaTransactionValue {
+    if (typeof payload !== 'object') {
+      throw new Error('Solana getTransaction returned invalid payload.');
+    }
+
+    return payload as ISolanaTransactionValue;
+  }
+
+  private resolveLamportsDelta(
+    accountKeys: readonly string[],
+    value: ISolanaTransactionValue,
+    address: string,
+  ): number {
+    const normalizedAddress: string = address.trim();
+    const addressIndex: number = accountKeys.findIndex(
+      (accountKey: string): boolean => accountKey === normalizedAddress,
+    );
+
+    if (addressIndex < 0) {
+      return 0;
+    }
+
+    const preBalance: number = value.meta?.preBalances?.[addressIndex] ?? 0;
+    const postBalance: number = value.meta?.postBalances?.[addressIndex] ?? 0;
+    return postBalance - preBalance;
+  }
+
+  private resolveDirectionByLamportsDelta(deltaLamports: number): HistoryDirection {
+    return deltaLamports >= 0 ? HistoryDirection.IN : HistoryDirection.OUT;
+  }
+
+  private resolveErrorFlag(
+    value: ISolanaTransactionValue,
+    signatureInfo: ISolanaSignatureInfo,
+  ): boolean {
+    const metaError: unknown = value.meta?.err;
+    const hasMetaError: boolean = metaError !== undefined && metaError !== null;
+    const hasSignatureError: boolean =
+      signatureInfo.err !== null && signatureInfo.err !== undefined;
+
+    return hasMetaError || hasSignatureError;
   }
 
   private detectSplTransfer(value: ISolanaTransactionValue): boolean {

@@ -3,6 +3,22 @@ import { Module } from '@nestjs/common';
 import { EtherscanHistoryService } from './etherscan-history.service';
 import { HistoryCacheService } from './history-cache.service';
 import { HistoryRateLimiterService } from './history-rate-limiter.service';
+import { TrackingAddressService } from './tracking-address.service';
+import { TrackingHistoryFormatterService } from './tracking-history-formatter.service';
+import { TrackingHistoryQueryParserService } from './tracking-history-query-parser.service';
+import {
+  TrackingHistoryService,
+  TrackingHistoryServiceDependencies,
+} from './tracking-history.service';
+import { TrackingSettingsParserService } from './tracking-settings-parser.service';
+import {
+  TrackingSettingsService,
+  TrackingSettingsServiceDependencies,
+} from './tracking-settings.service';
+import {
+  TrackingWalletsService,
+  TrackingWalletsServiceDependencies,
+} from './tracking-wallets.service';
 import { TrackingService } from './tracking.service';
 import { ADDRESS_CODEC_REGISTRY } from '../core/ports/address/address-port.tokens';
 import { HISTORY_EXPLORER_ADAPTER } from '../core/ports/explorers/explorer-port.tokens';
@@ -38,6 +54,16 @@ import { StorageModule } from '../storage/storage.module';
     },
     HistoryCacheService,
     HistoryRateLimiterService,
+    TrackingAddressService,
+    TrackingHistoryFormatterService,
+    TrackingHistoryQueryParserService,
+    TrackingSettingsParserService,
+    TrackingWalletsServiceDependencies,
+    TrackingWalletsService,
+    TrackingSettingsServiceDependencies,
+    TrackingSettingsService,
+    TrackingHistoryServiceDependencies,
+    TrackingHistoryService,
     TrackingService,
   ],
   exports: [TrackingService],

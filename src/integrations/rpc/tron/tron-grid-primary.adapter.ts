@@ -8,15 +8,15 @@ import { TronAddressCodec } from '../../address/tron/tron-address.codec';
 @Injectable()
 export class TronGridPrimaryAdapter extends BaseTronRpcAdapter implements IPrimaryRpcAdapter {
   public constructor(appConfigService: AppConfigService, tronAddressCodec: TronAddressCodec) {
-    super(
-      appConfigService.tronPrimaryHttpUrl,
-      'tron-grid-primary',
-      appConfigService.tronGridApiKey,
+    super({
+      httpUrl: appConfigService.tronPrimaryHttpUrl,
+      providerName: 'tron-grid-primary',
+      tronApiKey: appConfigService.tronGridApiKey,
       tronAddressCodec,
-      {
+      streamOptions: {
         pollIntervalMs: appConfigService.chainTronPollIntervalMs,
         maxBlockCatchupPerPoll: appConfigService.chainTronCatchupBatch,
       },
-    );
+    });
   }
 }

@@ -2,23 +2,18 @@ import { Injectable, Logger } from '@nestjs/common';
 
 import type {
   ITronGridListResponse,
-  ITronGridNativeContractItem,
-  ITronGridNativeRetItem,
   ITronGridNativeTransactionItem,
-  ITronGridTrc20TokenInfo,
   ITronGridTrc20TransactionItem,
 } from './tron-grid-history.interfaces';
+import { TronGridHistoryMapper } from './tron-grid-history.mapper';
 import { AppConfigService } from '../../../config/app-config.service';
 import { ChainKey } from '../../../core/chains/chain-key.interfaces';
 import type { IHistoryExplorerAdapter } from '../../../core/ports/explorers/history-explorer.interfaces';
 import {
-  HistoryDirection,
-  HistoryItemType,
   type IHistoryItemDto,
   type IHistoryPageDto,
 } from '../../../features/tracking/dto/history-item.dto';
 import {
-  HistoryDirectionFilter,
   HistoryKind,
   type IHistoryRequestDto,
 } from '../../../features/tracking/dto/history-request.dto';
@@ -45,7 +40,6 @@ const TRON_MAX_PAGE_SIZE = 200;
 const TRON_MAX_PAGE_REQUESTS = 20;
 const HTTP_STATUS_BAD_REQUEST = 400;
 const RESPONSE_PREVIEW_MAX_LENGTH = 300;
-const TRX_NATIVE_DECIMALS = 6;
 
 const QUERY_POLICIES: readonly ITronGridRequestQueryPolicy[] = [
   {
@@ -65,11 +59,17 @@ const QUERY_POLICIES: readonly ITronGridRequestQueryPolicy[] = [
 @Injectable()
 export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
   private readonly logger: Logger = new Logger(TronGridHistoryAdapter.name);
+  private readonly mapper: TronGridHistoryMapper;
 
   public constructor(
     private readonly appConfigService: AppConfigService,
     private readonly tronAddressCodec: TronAddressCodec,
-  ) {}
+  ) {
+    this.mapper = new TronGridHistoryMapper(
+      this.tronAddressCodec,
+      this.appConfigService.tronscanTxBaseUrl,
+    );
+  }
 
   public async loadRecentTransactions(request: IHistoryRequestDto): Promise<IHistoryPageDto> {
     if (request.chainKey !== ChainKey.TRON_MAINNET) {
@@ -91,7 +91,7 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
         rightItem.timestampSec - leftItem.timestampSec,
     );
 
-    const filteredItems: readonly IHistoryItemDto[] = this.applyDirectionFilter(
+    const filteredItems: readonly IHistoryItemDto[] = this.mapper.applyDirectionFilter(
       mergedItems,
       request.direction,
     );
@@ -129,7 +129,7 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
       }
 
       for (const item of page.items) {
-        const mappedItem: IHistoryItemDto | null = this.mapNativeTransaction(item, address);
+        const mappedItem: IHistoryItemDto | null = this.mapper.mapNativeTransaction(item, address);
 
         if (mappedItem !== null) {
           results.push(mappedItem);
@@ -173,7 +173,7 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
       }
 
       for (const item of page.items) {
-        const mappedItem: IHistoryItemDto | null = this.mapTrc20Transaction(item, address);
+        const mappedItem: IHistoryItemDto | null = this.mapper.mapTrc20Transaction(item, address);
 
         if (mappedItem !== null) {
           results.push(mappedItem);
@@ -206,7 +206,7 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
     const rawItems: readonly unknown[] = this.resolveResponseData(payload);
     const parsedItems: ITronGridNativeTransactionItem[] = rawItems
       .map((item: unknown): ITronGridNativeTransactionItem | null =>
-        this.parseNativeTransactionItem(item),
+        this.mapper.parseNativeTransactionItem(item),
       )
       .filter(
         (
@@ -227,7 +227,7 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
     const rawItems: readonly unknown[] = this.resolveResponseData(payload);
     const parsedItems: ITronGridTrc20TransactionItem[] = rawItems
       .map((item: unknown): ITronGridTrc20TransactionItem | null =>
-        this.parseTrc20TransactionItem(item),
+        this.mapper.parseTrc20TransactionItem(item),
       )
       .filter(
         (
@@ -361,281 +361,6 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
     }
   }
 
-  private parseNativeTransactionItem(value: unknown): ITronGridNativeTransactionItem | null {
-    const record: Record<string, unknown> | null = this.parseRecord(value);
-
-    if (record === null) {
-      return null;
-    }
-
-    const txId: string | null = this.normalizeString(record['txID']);
-    const blockTimestamp: number | null = this.normalizeTimestampMs(record['block_timestamp']);
-    const rawDataRecord: Record<string, unknown> | null = this.parseRecord(record['raw_data']);
-    const contractRaw: unknown = rawDataRecord?.['contract'];
-
-    if (txId === null || blockTimestamp === null || !Array.isArray(contractRaw)) {
-      return null;
-    }
-
-    const contracts: ITronGridNativeContractItem[] = contractRaw
-      .map((contractItem: unknown): ITronGridNativeContractItem | null =>
-        this.parseNativeContractItem(contractItem),
-      )
-      .filter(
-        (
-          contractItem: ITronGridNativeContractItem | null,
-        ): contractItem is ITronGridNativeContractItem => contractItem !== null,
-      );
-    const retRaw: unknown = record['ret'];
-    const ret: readonly ITronGridNativeRetItem[] | undefined = this.parseRetItems(retRaw);
-
-    return {
-      txID: txId,
-      block_timestamp: blockTimestamp,
-      raw_data: {
-        contract: contracts,
-      },
-      ret,
-    };
-  }
-
-  private parseNativeContractItem(value: unknown): ITronGridNativeContractItem | null {
-    const record: Record<string, unknown> | null = this.parseRecord(value);
-
-    if (record === null) {
-      return null;
-    }
-
-    const contractType: string | null = this.normalizeString(record['type']);
-    const parameterRecord: Record<string, unknown> | null = this.parseRecord(record['parameter']);
-    const valueRecord: Record<string, unknown> | null = this.parseRecord(
-      parameterRecord?.['value'],
-    );
-
-    if (contractType === null || valueRecord === null) {
-      return null;
-    }
-
-    return {
-      type: contractType,
-      parameter: {
-        value: {
-          owner_address: this.normalizeString(valueRecord['owner_address']) ?? undefined,
-          to_address: this.normalizeString(valueRecord['to_address']) ?? undefined,
-          contract_address: this.normalizeString(valueRecord['contract_address']) ?? undefined,
-          amount: this.normalizeUnsignedValue(valueRecord['amount']) ?? undefined,
-          call_value: this.normalizeUnsignedValue(valueRecord['call_value']) ?? undefined,
-        },
-      },
-    };
-  }
-
-  private parseRetItems(value: unknown): readonly ITronGridNativeRetItem[] | undefined {
-    if (!Array.isArray(value)) {
-      return undefined;
-    }
-
-    return value
-      .map((retValue: unknown): ITronGridNativeRetItem | null => {
-        const retRecord: Record<string, unknown> | null = this.parseRecord(retValue);
-
-        if (retRecord === null) {
-          return null;
-        }
-
-        const contractRet: string | null = this.normalizeString(retRecord['contractRet']);
-
-        if (contractRet === null) {
-          return null;
-        }
-
-        return {
-          contractRet,
-        };
-      })
-      .filter(
-        (retItem: ITronGridNativeRetItem | null): retItem is ITronGridNativeRetItem =>
-          retItem !== null,
-      );
-  }
-
-  private parseTrc20TransactionItem(value: unknown): ITronGridTrc20TransactionItem | null {
-    const record: Record<string, unknown> | null = this.parseRecord(value);
-
-    if (record === null) {
-      return null;
-    }
-
-    const txId: string | null = this.normalizeString(record['transaction_id']);
-    const blockTimestamp: number | null = this.normalizeTimestampMs(record['block_timestamp']);
-
-    if (txId === null || blockTimestamp === null) {
-      return null;
-    }
-
-    return {
-      transaction_id: txId,
-      block_timestamp: blockTimestamp,
-      from: this.normalizeString(record['from']) ?? undefined,
-      to: this.normalizeString(record['to']) ?? undefined,
-      value: this.normalizeUnsignedValue(record['value']) ?? undefined,
-      token_info: this.parseTokenInfo(record['token_info']),
-    };
-  }
-
-  private parseTokenInfo(value: unknown): ITronGridTrc20TokenInfo | undefined {
-    const record: Record<string, unknown> | null = this.parseRecord(value);
-
-    if (record === null) {
-      return undefined;
-    }
-
-    return {
-      symbol: this.normalizeString(record['symbol']) ?? undefined,
-      decimals: this.normalizeTokenDecimals(record['decimals']),
-    };
-  }
-
-  private mapNativeTransaction(
-    item: ITronGridNativeTransactionItem,
-    trackedAddress: string,
-  ): IHistoryItemDto | null {
-    const txHash: string | null = this.normalizeString(item.txID);
-    const blockTimestampMs: number | null = this.normalizeTimestampMs(item.block_timestamp);
-    const contract: ITronGridNativeContractItem | null = this.resolvePrimaryContract(item);
-
-    if (txHash === null || blockTimestampMs === null || contract === null) {
-      return null;
-    }
-
-    const contractType: string = this.normalizeString(contract.type) ?? '';
-    const fromAddress: string = this.normalizeTronAddress(contract.parameter?.value?.owner_address);
-    const toAddress: string =
-      contractType === 'TransferContract'
-        ? this.normalizeTronAddress(contract.parameter?.value?.to_address)
-        : this.normalizeTronAddress(contract.parameter?.value?.contract_address);
-    const amountRawFromTransfer: string | null = this.normalizeUnsignedValue(
-      contract.parameter?.value?.amount,
-    );
-    const amountRawFromCall: string | null = this.normalizeUnsignedValue(
-      contract.parameter?.value?.call_value,
-    );
-    const txValueRaw: string = amountRawFromTransfer ?? amountRawFromCall ?? '0';
-
-    if (
-      contractType !== 'TransferContract' &&
-      (amountRawFromCall === null || amountRawFromCall === '0')
-    ) {
-      return null;
-    }
-
-    return {
-      txHash,
-      timestampSec: Math.floor(blockTimestampMs / 1000),
-      from: fromAddress,
-      to: toAddress,
-      valueRaw: txValueRaw,
-      isError: this.resolveIsError(item.ret),
-      assetSymbol: 'TRX',
-      assetDecimals: TRX_NATIVE_DECIMALS,
-      eventType: HistoryItemType.TRANSFER,
-      direction: this.resolveDirection(trackedAddress, fromAddress, toAddress),
-      txLink: `${this.appConfigService.tronscanTxBaseUrl}${txHash}`,
-    };
-  }
-
-  private mapTrc20Transaction(
-    item: ITronGridTrc20TransactionItem,
-    trackedAddress: string,
-  ): IHistoryItemDto | null {
-    const txHash: string | null = this.normalizeString(item.transaction_id);
-    const blockTimestampMs: number | null = this.normalizeTimestampMs(item.block_timestamp);
-
-    if (txHash === null || blockTimestampMs === null) {
-      return null;
-    }
-
-    const fromAddress: string = this.normalizeTronAddress(item.from);
-    const toAddress: string = this.normalizeTronAddress(item.to);
-    const valueRaw: string = this.normalizeUnsignedValue(item.value) ?? '0';
-    const symbol: string = this.normalizeString(item.token_info?.symbol) ?? 'TRC20';
-    const decimals: number = this.normalizeTokenDecimals(item.token_info?.decimals);
-
-    return {
-      txHash,
-      timestampSec: Math.floor(blockTimestampMs / 1000),
-      from: fromAddress,
-      to: toAddress,
-      valueRaw,
-      isError: false,
-      assetSymbol: symbol,
-      assetDecimals: decimals,
-      eventType: HistoryItemType.TRANSFER,
-      direction: this.resolveDirection(trackedAddress, fromAddress, toAddress),
-      txLink: `${this.appConfigService.tronscanTxBaseUrl}${txHash}`,
-    };
-  }
-
-  private resolvePrimaryContract(
-    item: ITronGridNativeTransactionItem,
-  ): ITronGridNativeContractItem | null {
-    const contracts: readonly ITronGridNativeContractItem[] | undefined = item.raw_data?.contract;
-
-    if (!contracts || contracts.length === 0) {
-      return null;
-    }
-
-    return contracts[0] ?? null;
-  }
-
-  private resolveDirection(
-    trackedAddress: string,
-    fromAddress: string,
-    toAddress: string,
-  ): HistoryDirection {
-    const normalizedTrackedAddress: string | null = this.tronAddressCodec.normalize(trackedAddress);
-    const normalizedFrom: string | null = this.tronAddressCodec.normalize(fromAddress);
-    const normalizedTo: string | null = this.tronAddressCodec.normalize(toAddress);
-
-    if (normalizedTrackedAddress === null) {
-      return HistoryDirection.UNKNOWN;
-    }
-
-    if (normalizedFrom === normalizedTrackedAddress && normalizedTo !== normalizedTrackedAddress) {
-      return HistoryDirection.OUT;
-    }
-
-    if (normalizedTo === normalizedTrackedAddress && normalizedFrom !== normalizedTrackedAddress) {
-      return HistoryDirection.IN;
-    }
-
-    return HistoryDirection.UNKNOWN;
-  }
-
-  private resolveIsError(retItems: readonly ITronGridNativeRetItem[] | undefined): boolean {
-    if (!retItems || retItems.length === 0) {
-      return false;
-    }
-
-    for (const retItem of retItems) {
-      const contractRet: string | null = this.normalizeString(retItem.contractRet);
-
-      if (contractRet !== null && contractRet !== 'SUCCESS') {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  private normalizeTronAddress(rawAddress: string | undefined): string {
-    if (typeof rawAddress !== 'string') {
-      return 'unknown';
-    }
-
-    return this.tronAddressCodec.normalize(rawAddress) ?? rawAddress.trim();
-  }
-
   private normalizeString(rawValue: unknown): string | null {
     if (typeof rawValue !== 'string') {
       return null;
@@ -648,65 +373,5 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
     }
 
     return normalizedValue;
-  }
-
-  private normalizeTimestampMs(rawValue: unknown): number | null {
-    if (typeof rawValue !== 'number' || !Number.isFinite(rawValue) || rawValue <= 0) {
-      return null;
-    }
-
-    return Math.floor(rawValue);
-  }
-
-  private normalizeUnsignedValue(rawValue: unknown): string | null {
-    if (typeof rawValue === 'number' && Number.isFinite(rawValue) && rawValue >= 0) {
-      return Math.floor(rawValue).toString();
-    }
-
-    if (typeof rawValue !== 'string') {
-      return null;
-    }
-
-    const normalizedValue: string = rawValue.trim();
-
-    if (!/^\d+$/.test(normalizedValue)) {
-      return null;
-    }
-
-    return normalizedValue;
-  }
-
-  private normalizeTokenDecimals(rawValue: unknown): number {
-    if (typeof rawValue === 'number' && Number.isFinite(rawValue) && rawValue >= 0) {
-      return Math.floor(rawValue);
-    }
-
-    if (typeof rawValue === 'string' && /^\d+$/.test(rawValue.trim())) {
-      return Number.parseInt(rawValue.trim(), 10);
-    }
-
-    return 0;
-  }
-
-  private parseRecord(value: unknown): Record<string, unknown> | null {
-    if (!value || typeof value !== 'object') {
-      return null;
-    }
-
-    return value as Record<string, unknown>;
-  }
-
-  private applyDirectionFilter(
-    items: readonly IHistoryItemDto[],
-    directionFilter: HistoryDirectionFilter,
-  ): readonly IHistoryItemDto[] {
-    if (directionFilter === HistoryDirectionFilter.ALL) {
-      return items;
-    }
-
-    const targetDirection: HistoryDirection =
-      directionFilter === HistoryDirectionFilter.IN ? HistoryDirection.IN : HistoryDirection.OUT;
-
-    return items.filter((item: IHistoryItemDto): boolean => item.direction === targetDirection);
   }
 }

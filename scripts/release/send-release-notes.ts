@@ -13,86 +13,126 @@ type ReleaseNotesCliOptions = {
   readonly dryRun: boolean;
 };
 
+type ReleaseNotesOptionState = {
+  chatId: string | null;
+  botToken: string | null;
+  title: string;
+  notesFile: string | null;
+  highlightsRaw: string | null;
+  appVersion: string | null;
+  dryRun: boolean;
+};
+
+const isOptionWithValue = (arg: string): boolean =>
+  arg === '--chat-id' ||
+  arg === '--bot-token' ||
+  arg === '--title' ||
+  arg === '--notes-file' ||
+  arg === '--highlights' ||
+  arg === '--version';
+
+const applyOptionWithValue = (state: ReleaseNotesOptionState, arg: string, value: string): void => {
+  if (arg === '--chat-id') {
+    state.chatId = value.trim();
+    return;
+  }
+
+  if (arg === '--bot-token') {
+    state.botToken = value.trim();
+    return;
+  }
+
+  if (arg === '--title') {
+    state.title = value.trim();
+    return;
+  }
+
+  if (arg === '--notes-file') {
+    state.notesFile = value.trim();
+    return;
+  }
+
+  if (arg === '--highlights') {
+    state.highlightsRaw = value.trim();
+    return;
+  }
+
+  if (arg === '--version') {
+    state.appVersion = value.trim();
+  }
+};
+
+type ParsedCliStep = {
+  readonly nextIndex: number;
+  readonly dryRun: boolean;
+};
+
+const parseSingleCliArgument = (
+  argv: readonly string[],
+  index: number,
+  state: ReleaseNotesOptionState,
+): ParsedCliStep => {
+  const arg: string | undefined = argv[index];
+
+  if (typeof arg !== 'string') {
+    return {
+      nextIndex: index + 1,
+      dryRun: state.dryRun,
+    };
+  }
+
+  if (arg === '--dry-run') {
+    return {
+      nextIndex: index + 1,
+      dryRun: true,
+    };
+  }
+
+  if (!isOptionWithValue(arg)) {
+    return {
+      nextIndex: index + 1,
+      dryRun: state.dryRun,
+    };
+  }
+
+  const value: string | undefined = argv[index + 1];
+
+  if (typeof value !== 'string') {
+    throw new Error(`Missing value for argument ${arg}`);
+  }
+
+  applyOptionWithValue(state, arg, value);
+  return {
+    nextIndex: index + 2,
+    dryRun: state.dryRun,
+  };
+};
+
 const parseCliOptions = (argv: readonly string[]): ReleaseNotesCliOptions => {
-  let chatId: string | null = process.env['RELEASE_NOTES_CHAT_ID']?.trim() ?? null;
-  let botToken: string | null = process.env['BOT_TOKEN']?.trim() ?? null;
-  let title: string = 'Что нового:';
-  let notesFile: string | null = null;
-  let highlightsRaw: string | null = null;
-  let appVersion: string | null = process.env['APP_VERSION']?.trim() ?? null;
-  let dryRun: boolean = false;
+  const state: ReleaseNotesOptionState = {
+    chatId: process.env['RELEASE_NOTES_CHAT_ID']?.trim() ?? null,
+    botToken: process.env['BOT_TOKEN']?.trim() ?? null,
+    title: 'Что нового:',
+    notesFile: null,
+    highlightsRaw: null,
+    appVersion: process.env['APP_VERSION']?.trim() ?? null,
+    dryRun: false,
+  };
 
-  for (let index: number = 0; index < argv.length; index += 1) {
-    const arg: string | undefined = argv[index];
-
-    if (typeof arg !== 'string') {
-      continue;
-    }
-
-    if (arg === '--dry-run') {
-      dryRun = true;
-      continue;
-    }
-
-    const value: string | undefined = argv[index + 1];
-
-    if (
-      (arg === '--chat-id' ||
-        arg === '--bot-token' ||
-        arg === '--title' ||
-        arg === '--notes-file' ||
-        arg === '--highlights' ||
-        arg === '--version') &&
-      typeof value !== 'string'
-    ) {
-      throw new Error(`Missing value for argument ${arg}`);
-    }
-
-    if (arg === '--chat-id' && typeof value === 'string') {
-      chatId = value.trim();
-      index += 1;
-      continue;
-    }
-
-    if (arg === '--bot-token' && typeof value === 'string') {
-      botToken = value.trim();
-      index += 1;
-      continue;
-    }
-
-    if (arg === '--title' && typeof value === 'string') {
-      title = value.trim();
-      index += 1;
-      continue;
-    }
-
-    if (arg === '--notes-file' && typeof value === 'string') {
-      notesFile = value.trim();
-      index += 1;
-      continue;
-    }
-
-    if (arg === '--highlights' && typeof value === 'string') {
-      highlightsRaw = value.trim();
-      index += 1;
-      continue;
-    }
-
-    if (arg === '--version' && typeof value === 'string') {
-      appVersion = value.trim();
-      index += 1;
-      continue;
-    }
+  for (let index: number = 0; index < argv.length; ) {
+    const parsedStep: ParsedCliStep = parseSingleCliArgument(argv, index, state);
+    state.dryRun = parsedStep.dryRun;
+    index = parsedStep.nextIndex;
   }
 
   return {
-    chatId,
-    botToken,
-    title,
-    notesFile,
-    highlightsRaw,
-    appVersion,
-    dryRun,
+    chatId: state.chatId,
+    botToken: state.botToken,
+    title: state.title,
+    notesFile: state.notesFile,
+    highlightsRaw: state.highlightsRaw,
+    appVersion: state.appVersion,
+    dryRun: state.dryRun,
   };
 };
 

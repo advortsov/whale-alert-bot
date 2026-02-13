@@ -17,20 +17,41 @@ import {
 
 @Injectable()
 export class ProviderFactory implements IProviderFactory {
-  public constructor(
-    @Inject(ETHEREUM_PRIMARY_RPC_ADAPTER)
-    private readonly ethereumPrimaryProvider: IPrimaryRpcAdapter,
-    @Inject(ETHEREUM_FALLBACK_RPC_ADAPTER)
-    private readonly ethereumFallbackProvider: IFallbackRpcAdapter,
-    @Inject(SOLANA_PRIMARY_RPC_ADAPTER)
-    private readonly solanaPrimaryProvider: IPrimaryRpcAdapter,
-    @Inject(SOLANA_FALLBACK_RPC_ADAPTER)
-    private readonly solanaFallbackProvider: IFallbackRpcAdapter,
-    @Inject(TRON_PRIMARY_RPC_ADAPTER)
-    private readonly tronPrimaryProvider: IPrimaryRpcAdapter,
-    @Inject(TRON_FALLBACK_RPC_ADAPTER)
-    private readonly tronFallbackProvider: IFallbackRpcAdapter,
-  ) {}
+  @Inject(ETHEREUM_PRIMARY_RPC_ADAPTER)
+  private ethereumPrimaryProvider!: IPrimaryRpcAdapter;
+
+  @Inject(ETHEREUM_FALLBACK_RPC_ADAPTER)
+  private ethereumFallbackProvider!: IFallbackRpcAdapter;
+
+  @Inject(SOLANA_PRIMARY_RPC_ADAPTER)
+  private solanaPrimaryProvider!: IPrimaryRpcAdapter;
+
+  @Inject(SOLANA_FALLBACK_RPC_ADAPTER)
+  private solanaFallbackProvider!: IFallbackRpcAdapter;
+
+  @Inject(TRON_PRIMARY_RPC_ADAPTER)
+  private tronPrimaryProvider!: IPrimaryRpcAdapter;
+
+  @Inject(TRON_FALLBACK_RPC_ADAPTER)
+  private tronFallbackProvider!: IFallbackRpcAdapter;
+
+  public static createForTesting(providersOverride: {
+    readonly ethereumPrimaryProvider: IPrimaryRpcAdapter;
+    readonly ethereumFallbackProvider: IFallbackRpcAdapter;
+    readonly solanaPrimaryProvider: IPrimaryRpcAdapter;
+    readonly solanaFallbackProvider: IFallbackRpcAdapter;
+    readonly tronPrimaryProvider: IPrimaryRpcAdapter;
+    readonly tronFallbackProvider: IFallbackRpcAdapter;
+  }): ProviderFactory {
+    const factory: ProviderFactory = new ProviderFactory();
+    factory.ethereumPrimaryProvider = providersOverride.ethereumPrimaryProvider;
+    factory.ethereumFallbackProvider = providersOverride.ethereumFallbackProvider;
+    factory.solanaPrimaryProvider = providersOverride.solanaPrimaryProvider;
+    factory.solanaFallbackProvider = providersOverride.solanaFallbackProvider;
+    factory.tronPrimaryProvider = providersOverride.tronPrimaryProvider;
+    factory.tronFallbackProvider = providersOverride.tronFallbackProvider;
+    return factory;
+  }
 
   public createPrimary(chainId: ChainKey): IPrimaryRpcAdapter {
     switch (chainId) {

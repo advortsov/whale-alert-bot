@@ -13,6 +13,8 @@ import type {
 } from './subscriptions.repository.interfaces';
 
 const USER_WALLET_SUBSCRIPTIONS_TABLE = 'user_wallet_subscriptions';
+const TRACKED_WALLETS_CHAIN_KEY_COLUMN = 'tracked_wallets.chain_key';
+const USER_WALLET_SUBSCRIPTIONS_WALLET_ID_COLUMN = 'user_wallet_subscriptions.wallet_id';
 
 @Injectable()
 export class SubscriptionsRepository {
@@ -53,7 +55,7 @@ export class SubscriptionsRepository {
       .select([
         'user_wallet_subscriptions.id',
         'tracked_wallets.id as wallet_id',
-        'tracked_wallets.chain_key as chain_key',
+        `${TRACKED_WALLETS_CHAIN_KEY_COLUMN} as chain_key`,
         'tracked_wallets.address',
         'tracked_wallets.label',
         'user_wallet_subscriptions.created_at',
@@ -111,11 +113,11 @@ export class SubscriptionsRepository {
       .selectFrom('tracked_wallets')
       .innerJoin(
         USER_WALLET_SUBSCRIPTIONS_TABLE,
-        'user_wallet_subscriptions.wallet_id',
+        USER_WALLET_SUBSCRIPTIONS_WALLET_ID_COLUMN,
         'tracked_wallets.id',
       )
       .select('tracked_wallets.address')
-      .where('tracked_wallets.chain_key', '=', chainKey)
+      .where(TRACKED_WALLETS_CHAIN_KEY_COLUMN, '=', chainKey)
       .distinct()
       .execute();
 
@@ -131,12 +133,12 @@ export class SubscriptionsRepository {
       .selectFrom('tracked_wallets')
       .innerJoin(
         USER_WALLET_SUBSCRIPTIONS_TABLE,
-        'user_wallet_subscriptions.wallet_id',
+        USER_WALLET_SUBSCRIPTIONS_WALLET_ID_COLUMN,
         'tracked_wallets.id',
       )
       .innerJoin('users', 'users.id', 'user_wallet_subscriptions.user_id')
       .select('users.telegram_id')
-      .where('tracked_wallets.chain_key', '=', chainKey)
+      .where(TRACKED_WALLETS_CHAIN_KEY_COLUMN, '=', chainKey)
       .where('tracked_wallets.address', '=', address)
       .execute();
 
@@ -157,7 +159,7 @@ export class SubscriptionsRepository {
       .selectFrom('tracked_wallets')
       .innerJoin(
         USER_WALLET_SUBSCRIPTIONS_TABLE,
-        'user_wallet_subscriptions.wallet_id',
+        USER_WALLET_SUBSCRIPTIONS_WALLET_ID_COLUMN,
         'tracked_wallets.id',
       )
       .innerJoin('users', 'users.id', 'user_wallet_subscriptions.user_id')
@@ -165,9 +167,9 @@ export class SubscriptionsRepository {
         'users.telegram_id',
         'user_wallet_subscriptions.user_id',
         'user_wallet_subscriptions.wallet_id',
-        'tracked_wallets.chain_key',
+        TRACKED_WALLETS_CHAIN_KEY_COLUMN,
       ])
-      .where('tracked_wallets.chain_key', '=', chainKey)
+      .where(TRACKED_WALLETS_CHAIN_KEY_COLUMN, '=', chainKey)
       .where('tracked_wallets.address', '=', address)
       .execute();
 

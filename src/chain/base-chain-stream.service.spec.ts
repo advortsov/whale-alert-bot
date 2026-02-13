@@ -4,6 +4,7 @@ import {
   BaseChainStreamService,
   type IChainRuntimeSnapshot,
   type IChainStreamConfig,
+  type IBaseChainStreamDependencies,
   type IMatchedTransaction,
 } from './base-chain-stream.service';
 import { ChainId, ClassifiedEventType, EventDirection, AssetStandard } from './chain.types';
@@ -107,14 +108,15 @@ class TestChainStreamService extends BaseChainStreamService {
       reorgConfirmations?: number;
     },
   ) {
-    super(
+    const dependencies: IBaseChainStreamDependencies = {
       providerFailoverService,
       chainCheckpointsRepository,
       subscriptionsRepository,
       processedEventsRepository,
       walletEventsRepository,
       alertDispatcherService,
-    );
+    };
+    super(dependencies);
     this.stub = options.stub;
     this._trackedAddresses = options.trackedAddresses;
     this._classifyResult = options.classifyResult;

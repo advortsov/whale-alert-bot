@@ -7,6 +7,22 @@ import {
   type HistoryRateLimitDecision,
 } from './history-rate-limiter.interfaces';
 import type { HistoryRateLimiterService } from './history-rate-limiter.service';
+import { TrackingAddressService } from './tracking-address.service';
+import { TrackingHistoryFormatterService } from './tracking-history-formatter.service';
+import { TrackingHistoryQueryParserService } from './tracking-history-query-parser.service';
+import {
+  TrackingHistoryService,
+  TrackingHistoryServiceDependencies,
+} from './tracking-history.service';
+import { TrackingSettingsParserService } from './tracking-settings-parser.service';
+import {
+  TrackingSettingsService,
+  TrackingSettingsServiceDependencies,
+} from './tracking-settings.service';
+import {
+  TrackingWalletsService,
+  TrackingWalletsServiceDependencies,
+} from './tracking-wallets.service';
 import { AlertFilterToggleTarget, type TelegramUserRef } from './tracking.interfaces';
 import { TrackingService } from './tracking.service';
 import type { AppConfigService } from '../config/app-config.service';
@@ -284,20 +300,95 @@ const createTestContext = (): TestContext => {
     created_at: new Date('2026-02-01T00:00:00.000Z'),
   });
 
-  const service: TrackingService = new TrackingService(
-    usersRepositoryStub as unknown as UsersRepository,
-    trackedWalletsRepositoryStub as unknown as TrackedWalletsRepository,
+  const trackingAddressService: TrackingAddressService = new TrackingAddressService(
     subscriptionsRepositoryStub as unknown as SubscriptionsRepository,
     addressCodecRegistryStub as unknown as IAddressCodecRegistry,
-    historyExplorerAdapterStub as unknown as IHistoryExplorerAdapter,
-    historyCacheServiceStub as unknown as HistoryCacheService,
-    historyRateLimiterServiceStub as unknown as HistoryRateLimiterService,
-    userAlertPreferencesRepositoryStub as unknown as UserAlertPreferencesRepository,
-    userAlertSettingsRepositoryStub as unknown as UserAlertSettingsRepository,
-    userWalletAlertPreferencesRepositoryStub as unknown as UserWalletAlertPreferencesRepository,
-    alertMutesRepositoryStub as unknown as AlertMutesRepository,
-    walletEventsRepositoryStub as unknown as WalletEventsRepository,
+  );
+  const settingsParserService: TrackingSettingsParserService = new TrackingSettingsParserService();
+  const historyFormatter: TrackingHistoryFormatterService = new TrackingHistoryFormatterService(
     appConfigServiceStub as unknown as AppConfigService,
+  );
+  const historyQueryParserService: TrackingHistoryQueryParserService =
+    new TrackingHistoryQueryParserService();
+
+  const walletsDeps = new TrackingWalletsServiceDependencies();
+  (walletsDeps as { usersRepository: UsersRepository }).usersRepository =
+    usersRepositoryStub as unknown as UsersRepository;
+  (walletsDeps as { trackedWalletsRepository: TrackedWalletsRepository }).trackedWalletsRepository =
+    trackedWalletsRepositoryStub as unknown as TrackedWalletsRepository;
+  (walletsDeps as { subscriptionsRepository: SubscriptionsRepository }).subscriptionsRepository =
+    subscriptionsRepositoryStub as unknown as SubscriptionsRepository;
+  (walletsDeps as { addressCodecRegistry: IAddressCodecRegistry }).addressCodecRegistry =
+    addressCodecRegistryStub as unknown as IAddressCodecRegistry;
+  (walletsDeps as { trackingAddressService: TrackingAddressService }).trackingAddressService =
+    trackingAddressService;
+  (
+    walletsDeps as { userAlertPreferencesRepository: UserAlertPreferencesRepository }
+  ).userAlertPreferencesRepository =
+    userAlertPreferencesRepositoryStub as unknown as UserAlertPreferencesRepository;
+  (
+    walletsDeps as { userAlertSettingsRepository: UserAlertSettingsRepository }
+  ).userAlertSettingsRepository =
+    userAlertSettingsRepositoryStub as unknown as UserAlertSettingsRepository;
+  (
+    walletsDeps as { userWalletAlertPreferencesRepository: UserWalletAlertPreferencesRepository }
+  ).userWalletAlertPreferencesRepository =
+    userWalletAlertPreferencesRepositoryStub as unknown as UserWalletAlertPreferencesRepository;
+  (walletsDeps as { alertMutesRepository: AlertMutesRepository }).alertMutesRepository =
+    alertMutesRepositoryStub as unknown as AlertMutesRepository;
+  (walletsDeps as { walletEventsRepository: WalletEventsRepository }).walletEventsRepository =
+    walletEventsRepositoryStub as unknown as WalletEventsRepository;
+  (walletsDeps as { settingsParserService: TrackingSettingsParserService }).settingsParserService =
+    settingsParserService;
+  (walletsDeps as { historyFormatter: TrackingHistoryFormatterService }).historyFormatter =
+    historyFormatter;
+  const walletsService: TrackingWalletsService = new TrackingWalletsService(walletsDeps);
+
+  const settingsDeps = new TrackingSettingsServiceDependencies();
+  (settingsDeps as { usersRepository: UsersRepository }).usersRepository =
+    usersRepositoryStub as unknown as UsersRepository;
+  (
+    settingsDeps as { userAlertPreferencesRepository: UserAlertPreferencesRepository }
+  ).userAlertPreferencesRepository =
+    userAlertPreferencesRepositoryStub as unknown as UserAlertPreferencesRepository;
+  (
+    settingsDeps as { userAlertSettingsRepository: UserAlertSettingsRepository }
+  ).userAlertSettingsRepository =
+    userAlertSettingsRepositoryStub as unknown as UserAlertSettingsRepository;
+  (
+    settingsDeps as { historyRateLimiterService: HistoryRateLimiterService }
+  ).historyRateLimiterService =
+    historyRateLimiterServiceStub as unknown as HistoryRateLimiterService;
+  (settingsDeps as { settingsParserService: TrackingSettingsParserService }).settingsParserService =
+    settingsParserService;
+  const settingsService: TrackingSettingsService = new TrackingSettingsService(settingsDeps);
+
+  const historyDeps = new TrackingHistoryServiceDependencies();
+  (historyDeps as { usersRepository: UsersRepository }).usersRepository =
+    usersRepositoryStub as unknown as UsersRepository;
+  (historyDeps as { trackingAddressService: TrackingAddressService }).trackingAddressService =
+    trackingAddressService;
+  (historyDeps as { historyExplorerAdapter: IHistoryExplorerAdapter }).historyExplorerAdapter =
+    historyExplorerAdapterStub as unknown as IHistoryExplorerAdapter;
+  (historyDeps as { historyCacheService: HistoryCacheService }).historyCacheService =
+    historyCacheServiceStub as unknown as HistoryCacheService;
+  (
+    historyDeps as { historyRateLimiterService: HistoryRateLimiterService }
+  ).historyRateLimiterService =
+    historyRateLimiterServiceStub as unknown as HistoryRateLimiterService;
+  (historyDeps as { walletEventsRepository: WalletEventsRepository }).walletEventsRepository =
+    walletEventsRepositoryStub as unknown as WalletEventsRepository;
+  (historyDeps as { historyFormatter: TrackingHistoryFormatterService }).historyFormatter =
+    historyFormatter;
+  (
+    historyDeps as { historyQueryParserService: TrackingHistoryQueryParserService }
+  ).historyQueryParserService = historyQueryParserService;
+  const historyService: TrackingHistoryService = new TrackingHistoryService(historyDeps);
+
+  const service: TrackingService = new TrackingService(
+    walletsService,
+    settingsService,
+    historyService,
   );
 
   return {
@@ -397,12 +488,13 @@ describe('TrackingService', (): void => {
       staleUntilEpochMs: 3000,
     });
 
-    const message: string = await context.service.getAddressHistoryWithPolicy(
-      context.userRef,
-      '#3',
-      '5',
-      HistoryRequestSource.COMMAND,
-    );
+    const message: string = await context.service.getAddressHistoryWithPolicy(context.userRef, {
+      rawAddress: '#3',
+      rawLimit: '5',
+      source: HistoryRequestSource.COMMAND,
+      rawKind: null,
+      rawDirection: null,
+    });
 
     expect(message).toBe('cached history message');
     expect(context.historyExplorerAdapterStub.loadRecentTransactions).not.toHaveBeenCalled();
@@ -431,12 +523,13 @@ describe('TrackingService', (): void => {
       nextOffset: null,
     });
 
-    const message: string = await context.service.getAddressHistoryWithPolicy(
-      context.userRef,
-      '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
-      '5',
-      HistoryRequestSource.COMMAND,
-    );
+    const message: string = await context.service.getAddressHistoryWithPolicy(context.userRef, {
+      rawAddress: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
+      rawLimit: '5',
+      source: HistoryRequestSource.COMMAND,
+      rawKind: null,
+      rawDirection: null,
+    });
 
     expect(context.historyExplorerAdapterStub.loadRecentTransactions).toHaveBeenCalledTimes(1);
     expect(context.historyCacheServiceStub.set).toHaveBeenCalledTimes(1);
@@ -477,12 +570,13 @@ describe('TrackingService', (): void => {
       },
     ]);
 
-    const message: string = await context.service.getAddressHistoryWithPolicy(
-      context.userRef,
-      '#16',
-      '5',
-      HistoryRequestSource.COMMAND,
-    );
+    const message: string = await context.service.getAddressHistoryWithPolicy(context.userRef, {
+      rawAddress: '#16',
+      rawLimit: '5',
+      source: HistoryRequestSource.COMMAND,
+      rawKind: null,
+      rawDirection: null,
+    });
 
     expect(context.historyExplorerAdapterStub.loadRecentTransactions).not.toHaveBeenCalled();
     expect(message).toContain(
@@ -524,12 +618,13 @@ describe('TrackingService', (): void => {
       },
     ]);
 
-    const message: string = await context.service.getAddressHistoryWithPolicy(
-      context.userRef,
-      '#17',
-      '5',
-      HistoryRequestSource.COMMAND,
-    );
+    const message: string = await context.service.getAddressHistoryWithPolicy(context.userRef, {
+      rawAddress: '#17',
+      rawLimit: '5',
+      source: HistoryRequestSource.COMMAND,
+      rawKind: null,
+      rawDirection: null,
+    });
 
     expect(context.historyExplorerAdapterStub.loadRecentTransactions).not.toHaveBeenCalled();
     expect(message).toContain(

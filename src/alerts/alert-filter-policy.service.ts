@@ -70,71 +70,23 @@ export class AlertFilterPolicyService {
     eventContext: IAlertSemanticEventContext,
   ): ISemanticFilterDecision {
     const normalizedDex: string | null = normalizeDexKey(eventContext.dex);
-    const normalizedType: AlertSmartFilterType = policy.type;
+    const isTypeAllowed: boolean = this.isSemanticTypeAllowed(policy.type, eventContext);
 
-    if (
-      normalizedType === AlertSmartFilterType.TRANSFER &&
-      eventContext.eventType !== ClassifiedEventType.TRANSFER
-    ) {
-      return {
-        allowed: false,
-        suppressedReason: 'type_filter',
-        normalizedDex,
-      };
+    if (!isTypeAllowed) {
+      return this.buildSemanticDecision(false, 'type_filter', normalizedDex);
     }
 
-    if (
-      normalizedType === AlertSmartFilterType.BUY &&
-      (eventContext.eventType !== ClassifiedEventType.SWAP ||
-        eventContext.direction !== EventDirection.IN)
-    ) {
-      return {
-        allowed: false,
-        suppressedReason: 'type_filter',
-        normalizedDex,
-      };
-    }
-
-    if (
-      normalizedType === AlertSmartFilterType.SELL &&
-      (eventContext.eventType !== ClassifiedEventType.SWAP ||
-        eventContext.direction !== EventDirection.OUT)
-    ) {
-      return {
-        allowed: false,
-        suppressedReason: 'type_filter',
-        normalizedDex,
-      };
-    }
-
-    if (eventContext.eventType === ClassifiedEventType.SWAP) {
-      if (policy.includeDexes.length > 0) {
-        const inIncludeList: boolean =
-          normalizedDex !== null && policy.includeDexes.includes(normalizedDex);
-
-        if (!inIncludeList) {
-          return {
-            allowed: false,
-            suppressedReason: 'dex_include',
-            normalizedDex,
-          };
-        }
-      }
-
-      if (normalizedDex !== null && policy.excludeDexes.includes(normalizedDex)) {
-        return {
-          allowed: false,
-          suppressedReason: 'dex_exclude',
-          normalizedDex,
-        };
-      }
-    }
-
-    return {
-      allowed: true,
-      suppressedReason: null,
+    const dexDecision: ISemanticFilterDecision | null = this.evaluateDexDecision(
+      policy,
+      eventContext,
       normalizedDex,
-    };
+    );
+
+    if (dexDecision !== null) {
+      return dexDecision;
+    }
+
+    return this.buildSemanticDecision(true, null, normalizedDex);
   }
 
   public evaluateCexFlow(
@@ -179,6 +131,83 @@ export class AlertFilterPolicyService {
     return {
       allowed: true,
       suppressedReason: null,
+    };
+  }
+
+  private evaluateDexDecision(
+    policy: IAlertSemanticFilterPolicy,
+    eventContext: IAlertSemanticEventContext,
+    normalizedDex: string | null,
+  ): ISemanticFilterDecision | null {
+    if (eventContext.eventType !== ClassifiedEventType.SWAP) {
+      return null;
+    }
+
+    if (this.isDexExcluded(policy, normalizedDex)) {
+      return this.buildSemanticDecision(false, 'dex_exclude', normalizedDex);
+    }
+
+    if (!this.isDexIncluded(policy, normalizedDex)) {
+      return this.buildSemanticDecision(false, 'dex_include', normalizedDex);
+    }
+
+    return null;
+  }
+
+  private isDexIncluded(policy: IAlertSemanticFilterPolicy, normalizedDex: string | null): boolean {
+    if (policy.includeDexes.length === 0) {
+      return true;
+    }
+
+    if (normalizedDex === null) {
+      return false;
+    }
+
+    return policy.includeDexes.includes(normalizedDex);
+  }
+
+  private isDexExcluded(policy: IAlertSemanticFilterPolicy, normalizedDex: string | null): boolean {
+    if (normalizedDex === null) {
+      return false;
+    }
+
+    return policy.excludeDexes.includes(normalizedDex);
+  }
+
+  private isSemanticTypeAllowed(
+    filterType: AlertSmartFilterType,
+    eventContext: IAlertSemanticEventContext,
+  ): boolean {
+    if (filterType === AlertSmartFilterType.ALL) {
+      return true;
+    }
+
+    if (filterType === AlertSmartFilterType.TRANSFER) {
+      return eventContext.eventType === ClassifiedEventType.TRANSFER;
+    }
+
+    const isSwapEvent: boolean = eventContext.eventType === ClassifiedEventType.SWAP;
+
+    if (!isSwapEvent) {
+      return false;
+    }
+
+    if (filterType === AlertSmartFilterType.BUY) {
+      return eventContext.direction === EventDirection.IN;
+    }
+
+    return eventContext.direction === EventDirection.OUT;
+  }
+
+  private buildSemanticDecision(
+    allowed: boolean,
+    suppressedReason: ISemanticFilterDecision['suppressedReason'],
+    normalizedDex: string | null,
+  ): ISemanticFilterDecision {
+    return {
+      allowed,
+      suppressedReason,
+      normalizedDex,
     };
   }
 }

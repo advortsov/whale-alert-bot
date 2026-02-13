@@ -21,7 +21,7 @@ export class LocalBotHarness {
   private messageIdCounter: number = INITIAL_MESSAGE_ID_COUNTER;
 
   public constructor(dependencies: LocalBotHarnessDependencies) {
-    this.update = new TelegramUpdate(
+    this.update = TelegramUpdate.createForTesting(
       dependencies.trackingService,
       dependencies.runtimeStatusService,
       dependencies.appConfigService,
