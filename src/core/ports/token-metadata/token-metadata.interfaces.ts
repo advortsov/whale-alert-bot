@@ -1,9 +1,9 @@
-export interface TokenMetadataDto {
+export interface ITokenMetadataDto {
   readonly address: string;
   readonly symbol: string;
   readonly decimals: number;
 }
 
 export interface ITokenMetadataAdapter {
-  getMetadata(contractAddress: string | null, nowEpochMs?: number): TokenMetadataDto;
+  getMetadata(contractAddress: string | null, nowEpochMs?: number): ITokenMetadataDto;
 }

@@ -1,6 +1,6 @@
 import type { ChainKey } from '../../core/chains/chain-key.interfaces';
 
-export interface UpsertAlertMuteInput {
+export interface IUpsertAlertMuteInput {
   readonly userId: number;
   readonly chainKey: ChainKey;
   readonly walletId: number;

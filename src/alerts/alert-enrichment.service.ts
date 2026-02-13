@@ -5,6 +5,8 @@ import { EventDirection, type ClassifiedEvent } from '../chain/chain.types';
 import { TOKEN_METADATA_ADAPTER } from '../core/ports/token-metadata/token-metadata-port.tokens';
 import type { ITokenMetadataAdapter } from '../core/ports/token-metadata/token-metadata.interfaces';
 
+const VALUE_DISPLAY_PRECISION = 6;
+
 @Injectable()
 export class AlertEnrichmentService {
   public constructor(
@@ -35,7 +37,7 @@ export class AlertEnrichmentService {
     try {
       const normalizedValue: string = formatUnits(BigInt(valueRaw), decimals);
       const asNumber: number = Number.parseFloat(normalizedValue);
-      return asNumber.toFixed(6);
+      return asNumber.toFixed(VALUE_DISPLAY_PRECISION);
     } catch {
       return null;
     }

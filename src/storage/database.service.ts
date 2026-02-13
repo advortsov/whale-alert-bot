@@ -2,24 +2,24 @@ import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { Kysely, PostgresDialect, sql } from 'kysely';
 import { Pool } from 'pg';
 
-import type { Database } from './database.types';
+import type { IDatabase } from './database.types';
 import { AppConfigService } from '../config/app-config.service';
 
 @Injectable()
 export class DatabaseService implements OnModuleDestroy {
-  private readonly db: Kysely<Database>;
+  private readonly db: Kysely<IDatabase>;
 
   public constructor(private readonly appConfigService: AppConfigService) {
     const pool: Pool = new Pool({
       connectionString: this.appConfigService.databaseUrl,
     });
 
-    this.db = new Kysely<Database>({
+    this.db = new Kysely<IDatabase>({
       dialect: new PostgresDialect({ pool }),
     });
   }
 
-  public getDb(): Kysely<Database> {
+  public getDb(): Kysely<IDatabase> {
     return this.db;
   }
 

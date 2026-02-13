@@ -6,8 +6,8 @@ export type {
   IProviderFailoverService,
   IRpcAdapter as IRpcProvider,
   ISubscriptionHandle,
-  ProviderHealth,
+  IProviderHealth,
   ProviderOperation,
 } from '../../core/ports/rpc/rpc-adapter.interfaces';
 
-export type { BlockEnvelope as BlockWithTransactions } from '../../core/ports/rpc/block-stream.interfaces';
+export type { IBlockEnvelope as BlockWithTransactions } from '../../core/ports/rpc/block-stream.interfaces';

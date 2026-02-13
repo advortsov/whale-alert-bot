@@ -12,7 +12,7 @@ export enum HistoryDirectionFilter {
   OUT = 'out',
 }
 
-export interface HistoryRequestDto {
+export interface IHistoryRequestDto {
   readonly chainKey: ChainKey;
   readonly address: string;
   readonly limit: number;

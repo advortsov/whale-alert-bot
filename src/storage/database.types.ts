@@ -12,14 +12,14 @@ type NullableUpdatableTimestampColumn = ColumnType<
   Date | string | null | undefined
 >;
 
-export interface UsersTable {
+export interface IUsersTable {
   id: Generated<number>;
   telegram_id: string;
   username: string | null;
   created_at: TimestampColumn;
 }
 
-export interface TrackedWalletsTable {
+export interface ITrackedWalletsTable {
   id: Generated<number>;
   chain_key: string;
   address: string;
@@ -27,14 +27,14 @@ export interface TrackedWalletsTable {
   created_at: TimestampColumn;
 }
 
-export interface UserWalletSubscriptionsTable {
+export interface IUserWalletSubscriptionsTable {
   id: Generated<number>;
   user_id: number;
   wallet_id: number;
   created_at: TimestampColumn;
 }
 
-export interface ProcessedEventsTable {
+export interface IProcessedEventsTable {
   id: Generated<number>;
   tx_hash: string;
   log_index: number;
@@ -44,7 +44,7 @@ export interface ProcessedEventsTable {
   processed_at: TimestampColumn;
 }
 
-export interface UserAlertPreferencesTable {
+export interface IUserAlertPreferencesTable {
   id: Generated<number>;
   user_id: number;
   min_amount: number;
@@ -55,7 +55,7 @@ export interface UserAlertPreferencesTable {
   updated_at: UpdatableTimestampColumn;
 }
 
-export interface UserWalletAlertPreferencesTable {
+export interface IUserWalletAlertPreferencesTable {
   id: Generated<number>;
   user_id: number;
   wallet_id: number;
@@ -65,7 +65,7 @@ export interface UserWalletAlertPreferencesTable {
   updated_at: UpdatableTimestampColumn;
 }
 
-export interface UserAlertSettingsTable {
+export interface IUserAlertSettingsTable {
   id: Generated<number>;
   user_id: number;
   chain_key: string;
@@ -81,7 +81,7 @@ export interface UserAlertSettingsTable {
   updated_at: UpdatableTimestampColumn;
 }
 
-export interface AlertMutesTable {
+export interface IAlertMutesTable {
   id: Generated<number>;
   user_id: number;
   chain_key: string;
@@ -91,14 +91,14 @@ export interface AlertMutesTable {
   created_at: TimestampColumn;
 }
 
-export interface ChainCheckpointsTable {
+export interface IChainCheckpointsTable {
   chain_id: number;
   chain_key: string;
   last_processed_block: string;
   updated_at: UpdatableTimestampColumn;
 }
 
-export interface WalletEventsTable {
+export interface IWalletEventsTable {
   id: Generated<number>;
   chain_id: number;
   chain_key: string;
@@ -120,45 +120,45 @@ export interface WalletEventsTable {
   created_at: TimestampColumn;
 }
 
-export interface Database {
-  users: UsersTable;
-  tracked_wallets: TrackedWalletsTable;
-  user_wallet_subscriptions: UserWalletSubscriptionsTable;
-  processed_events: ProcessedEventsTable;
-  user_alert_preferences: UserAlertPreferencesTable;
-  user_wallet_alert_preferences: UserWalletAlertPreferencesTable;
-  user_alert_settings: UserAlertSettingsTable;
-  alert_mutes: AlertMutesTable;
-  chain_checkpoints: ChainCheckpointsTable;
-  wallet_events: WalletEventsTable;
+export interface IDatabase {
+  users: IUsersTable;
+  tracked_wallets: ITrackedWalletsTable;
+  user_wallet_subscriptions: IUserWalletSubscriptionsTable;
+  processed_events: IProcessedEventsTable;
+  user_alert_preferences: IUserAlertPreferencesTable;
+  user_wallet_alert_preferences: IUserWalletAlertPreferencesTable;
+  user_alert_settings: IUserAlertSettingsTable;
+  alert_mutes: IAlertMutesTable;
+  chain_checkpoints: IChainCheckpointsTable;
+  wallet_events: IWalletEventsTable;
 }
 
-export type UserRow = Selectable<UsersTable>;
-export type NewUserRow = Insertable<UsersTable>;
+export type UserRow = Selectable<IUsersTable>;
+export type NewUserRow = Insertable<IUsersTable>;
 
-export type TrackedWalletRow = Selectable<TrackedWalletsTable>;
-export type NewTrackedWalletRow = Insertable<TrackedWalletsTable>;
+export type TrackedWalletRow = Selectable<ITrackedWalletsTable>;
+export type NewTrackedWalletRow = Insertable<ITrackedWalletsTable>;
 
-export type UserWalletSubscriptionRow = Selectable<UserWalletSubscriptionsTable>;
-export type NewUserWalletSubscriptionRow = Insertable<UserWalletSubscriptionsTable>;
+export type UserWalletSubscriptionRow = Selectable<IUserWalletSubscriptionsTable>;
+export type NewUserWalletSubscriptionRow = Insertable<IUserWalletSubscriptionsTable>;
 
-export type ProcessedEventRow = Selectable<ProcessedEventsTable>;
-export type NewProcessedEventRow = Insertable<ProcessedEventsTable>;
+export type ProcessedEventRow = Selectable<IProcessedEventsTable>;
+export type NewProcessedEventRow = Insertable<IProcessedEventsTable>;
 
-export type UserAlertPreferenceRow = Selectable<UserAlertPreferencesTable>;
-export type NewUserAlertPreferenceRow = Insertable<UserAlertPreferencesTable>;
+export type UserAlertPreferenceRow = Selectable<IUserAlertPreferencesTable>;
+export type NewUserAlertPreferenceRow = Insertable<IUserAlertPreferencesTable>;
 
-export type UserWalletAlertPreferenceRow = Selectable<UserWalletAlertPreferencesTable>;
-export type NewUserWalletAlertPreferenceRow = Insertable<UserWalletAlertPreferencesTable>;
+export type UserWalletAlertPreferenceRow = Selectable<IUserWalletAlertPreferencesTable>;
+export type NewUserWalletAlertPreferenceRow = Insertable<IUserWalletAlertPreferencesTable>;
 
-export type UserAlertSettingsRow = Selectable<UserAlertSettingsTable>;
-export type NewUserAlertSettingsRow = Insertable<UserAlertSettingsTable>;
+export type UserAlertSettingsRow = Selectable<IUserAlertSettingsTable>;
+export type NewUserAlertSettingsRow = Insertable<IUserAlertSettingsTable>;
 
-export type AlertMuteRow = Selectable<AlertMutesTable>;
-export type NewAlertMuteRow = Insertable<AlertMutesTable>;
+export type AlertMuteRow = Selectable<IAlertMutesTable>;
+export type NewAlertMuteRow = Insertable<IAlertMutesTable>;
 
-export type ChainCheckpointRow = Selectable<ChainCheckpointsTable>;
-export type NewChainCheckpointRow = Insertable<ChainCheckpointsTable>;
+export type ChainCheckpointRow = Selectable<IChainCheckpointsTable>;
+export type NewChainCheckpointRow = Insertable<IChainCheckpointsTable>;
 
-export type WalletEventRow = Selectable<WalletEventsTable>;
-export type NewWalletEventRow = Insertable<WalletEventsTable>;
+export type WalletEventRow = Selectable<IWalletEventsTable>;
+export type NewWalletEventRow = Insertable<IWalletEventsTable>;

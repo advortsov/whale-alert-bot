@@ -4,15 +4,18 @@ import { TronEventClassifierService } from './tron-event-classifier.service';
 import { AlertDispatcherService } from '../../alerts/alert-dispatcher.service';
 import {
   BaseChainStreamService,
-  type ChainStreamConfig,
-  type MatchedTransaction,
+  type IChainStreamConfig,
+  type IMatchedTransaction,
 } from '../../chain/base-chain-stream.service';
 import { ChainId, type ClassifiedEvent } from '../../chain/chain.types';
 import { ProviderFailoverService } from '../../chain/providers/provider-failover.service';
 import { AppConfigService } from '../../config/app-config.service';
 import { ChainKey } from '../../core/chains/chain-key.interfaces';
-import type { ClassificationContextDto } from '../../core/ports/classification/chain-classifier.interfaces';
-import type { BlockEnvelope, ReceiptEnvelope } from '../../core/ports/rpc/block-stream.interfaces';
+import type { IClassificationContextDto } from '../../core/ports/classification/chain-classifier.interfaces';
+import type {
+  IBlockEnvelope,
+  IReceiptEnvelope,
+} from '../../core/ports/rpc/block-stream.interfaces';
 import type { ISubscriptionHandle } from '../../core/ports/rpc/rpc-adapter.interfaces';
 import { ChainCheckpointsRepository } from '../../storage/repositories/chain-checkpoints.repository';
 import { ProcessedEventsRepository } from '../../storage/repositories/processed-events.repository';
@@ -21,7 +24,7 @@ import { WalletEventsRepository } from '../../storage/repositories/wallet-events
 
 @Injectable()
 export class TronChainStreamService extends BaseChainStreamService {
-  private static readonly CHAIN_CONFIG: ChainStreamConfig = {
+  private static readonly CHAIN_CONFIG: IChainStreamConfig = {
     logPrefix: '[TRON]',
     chainKey: ChainKey.TRON_MAINNET,
     chainId: ChainId.TRON_MAINNET,
@@ -48,7 +51,7 @@ export class TronChainStreamService extends BaseChainStreamService {
     );
   }
 
-  protected getConfig(): ChainStreamConfig {
+  protected getConfig(): IChainStreamConfig {
     return TronChainStreamService.CHAIN_CONFIG;
   }
 
@@ -72,7 +75,7 @@ export class TronChainStreamService extends BaseChainStreamService {
     return 0;
   }
 
-  protected async fetchBlockEnvelope(blockNumber: number): Promise<BlockEnvelope | null> {
+  protected async fetchBlockEnvelope(blockNumber: number): Promise<IBlockEnvelope | null> {
     return this.providerFailoverService.executeForChain(ChainKey.TRON_MAINNET, (provider) =>
       provider.getBlockEnvelope(blockNumber),
     );
@@ -116,15 +119,15 @@ export class TronChainStreamService extends BaseChainStreamService {
   }
 
   protected async classifyTransaction(
-    matched: MatchedTransaction,
+    matched: IMatchedTransaction,
   ): Promise<ClassifiedEvent | null> {
-    const receiptEnvelope: ReceiptEnvelope | null =
+    const receiptEnvelope: IReceiptEnvelope | null =
       await this.providerFailoverService.executeForChain(
         ChainKey.TRON_MAINNET,
-        (provider): Promise<ReceiptEnvelope | null> => provider.getReceiptEnvelope(matched.txHash),
+        (provider): Promise<IReceiptEnvelope | null> => provider.getReceiptEnvelope(matched.txHash),
       );
 
-    const context: ClassificationContextDto = {
+    const context: IClassificationContextDto = {
       chainId: ChainId.TRON_MAINNET,
       txHash: matched.txHash,
       trackedAddress: matched.trackedAddress,

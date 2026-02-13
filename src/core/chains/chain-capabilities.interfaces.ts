@@ -1,6 +1,6 @@
 import type { ChainKey } from './chain-key.interfaces';
 
-export interface ChainCapabilities {
+export interface IChainCapabilities {
   readonly chainKey: ChainKey;
   readonly supportsNativeTransfers: boolean;
   readonly supportsTokenTransfers: boolean;

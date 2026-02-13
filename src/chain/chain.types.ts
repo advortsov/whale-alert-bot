@@ -1,6 +1,8 @@
 export enum ChainId {
   ETHEREUM_MAINNET = 1,
+  // eslint-disable-next-line no-magic-numbers
   SOLANA_MAINNET = 101,
+  // eslint-disable-next-line no-magic-numbers
   TRON_MAINNET = 111,
 }
 

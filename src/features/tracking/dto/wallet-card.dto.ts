@@ -1,6 +1,6 @@
 import type { ChainKey } from '../../../core/chains/chain-key.interfaces';
 
-export interface WalletCardDto {
+export interface IWalletCardDto {
   readonly walletId: number;
   readonly chainKey: ChainKey;
   readonly address: string;

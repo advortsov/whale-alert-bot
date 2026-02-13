@@ -2,7 +2,7 @@ import type { ChainKey } from '../../../core/chains/chain-key.interfaces';
 import type { AlertCexFlowMode } from '../../alerts/cex-flow.interfaces';
 import type { AlertSmartFilterType } from '../../alerts/smart-filter.interfaces';
 
-export interface FilterSettingsDto {
+export interface IFilterSettingsDto {
   readonly chainKey: ChainKey;
   readonly thresholdUsd: number;
   readonly minAmountUsd: number;

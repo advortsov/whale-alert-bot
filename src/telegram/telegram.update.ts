@@ -29,6 +29,19 @@ import {
 } from '../tracking/tracking.interfaces';
 import { TrackingService } from '../tracking/tracking.service';
 
+const USER_NOT_IDENTIFIED_MESSAGE = 'Не удалось определить пользователя.';
+const DEFAULT_MUTE_MINUTES = 30;
+const MUTE_24H_MINUTES = 1440;
+const FILTER_TOGGLE_PARTS_COUNT = 3;
+const HISTORY_NAV_MIN_PARTS_COUNT = 3;
+const HISTORY_NAV_EXTENDED_PARTS_COUNT = 5;
+const HISTORY_BUTTON_MIN_PARTS_COUNT = 2;
+const HISTORY_BUTTON_EXTENDED_PARTS_COUNT = 4;
+const WALLET_BUTTON_TITLE_MAX_LENGTH = 21;
+const ELLIPSIS_LENGTH = 3;
+const SHORT_ADDRESS_PREFIX_LENGTH = 8;
+const SHORT_ADDRESS_SUFFIX_OFFSET = -6;
+
 const SUPPORTED_COMMAND_MAP: Readonly<Record<string, SupportedTelegramCommand>> = {
   start: SupportedTelegramCommand.START,
   help: SupportedTelegramCommand.HELP,
@@ -159,7 +172,7 @@ export class TelegramUpdate {
     }
 
     if (!userRef) {
-      await this.answerCallbackSafe(ctx, 'Не удалось определить пользователя.');
+      await this.answerCallbackSafe(ctx, USER_NOT_IDENTIFIED_MESSAGE);
       return;
     }
 
@@ -333,7 +346,7 @@ export class TelegramUpdate {
       this.logger.warn(
         `Track command rejected: user context is missing line=${commandEntry.lineNumber} updateId=${updateMeta.updateId ?? 'n/a'}`,
       );
-      return 'Не удалось определить пользователя.';
+      return USER_NOT_IDENTIFIED_MESSAGE;
     }
 
     const responseMessage: string = await this.trackingService.trackAddress(
@@ -360,7 +373,7 @@ export class TelegramUpdate {
       );
       return {
         lineNumber: commandEntry.lineNumber,
-        message: 'Не удалось определить пользователя.',
+        message: USER_NOT_IDENTIFIED_MESSAGE,
         replyOptions: null,
       };
     }
@@ -402,7 +415,7 @@ export class TelegramUpdate {
       this.logger.warn(
         `Untrack command rejected: user context is missing line=${commandEntry.lineNumber} updateId=${updateMeta.updateId ?? 'n/a'}`,
       );
-      return 'Не удалось определить пользователя.';
+      return USER_NOT_IDENTIFIED_MESSAGE;
     }
 
     const responseMessage: string = await this.trackingService.untrackAddress(
@@ -450,7 +463,7 @@ export class TelegramUpdate {
       );
       return {
         lineNumber: commandEntry.lineNumber,
-        message: 'Не удалось определить пользователя.',
+        message: USER_NOT_IDENTIFIED_MESSAGE,
         replyOptions: null,
       };
     }
@@ -490,7 +503,7 @@ export class TelegramUpdate {
       );
       return {
         lineNumber: commandEntry.lineNumber,
-        message: 'Не удалось определить пользователя.',
+        message: USER_NOT_IDENTIFIED_MESSAGE,
         replyOptions: null,
       };
     }
@@ -527,7 +540,7 @@ export class TelegramUpdate {
       this.logger.warn(
         `Status command rejected: user context is missing line=${commandEntry.lineNumber} updateId=${updateMeta.updateId ?? 'n/a'}`,
       );
-      return 'Не удалось определить пользователя.';
+      return USER_NOT_IDENTIFIED_MESSAGE;
     }
 
     const userStatus: string = await this.trackingService.getUserStatus(userRef);
@@ -612,7 +625,7 @@ export class TelegramUpdate {
     }
 
     if (callbackTarget.action === WalletCallbackAction.MUTE) {
-      const muteMinutes: number = callbackTarget.muteMinutes ?? 30;
+      const muteMinutes: number = callbackTarget.muteMinutes ?? DEFAULT_MUTE_MINUTES;
       const message: string = await this.trackingService.setMuteAlerts(
         userRef,
         String(muteMinutes),
@@ -633,7 +646,7 @@ export class TelegramUpdate {
       const message: string = await this.trackingService.muteWalletAlertsForDuration(
         userRef,
         `#${String(callbackTarget.walletId)}`,
-        1440,
+        MUTE_24H_MINUTES,
         'alert_button',
       );
 
@@ -810,7 +823,7 @@ export class TelegramUpdate {
       this.logger.warn(
         `Filters command rejected: user context is missing line=${commandEntry.lineNumber} updateId=${updateMeta.updateId ?? 'n/a'}`,
       );
-      return 'Не удалось определить пользователя.';
+      return USER_NOT_IDENTIFIED_MESSAGE;
     }
 
     const targetArg: string | null = commandEntry.args[0] ?? null;
@@ -851,7 +864,7 @@ export class TelegramUpdate {
       this.logger.warn(
         `Filter command rejected: user context is missing line=${commandEntry.lineNumber} updateId=${updateMeta.updateId ?? 'n/a'}`,
       );
-      return 'Не удалось определить пользователя.';
+      return USER_NOT_IDENTIFIED_MESSAGE;
     }
 
     const keyArg: string | null = commandEntry.args[0] ?? null;
@@ -903,7 +916,7 @@ export class TelegramUpdate {
       this.logger.warn(
         `Threshold command rejected: user context is missing line=${commandEntry.lineNumber} updateId=${updateMeta.updateId ?? 'n/a'}`,
       );
-      return 'Не удалось определить пользователя.';
+      return USER_NOT_IDENTIFIED_MESSAGE;
     }
 
     const valueArg: string | null = commandEntry.args[0] ?? null;
@@ -924,7 +937,7 @@ export class TelegramUpdate {
       this.logger.warn(
         `Quiet command rejected: user context is missing line=${commandEntry.lineNumber} updateId=${updateMeta.updateId ?? 'n/a'}`,
       );
-      return 'Не удалось определить пользователя.';
+      return USER_NOT_IDENTIFIED_MESSAGE;
     }
 
     const windowArg: string | null = commandEntry.args[0] ?? null;
@@ -945,7 +958,7 @@ export class TelegramUpdate {
       this.logger.warn(
         `Timezone command rejected: user context is missing line=${commandEntry.lineNumber} updateId=${updateMeta.updateId ?? 'n/a'}`,
       );
-      return 'Не удалось определить пользователя.';
+      return USER_NOT_IDENTIFIED_MESSAGE;
     }
 
     const timezoneArg: string | null = commandEntry.args[0] ?? null;
@@ -968,7 +981,7 @@ export class TelegramUpdate {
       );
       return {
         lineNumber: commandEntry.lineNumber,
-        message: 'Не удалось определить пользователя.',
+        message: USER_NOT_IDENTIFIED_MESSAGE,
         replyOptions: null,
       };
     }
@@ -1006,7 +1019,7 @@ export class TelegramUpdate {
       );
       return {
         lineNumber: commandEntry.lineNumber,
-        message: 'Не удалось определить пользователя.',
+        message: USER_NOT_IDENTIFIED_MESSAGE,
         replyOptions: null,
       };
     }
@@ -1075,7 +1088,7 @@ export class TelegramUpdate {
       this.logger.warn(
         `Mute command rejected: user context is missing line=${commandEntry.lineNumber} updateId=${updateMeta.updateId ?? 'n/a'}`,
       );
-      return 'Не удалось определить пользователя.';
+      return USER_NOT_IDENTIFIED_MESSAGE;
     }
 
     const minutesArg: string | null = commandEntry.args[0] ?? null;
@@ -1516,7 +1529,7 @@ export class TelegramUpdate {
       return {
         action: WalletCallbackAction.IGNORE_24H,
         walletId,
-        muteMinutes: 1440,
+        muteMinutes: MUTE_24H_MINUTES,
         historyOffset: null,
         historyLimit: null,
         historyKind: null,
@@ -1537,7 +1550,7 @@ export class TelegramUpdate {
         rawWalletId === undefined ||
         rawFilterTarget === undefined ||
         rawState === undefined ||
-        payloadParts.length !== 3
+        payloadParts.length !== FILTER_TOGGLE_PARTS_COUNT
       ) {
         return null;
       }
@@ -1599,7 +1612,8 @@ export class TelegramUpdate {
         rawWalletId === undefined ||
         rawOffset === undefined ||
         rawLimit === undefined ||
-        (payloadParts.length !== 3 && payloadParts.length !== 5)
+        (payloadParts.length !== HISTORY_NAV_MIN_PARTS_COUNT &&
+          payloadParts.length !== HISTORY_NAV_EXTENDED_PARTS_COUNT)
       ) {
         return null;
       }
@@ -1647,7 +1661,8 @@ export class TelegramUpdate {
       if (
         rawWalletId === undefined ||
         rawLimit === undefined ||
-        (payloadParts.length !== 2 && payloadParts.length !== 4)
+        (payloadParts.length !== HISTORY_BUTTON_MIN_PARTS_COUNT &&
+          payloadParts.length !== HISTORY_BUTTON_EXTENDED_PARTS_COUNT)
       ) {
         return null;
       }
@@ -1935,14 +1950,16 @@ export class TelegramUpdate {
     const titleSource: string = wallet.walletLabel ?? this.shortAddress(wallet.walletAddress);
     const normalizedTitle: string = titleSource.trim();
     const title: string =
-      normalizedTitle.length > 24 ? `${normalizedTitle.slice(0, 21)}...` : normalizedTitle;
+      normalizedTitle.length > WALLET_BUTTON_TITLE_MAX_LENGTH + ELLIPSIS_LENGTH
+        ? `${normalizedTitle.slice(0, WALLET_BUTTON_TITLE_MAX_LENGTH)}...`
+        : normalizedTitle;
 
     return `📁 #${wallet.walletId} ${title}`;
   }
 
   private shortAddress(address: string): string {
-    const prefix: string = address.slice(0, 8);
-    const suffix: string = address.slice(-6);
+    const prefix: string = address.slice(0, SHORT_ADDRESS_PREFIX_LENGTH);
+    const suffix: string = address.slice(SHORT_ADDRESS_SUFFIX_OFFSET);
     return `${prefix}...${suffix}`;
   }
 }

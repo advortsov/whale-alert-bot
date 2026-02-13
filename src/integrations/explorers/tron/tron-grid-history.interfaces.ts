@@ -1,23 +1,23 @@
-export interface TronGridListLinks {
+export interface ITronGridListLinks {
   readonly next?: string | undefined;
 }
 
-export interface TronGridListMeta {
+export interface ITronGridListMeta {
   readonly fingerprint?: string | undefined;
-  readonly links?: TronGridListLinks | undefined;
+  readonly links?: ITronGridListLinks | undefined;
 }
 
-export interface TronGridListResponse<TItem> {
+export interface ITronGridListResponse<TItem> {
   readonly success?: boolean | undefined;
   readonly data?: readonly TItem[] | undefined;
-  readonly meta?: TronGridListMeta | undefined;
+  readonly meta?: ITronGridListMeta | undefined;
 }
 
-export interface TronGridNativeRetItem {
+export interface ITronGridNativeRetItem {
   readonly contractRet?: string | undefined;
 }
 
-export interface TronGridNativeContractValue {
+export interface ITronGridNativeContractValue {
   readonly owner_address?: string | undefined;
   readonly to_address?: string | undefined;
   readonly contract_address?: string | undefined;
@@ -25,36 +25,36 @@ export interface TronGridNativeContractValue {
   readonly call_value?: number | string | undefined;
 }
 
-export interface TronGridNativeContractParameter {
-  readonly value?: TronGridNativeContractValue | undefined;
+export interface ITronGridNativeContractParameter {
+  readonly value?: ITronGridNativeContractValue | undefined;
 }
 
-export interface TronGridNativeContractItem {
+export interface ITronGridNativeContractItem {
   readonly type?: string | undefined;
-  readonly parameter?: TronGridNativeContractParameter | undefined;
+  readonly parameter?: ITronGridNativeContractParameter | undefined;
 }
 
-export interface TronGridNativeRawData {
-  readonly contract?: readonly TronGridNativeContractItem[] | undefined;
+export interface ITronGridNativeRawData {
+  readonly contract?: readonly ITronGridNativeContractItem[] | undefined;
 }
 
-export interface TronGridNativeTransactionItem {
+export interface ITronGridNativeTransactionItem {
   readonly txID?: string | undefined;
   readonly block_timestamp?: number | undefined;
-  readonly raw_data?: TronGridNativeRawData | undefined;
-  readonly ret?: readonly TronGridNativeRetItem[] | undefined;
+  readonly raw_data?: ITronGridNativeRawData | undefined;
+  readonly ret?: readonly ITronGridNativeRetItem[] | undefined;
 }
 
-export interface TronGridTrc20TokenInfo {
+export interface ITronGridTrc20TokenInfo {
   readonly symbol?: string | undefined;
   readonly decimals?: number | string | undefined;
 }
 
-export interface TronGridTrc20TransactionItem {
+export interface ITronGridTrc20TransactionItem {
   readonly transaction_id?: string | undefined;
   readonly block_timestamp?: number | undefined;
   readonly from?: string | undefined;
   readonly to?: string | undefined;
   readonly value?: string | number | undefined;
-  readonly token_info?: TronGridTrc20TokenInfo | undefined;
+  readonly token_info?: ITronGridTrc20TokenInfo | undefined;
 }

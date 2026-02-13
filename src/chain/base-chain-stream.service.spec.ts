@@ -2,16 +2,16 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   BaseChainStreamService,
-  type ChainRuntimeSnapshot,
-  type ChainStreamConfig,
-  type MatchedTransaction,
+  type IChainRuntimeSnapshot,
+  type IChainStreamConfig,
+  type IMatchedTransaction,
 } from './base-chain-stream.service';
 import { ChainId, ClassifiedEventType, EventDirection, AssetStandard } from './chain.types';
 import type { ClassifiedEvent } from './chain.types';
 import type { ProviderFailoverService } from './providers/provider-failover.service';
 import type { AlertDispatcherService } from '../alerts/alert-dispatcher.service';
 import type { ChainKey } from '../core/chains/chain-key.interfaces';
-import type { BlockEnvelope, ReceiptEnvelope } from '../core/ports/rpc/block-stream.interfaces';
+import type { IBlockEnvelope, IReceiptEnvelope } from '../core/ports/rpc/block-stream.interfaces';
 import type {
   ISubscriptionHandle,
   ProviderOperation,
@@ -23,7 +23,7 @@ import type { WalletEventsRepository } from '../storage/repositories/wallet-even
 
 const TRACKED_ADDRESS: string = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const CHAIN_KEY: string = 'ethereum_mainnet';
-const CHAIN_CONFIG: ChainStreamConfig = {
+const CHAIN_CONFIG: IChainStreamConfig = {
   logPrefix: '[TEST]',
   chainKey: CHAIN_KEY as ChainKey,
   chainId: ChainId.ETHEREUM_MAINNET,
@@ -54,9 +54,9 @@ function makeClassifiedEvent(txHash: string): ClassifiedEvent {
 class TestProviderStub {
   public blockHandler: ((blockNumber: number) => Promise<void>) | null = null;
   public latestBlockNumber: number = 200;
-  private readonly blocks: Map<number, BlockEnvelope> = new Map<number, BlockEnvelope>();
+  private readonly blocks: Map<number, IBlockEnvelope> = new Map<number, IBlockEnvelope>();
 
-  public setBlock(blockNumber: number, block: BlockEnvelope): void {
+  public setBlock(blockNumber: number, block: IBlockEnvelope): void {
     this.blocks.set(blockNumber, block);
   }
 
@@ -67,7 +67,7 @@ class TestProviderStub {
     return { stop: async (): Promise<void> => undefined };
   }
 
-  public async getBlockEnvelope(blockNumber: number): Promise<BlockEnvelope | null> {
+  public async getBlockEnvelope(blockNumber: number): Promise<IBlockEnvelope | null> {
     return this.blocks.get(blockNumber) ?? null;
   }
 
@@ -75,7 +75,7 @@ class TestProviderStub {
     return this.latestBlockNumber;
   }
 
-  public async getReceiptEnvelope(_txHash: string): Promise<ReceiptEnvelope | null> {
+  public async getReceiptEnvelope(_txHash: string): Promise<IReceiptEnvelope | null> {
     return { txHash: _txHash, logs: [] };
   }
 }
@@ -88,7 +88,7 @@ class TestChainStreamService extends BaseChainStreamService {
   private readonly _queueMax: number;
   private readonly _catchupBatch: number;
   private readonly _reorgConfirmations: number;
-  public readonly snapshots: ChainRuntimeSnapshot[] = [];
+  public readonly snapshots: IChainRuntimeSnapshot[] = [];
 
   public constructor(
     providerFailoverService: ProviderFailoverService,
@@ -124,7 +124,7 @@ class TestChainStreamService extends BaseChainStreamService {
     this._reorgConfirmations = options.reorgConfirmations ?? 0;
   }
 
-  protected getConfig(): ChainStreamConfig {
+  protected getConfig(): IChainStreamConfig {
     return CHAIN_CONFIG;
   }
 
@@ -148,7 +148,7 @@ class TestChainStreamService extends BaseChainStreamService {
     return this._reorgConfirmations;
   }
 
-  protected async fetchBlockEnvelope(blockNumber: number): Promise<BlockEnvelope | null> {
+  protected async fetchBlockEnvelope(blockNumber: number): Promise<IBlockEnvelope | null> {
     return this.stub.getBlockEnvelope(blockNumber);
   }
 
@@ -180,12 +180,12 @@ class TestChainStreamService extends BaseChainStreamService {
   }
 
   protected async classifyTransaction(
-    _matched: MatchedTransaction,
+    _matched: IMatchedTransaction,
   ): Promise<ClassifiedEvent | null> {
     return this._classifyResult;
   }
 
-  protected override onSnapshotUpdated(snapshot: ChainRuntimeSnapshot): void {
+  protected override onSnapshotUpdated(snapshot: IChainRuntimeSnapshot): void {
     this.snapshots.push(snapshot);
   }
 }
@@ -429,7 +429,7 @@ describe('BaseChainStreamService', (): void => {
     await sleep(10);
 
     expect(service.snapshots.length).toBeGreaterThan(0);
-    const lastSnapshot: ChainRuntimeSnapshot | undefined =
+    const lastSnapshot: IChainRuntimeSnapshot | undefined =
       service.snapshots[service.snapshots.length - 1];
     expect(lastSnapshot?.chainKey).toBe(CHAIN_KEY);
 

@@ -2,9 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 
 import {
   EtherscanHistoryAction,
-  type EtherscanHistoryResponse,
-  type EtherscanNormalTransaction,
-  type EtherscanTokenTransaction,
+  type IEtherscanHistoryResponse,
+  type IEtherscanNormalTransaction,
+  type IEtherscanTokenTransaction,
 } from './etherscan-history.interfaces';
 import { AppConfigService } from '../../../config/app-config.service';
 import { ChainKey } from '../../../core/chains/chain-key.interfaces';
@@ -12,14 +12,16 @@ import type { IHistoryExplorerAdapter } from '../../../core/ports/explorers/hist
 import {
   HistoryDirection,
   HistoryItemType,
-  type HistoryItemDto,
-  type HistoryPageDto,
+  type IHistoryItemDto,
+  type IHistoryPageDto,
 } from '../../../features/tracking/dto/history-item.dto';
 import {
   HistoryDirectionFilter,
   HistoryKind,
-  type HistoryRequestDto,
+  type IHistoryRequestDto,
 } from '../../../features/tracking/dto/history-request.dto';
+
+const ETHERSCAN_FETCH_TIMEOUT_MS = 10_000;
 
 @Injectable()
 export class EtherscanHistoryAdapter implements IHistoryExplorerAdapter {
@@ -27,7 +29,7 @@ export class EtherscanHistoryAdapter implements IHistoryExplorerAdapter {
 
   public constructor(private readonly appConfigService: AppConfigService) {}
 
-  public async loadRecentTransactions(request: HistoryRequestDto): Promise<HistoryPageDto> {
+  public async loadRecentTransactions(request: IHistoryRequestDto): Promise<IHistoryPageDto> {
     if (request.chainKey !== ChainKey.ETHEREUM_MAINNET) {
       throw new Error(`Explorer history adapter does not support chain ${request.chainKey}.`);
     }
@@ -42,24 +44,24 @@ export class EtherscanHistoryAdapter implements IHistoryExplorerAdapter {
       `history request address=${request.address} limit=${String(request.limit)} offset=${String(request.offset)} kind=${request.kind} endpoint=${this.appConfigService.etherscanApiBaseUrl}`,
     );
 
-    const collectedItems: HistoryItemDto[] = [];
+    const collectedItems: IHistoryItemDto[] = [];
 
     if (request.kind === HistoryKind.ETH) {
-      const ethItems: readonly HistoryItemDto[] = await this.loadByAction(
+      const ethItems: readonly IHistoryItemDto[] = await this.loadByAction(
         request,
         apiKey,
         EtherscanHistoryAction.TX_LIST,
       );
       collectedItems.push(...ethItems);
     } else if (request.kind === HistoryKind.ERC20) {
-      const tokenItems: readonly HistoryItemDto[] = await this.loadByAction(
+      const tokenItems: readonly IHistoryItemDto[] = await this.loadByAction(
         request,
         apiKey,
         EtherscanHistoryAction.TOKEN_TX_LIST,
       );
       collectedItems.push(...tokenItems);
     } else {
-      const normalItems: readonly HistoryItemDto[] = await this.loadByAction(
+      const normalItems: readonly IHistoryItemDto[] = await this.loadByAction(
         request,
         apiKey,
         EtherscanHistoryAction.TX_LIST,
@@ -71,7 +73,7 @@ export class EtherscanHistoryAdapter implements IHistoryExplorerAdapter {
         this.logger.debug(
           `history txlist empty, fallback to tokentx address=${request.address} limit=${String(request.limit)}`,
         );
-        const tokenItems: readonly HistoryItemDto[] = await this.loadByAction(
+        const tokenItems: readonly IHistoryItemDto[] = await this.loadByAction(
           request,
           apiKey,
           EtherscanHistoryAction.TOKEN_TX_LIST,
@@ -80,12 +82,12 @@ export class EtherscanHistoryAdapter implements IHistoryExplorerAdapter {
       }
     }
 
-    const filteredItems: readonly HistoryItemDto[] = this.applyDirectionFilter(
+    const filteredItems: readonly IHistoryItemDto[] = this.applyDirectionFilter(
       collectedItems,
       request.direction,
     );
 
-    const pagedItems: readonly HistoryItemDto[] = filteredItems.slice(0, request.limit);
+    const pagedItems: readonly IHistoryItemDto[] = filteredItems.slice(0, request.limit);
 
     return {
       items: pagedItems,
@@ -94,11 +96,11 @@ export class EtherscanHistoryAdapter implements IHistoryExplorerAdapter {
   }
 
   private async loadByAction(
-    request: HistoryRequestDto,
+    request: IHistoryRequestDto,
     apiKey: string,
     action: EtherscanHistoryAction,
-  ): Promise<readonly HistoryItemDto[]> {
-    const response: EtherscanHistoryResponse = await this.requestHistory(request, apiKey, action);
+  ): Promise<readonly IHistoryItemDto[]> {
+    const response: IEtherscanHistoryResponse = await this.requestHistory(request, apiKey, action);
 
     if (this.isNoTransactionsResponse(response)) {
       return [];
@@ -120,9 +122,9 @@ export class EtherscanHistoryAdapter implements IHistoryExplorerAdapter {
   }
 
   private applyDirectionFilter(
-    items: readonly HistoryItemDto[],
+    items: readonly IHistoryItemDto[],
     directionFilter: HistoryDirectionFilter,
-  ): readonly HistoryItemDto[] {
+  ): readonly IHistoryItemDto[] {
     if (directionFilter === HistoryDirectionFilter.ALL) {
       return items;
     }
@@ -130,14 +132,14 @@ export class EtherscanHistoryAdapter implements IHistoryExplorerAdapter {
     const targetDirection: HistoryDirection =
       directionFilter === HistoryDirectionFilter.IN ? HistoryDirection.IN : HistoryDirection.OUT;
 
-    return items.filter((item: HistoryItemDto): boolean => item.direction === targetDirection);
+    return items.filter((item: IHistoryItemDto): boolean => item.direction === targetDirection);
   }
 
   private async requestHistory(
-    request: HistoryRequestDto,
+    request: IHistoryRequestDto,
     apiKey: string,
     action: EtherscanHistoryAction,
-  ): Promise<EtherscanHistoryResponse> {
+  ): Promise<IEtherscanHistoryResponse> {
     const url: URL = new URL(this.appConfigService.etherscanApiBaseUrl);
     url.searchParams.set('chainid', '1');
     url.searchParams.set('module', 'account');
@@ -152,7 +154,7 @@ export class EtherscanHistoryAdapter implements IHistoryExplorerAdapter {
 
     const response: Response = await fetch(url, {
       method: 'GET',
-      signal: AbortSignal.timeout(10_000),
+      signal: AbortSignal.timeout(ETHERSCAN_FETCH_TIMEOUT_MS),
     });
 
     if (!response.ok) {
@@ -171,8 +173,8 @@ export class EtherscanHistoryAdapter implements IHistoryExplorerAdapter {
     return Math.floor(offset / limit) + 1;
   }
 
-  private mapNormalTransaction(value: unknown, address: string): HistoryItemDto {
-    const tx: EtherscanNormalTransaction = this.parseNormalTransaction(value);
+  private mapNormalTransaction(value: unknown, address: string): IHistoryItemDto {
+    const tx: IEtherscanNormalTransaction = this.parseNormalTransaction(value);
     const direction: HistoryDirection =
       tx.from.toLowerCase() === address.toLowerCase() ? HistoryDirection.OUT : HistoryDirection.IN;
 
@@ -191,8 +193,8 @@ export class EtherscanHistoryAdapter implements IHistoryExplorerAdapter {
     };
   }
 
-  private mapTokenTransaction(value: unknown, address: string): HistoryItemDto {
-    const tx: EtherscanTokenTransaction = this.parseTokenTransaction(value);
+  private mapTokenTransaction(value: unknown, address: string): IHistoryItemDto {
+    const tx: IEtherscanTokenTransaction = this.parseTokenTransaction(value);
     const parsedDecimals: number = Number.parseInt(tx.tokenDecimal, 10);
     const tokenDecimals: number = Number.isNaN(parsedDecimals) ? 0 : parsedDecimals;
     const direction: HistoryDirection =
@@ -213,7 +215,7 @@ export class EtherscanHistoryAdapter implements IHistoryExplorerAdapter {
     };
   }
 
-  private parseNormalTransaction(value: unknown): EtherscanNormalTransaction {
+  private parseNormalTransaction(value: unknown): IEtherscanNormalTransaction {
     const tx: Record<string, unknown> = this.parseTransactionObject(value);
     const requiredFields: readonly string[] = [
       'hash',
@@ -230,10 +232,10 @@ export class EtherscanHistoryAdapter implements IHistoryExplorerAdapter {
       }
     }
 
-    return tx as unknown as EtherscanNormalTransaction;
+    return tx as unknown as IEtherscanNormalTransaction;
   }
 
-  private parseTokenTransaction(value: unknown): EtherscanTokenTransaction {
+  private parseTokenTransaction(value: unknown): IEtherscanTokenTransaction {
     const tx: Record<string, unknown> = this.parseTransactionObject(value);
     const requiredFields: readonly string[] = [
       'hash',
@@ -255,7 +257,7 @@ export class EtherscanHistoryAdapter implements IHistoryExplorerAdapter {
       throw new Error('Etherscan token tx field "isError" is invalid.');
     }
 
-    return tx as unknown as EtherscanTokenTransaction;
+    return tx as unknown as IEtherscanTokenTransaction;
   }
 
   private parseTransactionObject(value: unknown): Record<string, unknown> {
@@ -266,7 +268,7 @@ export class EtherscanHistoryAdapter implements IHistoryExplorerAdapter {
     return value as Record<string, unknown>;
   }
 
-  private isNoTransactionsResponse(response: EtherscanHistoryResponse): boolean {
+  private isNoTransactionsResponse(response: IEtherscanHistoryResponse): boolean {
     return (
       response.status === '0' &&
       response.message.toLowerCase() === 'no transactions found' &&
@@ -275,7 +277,7 @@ export class EtherscanHistoryAdapter implements IHistoryExplorerAdapter {
     );
   }
 
-  private extractApiError(response: EtherscanHistoryResponse): string {
+  private extractApiError(response: IEtherscanHistoryResponse): string {
     if (typeof response.result === 'string' && response.result.trim().length > 0) {
       return response.result;
     }
@@ -283,7 +285,7 @@ export class EtherscanHistoryAdapter implements IHistoryExplorerAdapter {
     return response.message;
   }
 
-  private parseHistoryResponse(payload: unknown): EtherscanHistoryResponse {
+  private parseHistoryResponse(payload: unknown): IEtherscanHistoryResponse {
     if (!payload || typeof payload !== 'object') {
       throw new Error('Etherscan response is not an object.');
     }

@@ -1,11 +1,14 @@
 import { ProviderFactory } from './provider.factory';
 import { ChainKey } from '../../core/chains/chain-key.interfaces';
-import type { BlockEnvelope, ReceiptEnvelope } from '../../core/ports/rpc/block-stream.interfaces';
+import type {
+  IBlockEnvelope,
+  IReceiptEnvelope,
+} from '../../core/ports/rpc/block-stream.interfaces';
 import type {
   IFallbackRpcAdapter,
   IPrimaryRpcAdapter,
   ISubscriptionHandle,
-  ProviderHealth,
+  IProviderHealth,
 } from '../../core/ports/rpc/rpc-adapter.interfaces';
 
 class PrimaryAdapterStub implements IPrimaryRpcAdapter {
@@ -25,15 +28,15 @@ class PrimaryAdapterStub implements IPrimaryRpcAdapter {
     return 1;
   }
 
-  public async getBlockEnvelope(): Promise<BlockEnvelope | null> {
+  public async getBlockEnvelope(): Promise<IBlockEnvelope | null> {
     return null;
   }
 
-  public async getReceiptEnvelope(): Promise<ReceiptEnvelope | null> {
+  public async getReceiptEnvelope(): Promise<IReceiptEnvelope | null> {
     return null;
   }
 
-  public async healthCheck(): Promise<ProviderHealth> {
+  public async healthCheck(): Promise<IProviderHealth> {
     return {
       provider: this.name,
       ok: true,
@@ -63,15 +66,15 @@ class FallbackAdapterStub implements IFallbackRpcAdapter {
     return 1;
   }
 
-  public async getBlockEnvelope(): Promise<BlockEnvelope | null> {
+  public async getBlockEnvelope(): Promise<IBlockEnvelope | null> {
     return null;
   }
 
-  public async getReceiptEnvelope(): Promise<ReceiptEnvelope | null> {
+  public async getReceiptEnvelope(): Promise<IReceiptEnvelope | null> {
     return null;
   }
 
-  public async healthCheck(): Promise<ProviderHealth> {
+  public async healthCheck(): Promise<IProviderHealth> {
     return {
       provider: this.name,
       ok: true,

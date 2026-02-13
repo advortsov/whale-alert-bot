@@ -44,7 +44,7 @@ export class MigrationService implements OnModuleInit {
       if (migrations.length > 0) {
         this.logger.log(`Applied ${migrations.length} migration(s), now at version ${maxVersion}`);
       } else {
-        this.logger.log(`Database schema is up to date at version ${maxVersion}`);
+        this.logger.log(`IDatabase schema is up to date at version ${maxVersion}`);
       }
     } finally {
       await pool.end();

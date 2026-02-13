@@ -4,6 +4,9 @@ import { getAddress } from 'ethers';
 import type { IAddressCodec } from '../../../core/ports/address/address-codec.interfaces';
 
 const ETHEREUM_ADDRESS_PATTERN: RegExp = /^0x[a-fA-F0-9]{40}$/;
+const SHORT_FORMAT_MIN_LENGTH = 14;
+const SHORT_FORMAT_PREFIX_LENGTH = 8;
+const SHORT_FORMAT_SUFFIX_OFFSET = -6;
 
 @Injectable()
 export class EthereumAddressCodec implements IAddressCodec {
@@ -22,10 +25,10 @@ export class EthereumAddressCodec implements IAddressCodec {
   public formatShort(address: string): string {
     const normalizedAddress: string = address.trim();
 
-    if (normalizedAddress.length <= 14) {
+    if (normalizedAddress.length <= SHORT_FORMAT_MIN_LENGTH) {
       return normalizedAddress;
     }
 
-    return `${normalizedAddress.slice(0, 8)}...${normalizedAddress.slice(-6)}`;
+    return `${normalizedAddress.slice(0, SHORT_FORMAT_PREFIX_LENGTH)}...${normalizedAddress.slice(SHORT_FORMAT_SUFFIX_OFFSET)}`;
   }
 }

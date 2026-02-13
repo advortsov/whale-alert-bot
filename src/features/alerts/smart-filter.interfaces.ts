@@ -7,19 +7,19 @@ export enum AlertSmartFilterType {
   TRANSFER = 'transfer',
 }
 
-export interface AlertSemanticFilterPolicy {
+export interface IAlertSemanticFilterPolicy {
   readonly type: AlertSmartFilterType;
   readonly includeDexes: readonly string[];
   readonly excludeDexes: readonly string[];
 }
 
-export interface AlertSemanticEventContext {
+export interface IAlertSemanticEventContext {
   readonly eventType: ClassifiedEventType;
   readonly direction: EventDirection;
   readonly dex: string | null;
 }
 
-export interface SemanticFilterDecision {
+export interface ISemanticFilterDecision {
   readonly allowed: boolean;
   readonly suppressedReason: string | null;
   readonly normalizedDex: string | null;

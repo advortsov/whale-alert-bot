@@ -2,7 +2,7 @@ import type { ChainKey } from '../../core/chains/chain-key.interfaces';
 import type { AlertCexFlowMode } from '../../features/alerts/cex-flow.interfaces';
 import type { AlertSmartFilterType } from '../../features/alerts/smart-filter.interfaces';
 
-export interface UserAlertSettingsUpdatePatch {
+export interface IUserAlertSettingsUpdatePatch {
   readonly thresholdUsd?: number;
   readonly minAmountUsd?: number;
   readonly cexFlowMode?: AlertCexFlowMode;
@@ -14,7 +14,7 @@ export interface UserAlertSettingsUpdatePatch {
   readonly timezone?: string;
 }
 
-export interface UserAlertSettingsLookupKey {
+export interface IUserAlertSettingsLookupKey {
   readonly userId: number;
   readonly chainKey: ChainKey;
 }

@@ -8,13 +8,13 @@ export enum PriceFailureReason {
   INVALID_RESPONSE = 'invalid_response',
 }
 
-export interface PriceRequestDto {
+export interface IPriceRequestDto {
   readonly chainKey: ChainKey;
   readonly tokenAddress: string | null;
   readonly tokenSymbol: string | null;
 }
 
-export interface PriceQuoteDto {
+export interface IPriceQuoteDto {
   readonly chainKey: ChainKey;
   readonly tokenAddress: string | null;
   readonly tokenSymbol: string | null;
@@ -24,5 +24,5 @@ export interface PriceQuoteDto {
 }
 
 export interface ITokenPricingPort {
-  getUsdQuote(request: PriceRequestDto): Promise<PriceQuoteDto | null>;
+  getUsdQuote(request: IPriceRequestDto): Promise<IPriceQuoteDto | null>;
 }

@@ -5,7 +5,7 @@ import { AlertCexFlowMode } from '../../features/alerts/cex-flow.interfaces';
 import { AlertSmartFilterType } from '../../features/alerts/smart-filter.interfaces';
 import { DatabaseService } from '../database.service';
 import type { NewUserAlertSettingsRow, UserAlertSettingsRow } from '../database.types';
-import type { UserAlertSettingsUpdatePatch } from './user-alert-settings.repository.interfaces';
+import type { IUserAlertSettingsUpdatePatch } from './user-alert-settings.repository.interfaces';
 
 @Injectable()
 export class UserAlertSettingsRepository {
@@ -59,7 +59,7 @@ export class UserAlertSettingsRepository {
   public async updateByUserAndChain(
     userId: number,
     chainKey: ChainKey,
-    patch: UserAlertSettingsUpdatePatch,
+    patch: IUserAlertSettingsUpdatePatch,
   ): Promise<UserAlertSettingsRow> {
     await this.findOrCreateByUserAndChain(userId, chainKey);
 

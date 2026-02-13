@@ -3,7 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { AppConfigService } from '../../config/app-config.service';
 import { ChainKey } from '../../core/chains/chain-key.interfaces';
 
-interface ThrottleState {
+interface IThrottleState {
   queueTail: Promise<void>;
   nextRequestAtMs: number;
   currentBackoffMs: number;
@@ -17,9 +17,9 @@ export class RpcThrottlerService {
   private readonly backoffBaseMs: number;
   private readonly solanaBackoffBaseMs: number;
   private readonly backoffMaxMs: number;
-  private readonly throttleStatesByKey: Map<string, ThrottleState> = new Map<
+  private readonly throttleStatesByKey: Map<string, IThrottleState> = new Map<
     string,
-    ThrottleState
+    IThrottleState
   >();
 
   public constructor(private readonly appConfigService: AppConfigService) {
@@ -43,7 +43,7 @@ export class RpcThrottlerService {
   }
 
   public increaseBackoffForKey(throttleKey: string, reason: string): void {
-    const state: ThrottleState = this.getOrCreateState(throttleKey);
+    const state: IThrottleState = this.getOrCreateState(throttleKey);
     const baseBackoffMs: number = this.getBaseBackoffMsForKey(throttleKey);
     const nextBackoffMs: number =
       state.currentBackoffMs === 0
@@ -65,7 +65,7 @@ export class RpcThrottlerService {
   }
 
   public resetBackoffForKey(throttleKey: string): void {
-    const state: ThrottleState = this.getOrCreateState(throttleKey);
+    const state: IThrottleState = this.getOrCreateState(throttleKey);
 
     if (state.currentBackoffMs === 0) {
       return;
@@ -82,12 +82,12 @@ export class RpcThrottlerService {
   }
 
   public getCurrentBackoffMsForKey(throttleKey: string): number {
-    const state: ThrottleState = this.getOrCreateState(throttleKey);
+    const state: IThrottleState = this.getOrCreateState(throttleKey);
     return state.currentBackoffMs;
   }
 
   private async waitForSlot(throttleKey: string): Promise<void> {
-    const state: ThrottleState = this.getOrCreateState(throttleKey);
+    const state: IThrottleState = this.getOrCreateState(throttleKey);
     const deferredSlot = this.createDeferred();
     const previousSlot: Promise<void> = state.queueTail;
 
@@ -108,14 +108,14 @@ export class RpcThrottlerService {
     deferredSlot.resolve();
   }
 
-  private getOrCreateState(throttleKey: string): ThrottleState {
-    const existingState: ThrottleState | undefined = this.throttleStatesByKey.get(throttleKey);
+  private getOrCreateState(throttleKey: string): IThrottleState {
+    const existingState: IThrottleState | undefined = this.throttleStatesByKey.get(throttleKey);
 
     if (existingState !== undefined) {
       return existingState;
     }
 
-    const createdState: ThrottleState = {
+    const createdState: IThrottleState = {
       queueTail: Promise.resolve(),
       nextRequestAtMs: 0,
       currentBackoffMs: 0,

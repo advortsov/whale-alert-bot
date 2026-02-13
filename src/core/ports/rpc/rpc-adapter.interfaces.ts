@@ -1,7 +1,7 @@
-import type { BlockEnvelope, ReceiptEnvelope } from './block-stream.interfaces';
+import type { IBlockEnvelope, IReceiptEnvelope } from './block-stream.interfaces';
 import type { ChainKey } from '../../chains/chain-key.interfaces';
 
-export interface ProviderHealth {
+export interface IProviderHealth {
   readonly provider: string;
   readonly ok: boolean;
   readonly details: string;
@@ -17,9 +17,9 @@ export interface IRpcAdapter {
   getName(): string;
   subscribeBlocks(handler: BlockHandler): Promise<ISubscriptionHandle>;
   getLatestBlockNumber(): Promise<number>;
-  getBlockEnvelope(blockNumber: number): Promise<BlockEnvelope | null>;
-  getReceiptEnvelope(txHash: string): Promise<ReceiptEnvelope | null>;
-  healthCheck(): Promise<ProviderHealth>;
+  getBlockEnvelope(blockNumber: number): Promise<IBlockEnvelope | null>;
+  getReceiptEnvelope(txHash: string): Promise<IReceiptEnvelope | null>;
+  healthCheck(): Promise<IProviderHealth>;
   disconnect(): Promise<void>;
 }
 

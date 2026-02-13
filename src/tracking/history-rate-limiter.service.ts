@@ -8,10 +8,10 @@ import {
 } from './history-rate-limiter.interfaces';
 import { AppConfigService } from '../config/app-config.service';
 
+const RATE_LIMIT_WINDOW_MS = 60_000;
+
 @Injectable()
 export class HistoryRateLimiterService {
-  private static readonly WINDOW_MS: number = 60_000;
-
   private readonly requestTimestampsByUser: Map<string, number[]> = new Map<string, number[]>();
   private readonly callbackTimestampByUser: Map<string, number> = new Map<string, number>();
 
@@ -38,7 +38,7 @@ export class HistoryRateLimiterService {
     if (requestTimestamps.length >= this.appConfigService.historyRateLimitPerMinute) {
       const oldestTimestamp: number | undefined = requestTimestamps[0];
       const retryAfterMs: number = oldestTimestamp
-        ? Math.max(HistoryRateLimiterService.WINDOW_MS - (nowEpochMs - oldestTimestamp), 1)
+        ? Math.max(RATE_LIMIT_WINDOW_MS - (nowEpochMs - oldestTimestamp), 1)
         : 1000;
 
       return {
@@ -114,7 +114,7 @@ export class HistoryRateLimiterService {
 
   private cleanupWindow(userId: string, nowEpochMs: number): number[] {
     const existingTimestamps: number[] = this.requestTimestampsByUser.get(userId) ?? [];
-    const threshold: number = nowEpochMs - HistoryRateLimiterService.WINDOW_MS;
+    const threshold: number = nowEpochMs - RATE_LIMIT_WINDOW_MS;
     const filteredTimestamps: number[] = existingTimestamps.filter(
       (timestamp: number): boolean => timestamp > threshold,
     );

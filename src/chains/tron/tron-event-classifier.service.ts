@@ -8,11 +8,15 @@ import {
 } from '../../chain/chain.types';
 import { ERC20_TRANSFER_TOPIC } from '../../chain/constants/event-signatures';
 import type {
-  ClassificationContextDto,
-  ClassificationResultDto,
+  IClassificationContextDto,
+  IClassificationResultDto,
   IChainEventClassifier,
 } from '../../core/ports/classification/chain-classifier.interfaces';
 import { TronAddressCodec } from '../../integrations/address/tron/tron-address.codec';
+
+const TRON_ADDRESS_HEX_MIN_LENGTH = 40;
+const TRON_ADDRESS_HEX_TAIL = -40;
+const RADIX_DECIMAL = 10;
 
 @Injectable()
 export class TronEventClassifierService implements IChainEventClassifier {
@@ -21,7 +25,7 @@ export class TronEventClassifierService implements IChainEventClassifier {
 
   public constructor(private readonly tronAddressCodec: TronAddressCodec) {}
 
-  public classify(context: ClassificationContextDto): ClassificationResultDto {
+  public classify(context: IClassificationContextDto): IClassificationResultDto {
     const trc20Event: ClassifiedEvent | null = this.tryClassifyTrc20(context);
 
     if (trc20Event !== null) {
@@ -38,7 +42,7 @@ export class TronEventClassifierService implements IChainEventClassifier {
     return { event: nativeEvent };
   }
 
-  private tryClassifyTrc20(context: ClassificationContextDto): ClassifiedEvent | null {
+  private tryClassifyTrc20(context: IClassificationContextDto): ClassifiedEvent | null {
     if (context.receiptEnvelope === null) {
       return null;
     }
@@ -95,7 +99,7 @@ export class TronEventClassifierService implements IChainEventClassifier {
     return null;
   }
 
-  private tryClassifyTrc10(context: ClassificationContextDto): ClassifiedEvent | null {
+  private tryClassifyTrc10(context: IClassificationContextDto): ClassifiedEvent | null {
     if (context.receiptEnvelope === null) {
       return null;
     }
@@ -142,7 +146,7 @@ export class TronEventClassifierService implements IChainEventClassifier {
     };
   }
 
-  private classifyNativeTransfer(context: ClassificationContextDto): ClassifiedEvent {
+  private classifyNativeTransfer(context: IClassificationContextDto): ClassifiedEvent {
     const nativeLog = context.receiptEnvelope?.logs.find((log): boolean => {
       const topic0: string | undefined = log.topics[0];
       return topic0 === TronEventClassifierService.NATIVE_HINT_TOPIC;
@@ -177,7 +181,7 @@ export class TronEventClassifierService implements IChainEventClassifier {
     };
   }
 
-  private resolveDirectionByEnvelope(context: ClassificationContextDto): EventDirection {
+  private resolveDirectionByEnvelope(context: IClassificationContextDto): EventDirection {
     if (context.txTo !== null && context.txTo === context.trackedAddress) {
       return EventDirection.IN;
     }
@@ -212,11 +216,11 @@ export class TronEventClassifierService implements IChainEventClassifier {
 
     const normalizedTopic: string = topicValue.trim().toLowerCase().replace(/^0x/, '');
 
-    if (normalizedTopic.length < 40) {
+    if (normalizedTopic.length < TRON_ADDRESS_HEX_MIN_LENGTH) {
       return null;
     }
 
-    const tail40: string = normalizedTopic.slice(-40);
+    const tail40: string = normalizedTopic.slice(TRON_ADDRESS_HEX_TAIL);
     const tronHexAddress: string = `41${tail40}`;
     return this.tronAddressCodec.normalize(tronHexAddress);
   }
@@ -233,7 +237,7 @@ export class TronEventClassifierService implements IChainEventClassifier {
     }
 
     try {
-      return BigInt(`0x${normalizedHex}`).toString(10);
+      return BigInt(`0x${normalizedHex}`).toString(RADIX_DECIMAL);
     } catch {
       return null;
     }

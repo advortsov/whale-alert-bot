@@ -2,9 +2,9 @@ import { Injectable } from '@nestjs/common';
 
 import {
   BaseChainStreamService,
-  type ChainRuntimeSnapshot,
-  type ChainStreamConfig,
-  type MatchedTransaction,
+  type IChainRuntimeSnapshot,
+  type IChainStreamConfig,
+  type IMatchedTransaction,
 } from './base-chain-stream.service';
 import {
   ChainId,
@@ -18,7 +18,7 @@ import { ProviderFactory } from './providers/provider.factory';
 import { AlertDispatcherService } from '../alerts/alert-dispatcher.service';
 import { AppConfigService } from '../config/app-config.service';
 import { ChainKey } from '../core/chains/chain-key.interfaces';
-import type { BlockEnvelope, ReceiptEnvelope } from '../core/ports/rpc/block-stream.interfaces';
+import type { IBlockEnvelope, IReceiptEnvelope } from '../core/ports/rpc/block-stream.interfaces';
 import type { ISubscriptionHandle } from '../core/ports/rpc/rpc-adapter.interfaces';
 import { RuntimeStatusService } from '../runtime/runtime-status.service';
 import { ChainCheckpointsRepository } from '../storage/repositories/chain-checkpoints.repository';
@@ -28,7 +28,7 @@ import { WalletEventsRepository } from '../storage/repositories/wallet-events.re
 
 @Injectable()
 export class ChainStreamService extends BaseChainStreamService {
-  private static readonly CHAIN_CONFIG: ChainStreamConfig = {
+  private static readonly CHAIN_CONFIG: IChainStreamConfig = {
     logPrefix: '[ETH]',
     chainKey: ChainKey.ETHEREUM_MAINNET,
     chainId: ChainId.ETHEREUM_MAINNET,
@@ -57,7 +57,7 @@ export class ChainStreamService extends BaseChainStreamService {
     );
   }
 
-  protected getConfig(): ChainStreamConfig {
+  protected getConfig(): IChainStreamConfig {
     return ChainStreamService.CHAIN_CONFIG;
   }
 
@@ -81,7 +81,7 @@ export class ChainStreamService extends BaseChainStreamService {
     return this.appConfigService.chainReorgConfirmations;
   }
 
-  protected async fetchBlockEnvelope(blockNumber: number): Promise<BlockEnvelope | null> {
+  protected async fetchBlockEnvelope(blockNumber: number): Promise<IBlockEnvelope | null> {
     return this.providerFailoverService.execute((provider) =>
       provider.getBlockEnvelope(blockNumber),
     );
@@ -125,10 +125,10 @@ export class ChainStreamService extends BaseChainStreamService {
   }
 
   protected async classifyTransaction(
-    matched: MatchedTransaction,
+    matched: IMatchedTransaction,
   ): Promise<ClassifiedEvent | null> {
-    const receipt: ReceiptEnvelope | null = await this.providerFailoverService.execute((provider) =>
-      provider.getReceiptEnvelope(matched.txHash),
+    const receipt: IReceiptEnvelope | null = await this.providerFailoverService.execute(
+      (provider) => provider.getReceiptEnvelope(matched.txHash),
     );
 
     const observedTransaction: ObservedTransaction = {
@@ -154,7 +154,7 @@ export class ChainStreamService extends BaseChainStreamService {
     await this.logStartupProviderChecks();
   }
 
-  protected override onSnapshotUpdated(snapshot: ChainRuntimeSnapshot): void {
+  protected override onSnapshotUpdated(snapshot: IChainRuntimeSnapshot): void {
     this.runtimeStatusService.setSnapshot({
       observedBlock: snapshot.observedBlock,
       processedBlock: snapshot.processedBlock,
@@ -167,7 +167,7 @@ export class ChainStreamService extends BaseChainStreamService {
   }
 
   private extractLogs(
-    receipt: ReceiptEnvelope | null,
+    receipt: IReceiptEnvelope | null,
   ): readonly ObservedTransaction['logs'][number][] {
     if (receipt === null) {
       return [];

@@ -15,14 +15,14 @@ import type { ProviderFactory } from './providers/provider.factory';
 import type { AlertDispatcherService } from '../alerts/alert-dispatcher.service';
 import type { AppConfigService } from '../config/app-config.service';
 import type {
-  BlockEnvelope,
-  ReceiptEnvelope,
-  TransactionEnvelope,
+  IBlockEnvelope,
+  IReceiptEnvelope,
+  ITransactionEnvelope,
 } from '../core/ports/rpc/block-stream.interfaces';
 import type {
   ISubscriptionHandle,
   ProviderOperation,
-  ProviderHealth,
+  IProviderHealth,
 } from '../core/ports/rpc/rpc-adapter.interfaces';
 import type { RuntimeStatusService } from '../runtime/runtime-status.service';
 import type { ChainCheckpointsRepository } from '../storage/repositories/chain-checkpoints.repository';
@@ -35,9 +35,9 @@ class ProviderStub {
   public receiptCalls: string[] = [];
   public blockRequestCalls: number[] = [];
   public latestBlockNumber: number = 200;
-  private readonly blocks: Map<number, BlockEnvelope> = new Map<number, BlockEnvelope>();
+  private readonly blocks: Map<number, IBlockEnvelope> = new Map<number, IBlockEnvelope>();
 
-  public setBlock(blockNumber: number, block: BlockEnvelope): void {
+  public setBlock(blockNumber: number, block: IBlockEnvelope): void {
     this.blocks.set(blockNumber, block);
   }
 
@@ -57,7 +57,7 @@ class ProviderStub {
     };
   }
 
-  public async getBlockEnvelope(blockNumber: number): Promise<BlockEnvelope | null> {
+  public async getBlockEnvelope(blockNumber: number): Promise<IBlockEnvelope | null> {
     this.blockRequestCalls.push(blockNumber);
     return this.blocks.get(blockNumber) ?? null;
   }
@@ -66,7 +66,7 @@ class ProviderStub {
     return this.latestBlockNumber;
   }
 
-  public async getReceiptEnvelope(txHash: string): Promise<ReceiptEnvelope | null> {
+  public async getReceiptEnvelope(txHash: string): Promise<IReceiptEnvelope | null> {
     this.receiptCalls.push(txHash);
 
     return {
@@ -75,7 +75,7 @@ class ProviderStub {
     };
   }
 
-  public async healthCheck(): Promise<ProviderHealth> {
+  public async healthCheck(): Promise<IProviderHealth> {
     return {
       provider: 'provider-stub',
       ok: true,
@@ -100,19 +100,19 @@ describe('ChainStreamService', (): void => {
   it('uses prefetched block transactions and requests receipts only for matched addresses', async (): Promise<void> => {
     const trackedAddress: string = '0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa';
     const providerStub: ProviderStub = new ProviderStub();
-    const txMatchedByFrom: TransactionEnvelope = {
+    const txMatchedByFrom: ITransactionEnvelope = {
       hash: '0x1',
       from: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       to: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
       blockTimestampSec: 1_739_400_000,
     };
-    const txMatchedByTo: TransactionEnvelope = {
+    const txMatchedByTo: ITransactionEnvelope = {
       hash: '0x2',
       from: '0xcccccccccccccccccccccccccccccccccccccccc',
       to: trackedAddress,
       blockTimestampSec: 1_739_400_000,
     };
-    const txUnmatched: TransactionEnvelope = {
+    const txUnmatched: ITransactionEnvelope = {
       hash: '0x3',
       from: '0xdddddddddddddddddddddddddddddddddddddddd',
       to: '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',

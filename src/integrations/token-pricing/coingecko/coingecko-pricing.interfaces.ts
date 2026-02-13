@@ -1,7 +1,7 @@
 import type { ChainKey } from '../../../core/chains/chain-key.interfaces';
 import type { PriceFailureReason } from '../../../core/ports/token-pricing/token-pricing.interfaces';
 
-export interface CoinGeckoPriceCacheEntry {
+export interface ICoinGeckoPriceCacheEntry {
   readonly key: string;
   readonly chainKey: ChainKey;
   readonly tokenAddress: string | null;
@@ -12,7 +12,7 @@ export interface CoinGeckoPriceCacheEntry {
   readonly staleUntilEpochMs: number;
 }
 
-export interface CoinGeckoQuoteResult {
+export interface ICoinGeckoQuoteResult {
   readonly usdPrice: number | null;
   readonly stale: boolean;
   readonly failureReason: PriceFailureReason | null;

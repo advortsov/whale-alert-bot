@@ -16,6 +16,10 @@ import {
   UNISWAP_V3_SWAP_TOPIC,
 } from './constants/event-signatures';
 
+const ETH_TOPIC_HEX_LENGTH = 66;
+const ETH_ADDRESS_OFFSET = 26;
+const RADIX_DECIMAL = 10;
+
 @Injectable()
 export class EventClassifierService {
   private readonly swapAllowlist: ReadonlySet<string>;
@@ -126,11 +130,11 @@ export class EventClassifierService {
   }
 
   private topicToAddress(topic: string | undefined): string | null {
-    if (topic?.length !== 66) {
+    if (topic?.length !== ETH_TOPIC_HEX_LENGTH) {
       return null;
     }
 
-    return `0x${topic.slice(26)}`.toLowerCase();
+    return `0x${topic.slice(ETH_ADDRESS_OFFSET)}`.toLowerCase();
   }
 
   private tryDecodeUint256(hexData: string): string | null {
@@ -139,7 +143,7 @@ export class EventClassifierService {
     }
 
     try {
-      return BigInt(hexData).toString(10);
+      return BigInt(hexData).toString(RADIX_DECIMAL);
     } catch {
       return null;
     }

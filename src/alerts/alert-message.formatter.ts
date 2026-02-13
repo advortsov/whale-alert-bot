@@ -1,14 +1,17 @@
 import { Injectable } from '@nestjs/common';
 
-import type { AlertMessageContext } from './alert.interfaces';
+import type { IAlertMessageContext } from './alert.interfaces';
 import { ClassifiedEventType, EventDirection, type ClassifiedEvent } from '../chain/chain.types';
 import { AppConfigService } from '../config/app-config.service';
+
+const SHORT_HASH_PREFIX_LENGTH = 10;
+const SHORT_HASH_SUFFIX_OFFSET = -8;
 
 @Injectable()
 export class AlertMessageFormatter {
   public constructor(private readonly appConfigService: AppConfigService) {}
 
-  public format(event: ClassifiedEvent, context?: AlertMessageContext): string {
+  public format(event: ClassifiedEvent, context?: IAlertMessageContext): string {
     const directionLabel: string = this.formatDirection(event.direction);
     const valueLabel: string = this.formatValue(event.valueFormatted, event.tokenSymbol);
     const tokenLabel: string = event.tokenSymbol ?? 'n/a';
@@ -83,7 +86,7 @@ export class AlertMessageFormatter {
     return `${valueFormatted} ${symbol}`;
   }
 
-  private formatUsdLine(context: AlertMessageContext | undefined): string | null {
+  private formatUsdLine(context: IAlertMessageContext | undefined): string | null {
     if (!context) {
       return null;
     }
@@ -100,8 +103,8 @@ export class AlertMessageFormatter {
   }
 
   private shortHash(txHash: string): string {
-    const prefix: string = txHash.slice(0, 10);
-    const suffix: string = txHash.slice(-8);
+    const prefix: string = txHash.slice(0, SHORT_HASH_PREFIX_LENGTH);
+    const suffix: string = txHash.slice(SHORT_HASH_SUFFIX_OFFSET);
     return `${prefix}...${suffix}`;
   }
 }

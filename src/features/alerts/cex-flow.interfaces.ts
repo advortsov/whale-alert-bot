@@ -7,17 +7,17 @@ export enum AlertCexFlowMode {
   ALL = 'all',
 }
 
-export interface AlertCexFlowPolicy {
+export interface IAlertCexFlowPolicy {
   readonly mode: AlertCexFlowMode;
 }
 
-export interface AlertCexFlowContext {
+export interface IAlertCexFlowContext {
   readonly eventType: ClassifiedEventType;
   readonly direction: EventDirection;
   readonly counterpartyTag: string | null;
 }
 
-export interface AlertCexFlowDecision {
+export interface IAlertCexFlowDecision {
   readonly allowed: boolean;
   readonly suppressedReason: string | null;
 }

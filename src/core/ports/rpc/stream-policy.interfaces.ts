@@ -9,7 +9,7 @@ export enum CatchupPolicy {
   BOUNDED = 'bounded',
 }
 
-export interface ChainStreamTuning {
+export interface IChainStreamTuning {
   readonly chainKey: ChainKey;
   readonly queueMax: number;
   readonly catchupBatch: number;

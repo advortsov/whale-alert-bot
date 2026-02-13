@@ -1,24 +1,24 @@
-export interface TransactionEnvelope {
+export interface ITransactionEnvelope {
   readonly hash: string;
   readonly from: string;
   readonly to: string | null;
   readonly blockTimestampSec: number | null;
 }
 
-export interface BlockEnvelope {
+export interface IBlockEnvelope {
   readonly number: number;
   readonly timestampSec: number | null;
-  readonly transactions: readonly TransactionEnvelope[];
+  readonly transactions: readonly ITransactionEnvelope[];
 }
 
-export interface ReceiptLogEnvelope {
+export interface IReceiptLogEnvelope {
   readonly address: string;
   readonly topics: readonly string[];
   readonly data: string;
   readonly logIndex: number;
 }
 
-export interface ReceiptEnvelope {
+export interface IReceiptEnvelope {
   readonly txHash: string;
-  readonly logs: readonly ReceiptLogEnvelope[];
+  readonly logs: readonly IReceiptLogEnvelope[];
 }

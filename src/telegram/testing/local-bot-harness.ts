@@ -12,10 +12,13 @@ import type {
   LocalBotHarnessDependencies,
 } from './local-bot-harness.interfaces';
 
+const INITIAL_MESSAGE_ID_COUNTER = 100;
+const DEFAULT_LOCAL_USER_NAME = 'local-user';
+
 export class LocalBotHarness {
   private readonly update: TelegramUpdate;
   private updateIdCounter: number = 1;
-  private messageIdCounter: number = 100;
+  private messageIdCounter: number = INITIAL_MESSAGE_ID_COUNTER;
 
   public constructor(dependencies: LocalBotHarnessDependencies) {
     this.update = new TelegramUpdate(
@@ -36,7 +39,7 @@ export class LocalBotHarness {
       from: {
         id: chatId,
         is_bot: false,
-        first_name: input.user.username ?? 'local-user',
+        first_name: input.user.username ?? DEFAULT_LOCAL_USER_NAME,
         username: input.user.username ?? undefined,
       },
       chat: {
@@ -63,7 +66,7 @@ export class LocalBotHarness {
           chat: {
             id: chatId,
             type: 'private',
-            first_name: input.user.username ?? 'local-user',
+            first_name: input.user.username ?? DEFAULT_LOCAL_USER_NAME,
           },
           text,
         };
@@ -101,7 +104,7 @@ export class LocalBotHarness {
       from: {
         id: chatId,
         is_bot: false,
-        first_name: input.user.username ?? 'local-user',
+        first_name: input.user.username ?? DEFAULT_LOCAL_USER_NAME,
         username: input.user.username ?? undefined,
       },
       chat: {
@@ -116,7 +119,7 @@ export class LocalBotHarness {
         from: {
           id: chatId,
           is_bot: false,
-          first_name: input.user.username ?? 'local-user',
+          first_name: input.user.username ?? DEFAULT_LOCAL_USER_NAME,
           username: input.user.username ?? undefined,
         },
         chat_instance: 'local-instance',
@@ -130,7 +133,7 @@ export class LocalBotHarness {
           chat: {
             id: chatId,
             type: 'private',
-            first_name: input.user.username ?? 'local-user',
+            first_name: input.user.username ?? DEFAULT_LOCAL_USER_NAME,
           },
           text,
         };

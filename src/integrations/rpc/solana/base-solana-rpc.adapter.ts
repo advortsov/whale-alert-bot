@@ -1,15 +1,15 @@
 import { Logger } from '@nestjs/common';
 
 import type {
-  BlockEnvelope,
-  ReceiptEnvelope,
-  TransactionEnvelope,
+  IBlockEnvelope,
+  IReceiptEnvelope,
+  ITransactionEnvelope,
 } from '../../../core/ports/rpc/block-stream.interfaces';
 import type {
   BlockHandler,
   IRpcAdapter,
   ISubscriptionHandle,
-  ProviderHealth,
+  IProviderHealth,
 } from '../../../core/ports/rpc/rpc-adapter.interfaces';
 
 type JsonRpcId = number;
@@ -67,12 +67,12 @@ type SolanaStreamOptions = {
   readonly pollJitterMs: number;
 };
 
-export abstract class BaseSolanaRpcAdapter implements IRpcAdapter {
-  private static readonly DEFAULT_TIMEOUT_MS: number = 8000;
-  private static readonly DEFAULT_POLL_INTERVAL_MS: number = 1000;
-  private static readonly DEFAULT_MAX_SLOT_CATCHUP_PER_POLL: number = 8;
-  private static readonly DEFAULT_POLL_JITTER_MS: number = 300;
+const DEFAULT_TIMEOUT_MS = 8000;
+const DEFAULT_POLL_INTERVAL_MS = 1000;
+const DEFAULT_MAX_SLOT_CATCHUP_PER_POLL = 8;
+const DEFAULT_POLL_JITTER_MS = 300;
 
+export abstract class BaseSolanaRpcAdapter implements IRpcAdapter {
   private readonly logger: Logger;
   private readonly streamOptions: SolanaStreamOptions;
 
@@ -84,12 +84,10 @@ export abstract class BaseSolanaRpcAdapter implements IRpcAdapter {
   ) {
     this.logger = new Logger(providerName);
     this.streamOptions = {
-      pollIntervalMs:
-        streamOptions?.pollIntervalMs ?? BaseSolanaRpcAdapter.DEFAULT_POLL_INTERVAL_MS,
+      pollIntervalMs: streamOptions?.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS,
       maxSlotCatchupPerPoll:
-        streamOptions?.maxSlotCatchupPerPoll ??
-        BaseSolanaRpcAdapter.DEFAULT_MAX_SLOT_CATCHUP_PER_POLL,
-      pollJitterMs: streamOptions?.pollJitterMs ?? BaseSolanaRpcAdapter.DEFAULT_POLL_JITTER_MS,
+        streamOptions?.maxSlotCatchupPerPoll ?? DEFAULT_MAX_SLOT_CATCHUP_PER_POLL,
+      pollJitterMs: streamOptions?.pollJitterMs ?? DEFAULT_POLL_JITTER_MS,
     };
   }
 
@@ -150,7 +148,7 @@ export abstract class BaseSolanaRpcAdapter implements IRpcAdapter {
     return this.callRpc<SolanaGetSlotResponse>('getSlot', []);
   }
 
-  public async getBlockEnvelope(blockNumber: number): Promise<BlockEnvelope | null> {
+  public async getBlockEnvelope(blockNumber: number): Promise<IBlockEnvelope | null> {
     let blockResult: SolanaGetBlockResponse;
 
     try {
@@ -181,8 +179,8 @@ export abstract class BaseSolanaRpcAdapter implements IRpcAdapter {
     const blockTimestampSec: number | null =
       typeof blockResult.blockTime === 'number' ? blockResult.blockTime : null;
 
-    const transactions: readonly TransactionEnvelope[] = (blockResult.transactions ?? []).map(
-      (transaction: SolanaBlockTransaction, index: number): TransactionEnvelope => {
+    const transactions: readonly ITransactionEnvelope[] = (blockResult.transactions ?? []).map(
+      (transaction: SolanaBlockTransaction, index: number): ITransactionEnvelope => {
         const hash: string = this.extractTransactionHash(transaction, blockNumber, index);
         const fromAddress: string = this.extractAccountKey(transaction, 0) ?? 'unknown';
         const toAddress: string | null = this.extractAccountKey(transaction, 1);
@@ -203,7 +201,7 @@ export abstract class BaseSolanaRpcAdapter implements IRpcAdapter {
     };
   }
 
-  public async getReceiptEnvelope(txHash: string): Promise<ReceiptEnvelope | null> {
+  public async getReceiptEnvelope(txHash: string): Promise<IReceiptEnvelope | null> {
     const transactionResult: SolanaGetTransactionResponse =
       await this.callRpc<SolanaGetTransactionResponse>('getTransaction', [
         txHash,
@@ -236,7 +234,7 @@ export abstract class BaseSolanaRpcAdapter implements IRpcAdapter {
     };
   }
 
-  public async healthCheck(): Promise<ProviderHealth> {
+  public async healthCheck(): Promise<IProviderHealth> {
     if (!this.httpUrl) {
       return {
         provider: this.providerName,
@@ -318,7 +316,7 @@ export abstract class BaseSolanaRpcAdapter implements IRpcAdapter {
     const abortController: AbortController = new AbortController();
     const timeoutHandle: NodeJS.Timeout = setTimeout((): void => {
       abortController.abort();
-    }, BaseSolanaRpcAdapter.DEFAULT_TIMEOUT_MS);
+    }, DEFAULT_TIMEOUT_MS);
 
     try {
       const response: Response = await fetch(this.httpUrl, {

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import type { HistoryTransactionItem } from './etherscan-history.interfaces';
+import type { IHistoryTransactionItem } from './etherscan-history.interfaces';
 import { ChainKey } from '../core/chains/chain-key.interfaces';
 import { HistoryDirectionFilter, HistoryKind } from '../features/tracking/dto/history-request.dto';
 import { EtherscanHistoryAdapter } from '../integrations/explorers/etherscan/etherscan-history.adapter';
@@ -12,7 +12,7 @@ export class EtherscanHistoryService {
   public async loadRecentTransactions(
     address: string,
     limit: number,
-  ): Promise<readonly HistoryTransactionItem[]> {
+  ): Promise<readonly IHistoryTransactionItem[]> {
     const page = await this.etherscanHistoryAdapter.loadRecentTransactions({
       chainKey: ChainKey.ETHEREUM_MAINNET,
       address,
@@ -24,7 +24,7 @@ export class EtherscanHistoryService {
     });
 
     return page.items.map(
-      (item): HistoryTransactionItem => ({
+      (item): IHistoryTransactionItem => ({
         hash: item.txHash,
         timestampSec: item.timestampSec,
         from: item.from,

@@ -3,7 +3,7 @@ export enum EtherscanHistoryAction {
   TOKEN_TX_LIST = 'tokentx',
 }
 
-export interface EtherscanNormalTransaction {
+export interface IEtherscanNormalTransaction {
   readonly hash: string;
   readonly timeStamp: string;
   readonly from: string;
@@ -12,7 +12,7 @@ export interface EtherscanNormalTransaction {
   readonly isError: string;
 }
 
-export interface EtherscanTokenTransaction {
+export interface IEtherscanTokenTransaction {
   readonly hash: string;
   readonly timeStamp: string;
   readonly from: string;
@@ -23,7 +23,7 @@ export interface EtherscanTokenTransaction {
   readonly isError?: string;
 }
 
-export interface EtherscanHistoryResponse {
+export interface IEtherscanHistoryResponse {
   readonly status: string;
   readonly message: string;
   readonly result: readonly unknown[] | string;

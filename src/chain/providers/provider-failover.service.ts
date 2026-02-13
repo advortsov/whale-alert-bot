@@ -10,9 +10,10 @@ import type {
   ProviderOperation,
 } from '../../core/ports/rpc/rpc-adapter.interfaces';
 
+const PRIMARY_BACKOFF_RESET_SUCCESS_STREAK = 3;
+
 @Injectable()
 export class ProviderFailoverService implements IProviderFailoverService {
-  private static readonly PRIMARY_BACKOFF_RESET_SUCCESS_STREAK: number = 3;
   private readonly logger: Logger = new Logger(ProviderFailoverService.name);
   private readonly primaryCooldownUntilByChain: Map<ChainKey, number> = new Map<ChainKey, number>();
   private readonly primarySuccessStreakByChain: Map<ChainKey, number> = new Map<ChainKey, number>();
@@ -178,14 +179,14 @@ export class ProviderFailoverService implements IProviderFailoverService {
     const nextSuccessStreak: number = (this.primarySuccessStreakByChain.get(chainKey) ?? 0) + 1;
     this.primarySuccessStreakByChain.set(chainKey, nextSuccessStreak);
 
-    if (nextSuccessStreak < ProviderFailoverService.PRIMARY_BACKOFF_RESET_SUCCESS_STREAK) {
+    if (nextSuccessStreak < PRIMARY_BACKOFF_RESET_SUCCESS_STREAK) {
       return;
     }
 
     this.rpcThrottlerService.resetBackoffForKey(primaryThrottleKey);
     this.primarySuccessStreakByChain.delete(chainKey);
     this.logger.log(
-      `Primary backoff reset after ${String(ProviderFailoverService.PRIMARY_BACKOFF_RESET_SUCCESS_STREAK)} consecutive successful calls. chain=${chainKey}`,
+      `Primary backoff reset after ${String(PRIMARY_BACKOFF_RESET_SUCCESS_STREAK)} consecutive successful calls. chain=${chainKey}`,
     );
   }
 

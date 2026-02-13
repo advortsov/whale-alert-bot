@@ -1,16 +1,16 @@
-export interface AlertFilterPolicy {
+export interface IAlertFilterPolicy {
   readonly thresholdUsd: number;
   readonly minAmountUsd: number;
 }
 
-export interface ThresholdDecision {
+export interface IThresholdDecision {
   readonly allowed: boolean;
   readonly suppressedReason: string | null;
   readonly usdAmount: number | null;
   readonly usdUnavailable: boolean;
 }
 
-export interface QuietHoursDecision {
+export interface IQuietHoursDecision {
   readonly suppressed: boolean;
   readonly reason: string | null;
 }

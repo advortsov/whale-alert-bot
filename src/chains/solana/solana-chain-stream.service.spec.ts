@@ -13,13 +13,13 @@ import type { ProviderFailoverService } from '../../chain/providers/provider-fai
 import type { AppConfigService } from '../../config/app-config.service';
 import { ChainKey } from '../../core/chains/chain-key.interfaces';
 import type {
-  BlockEnvelope,
-  ReceiptEnvelope,
-  TransactionEnvelope,
+  IBlockEnvelope,
+  IReceiptEnvelope,
+  ITransactionEnvelope,
 } from '../../core/ports/rpc/block-stream.interfaces';
 import type {
   ISubscriptionHandle,
-  ProviderHealth,
+  IProviderHealth,
   ProviderOperation,
 } from '../../core/ports/rpc/rpc-adapter.interfaces';
 import type { ChainCheckpointsRepository } from '../../storage/repositories/chain-checkpoints.repository';
@@ -30,14 +30,17 @@ import type { WalletEventsRepository } from '../../storage/repositories/wallet-e
 class SolanaProviderStub {
   public blockHandler: ((blockNumber: number) => Promise<void>) | null = null;
   public latestBlockNumber: number = 1000;
-  private readonly blockByNumber: Map<number, BlockEnvelope> = new Map<number, BlockEnvelope>();
-  private readonly receiptByHash: Map<string, ReceiptEnvelope> = new Map<string, ReceiptEnvelope>();
+  private readonly blockByNumber: Map<number, IBlockEnvelope> = new Map<number, IBlockEnvelope>();
+  private readonly receiptByHash: Map<string, IReceiptEnvelope> = new Map<
+    string,
+    IReceiptEnvelope
+  >();
 
-  public setBlock(blockNumber: number, block: BlockEnvelope): void {
+  public setBlock(blockNumber: number, block: IBlockEnvelope): void {
     this.blockByNumber.set(blockNumber, block);
   }
 
-  public setReceipt(txHash: string, receipt: ReceiptEnvelope): void {
+  public setReceipt(txHash: string, receipt: IReceiptEnvelope): void {
     this.receiptByHash.set(txHash, receipt);
   }
 
@@ -58,15 +61,15 @@ class SolanaProviderStub {
     return this.latestBlockNumber;
   }
 
-  public async getBlockEnvelope(blockNumber: number): Promise<BlockEnvelope | null> {
+  public async getBlockEnvelope(blockNumber: number): Promise<IBlockEnvelope | null> {
     return this.blockByNumber.get(blockNumber) ?? null;
   }
 
-  public async getReceiptEnvelope(txHash: string): Promise<ReceiptEnvelope | null> {
+  public async getReceiptEnvelope(txHash: string): Promise<IReceiptEnvelope | null> {
     return this.receiptByHash.get(txHash) ?? null;
   }
 
-  public async healthCheck(): Promise<ProviderHealth> {
+  public async healthCheck(): Promise<IProviderHealth> {
     return {
       provider: 'solana-provider-stub',
       ok: true,
@@ -91,7 +94,7 @@ describe('SolanaChainStreamService', (): void => {
   it('processes matched solana transfer and dispatches alert', async (): Promise<void> => {
     const trackedAddress: string = '11111111111111111111111111111111';
     const providerStub: SolanaProviderStub = new SolanaProviderStub();
-    const transaction: TransactionEnvelope = {
+    const transaction: ITransactionEnvelope = {
       hash: 'sol-tx-1',
       from: trackedAddress,
       to: '22222222222222222222222222222222',

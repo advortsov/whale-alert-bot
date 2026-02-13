@@ -4,7 +4,10 @@ import { ClassifiedEventType, type ClassifiedEvent } from './chain.types';
 import type { ProviderFailoverService } from './providers/provider-failover.service';
 import type { AlertDispatcherService } from '../alerts/alert-dispatcher.service';
 import type { ChainKey } from '../core/chains/chain-key.interfaces';
-import type { BlockEnvelope, TransactionEnvelope } from '../core/ports/rpc/block-stream.interfaces';
+import type {
+  IBlockEnvelope,
+  ITransactionEnvelope,
+} from '../core/ports/rpc/block-stream.interfaces';
 import type { ISubscriptionHandle } from '../core/ports/rpc/rpc-adapter.interfaces';
 import { QueueOverflowPolicy } from '../core/ports/rpc/stream-policy.interfaces';
 import type { ChainCheckpointsRepository } from '../storage/repositories/chain-checkpoints.repository';
@@ -12,20 +15,26 @@ import type { ProcessedEventsRepository } from '../storage/repositories/processe
 import type { SubscriptionsRepository } from '../storage/repositories/subscriptions.repository';
 import type { WalletEventsRepository } from '../storage/repositories/wallet-events.repository';
 
-export interface ChainStreamConfig {
+export interface IChainStreamConfig {
   readonly logPrefix: string;
   readonly chainKey: ChainKey;
   readonly chainId: number;
   readonly defaultHeartbeatIntervalSec: number;
 }
 
-export interface MatchedTransaction {
+export interface IMatchedTransaction {
   readonly txHash: string;
   readonly txFrom: string;
   readonly txTo: string | null;
   readonly trackedAddress: string;
   readonly blockTimestampSec: number | null;
 }
+
+const QUEUE_RETAIN_RATIO = 0.3;
+const QUEUE_RETAIN_MIN = 10;
+const DEGRADATION_EXIT_USAGE_RATIO = 0.25;
+const DEGRADATION_EXIT_LAG_RATIO = 0.5;
+const PERCENT_MULTIPLIER = 100;
 
 /**
  * Базовый оркестратор для chain stream pipeline.
@@ -52,7 +61,7 @@ export abstract class BaseChainStreamService implements OnModuleInit, OnModuleDe
     this.logger = new Logger(this.constructor.name);
   }
 
-  protected abstract getConfig(): ChainStreamConfig;
+  protected abstract getConfig(): IChainStreamConfig;
 
   protected abstract isWatcherEnabled(): boolean;
 
@@ -65,7 +74,7 @@ export abstract class BaseChainStreamService implements OnModuleInit, OnModuleDe
   protected abstract getReorgConfirmations(): number;
 
   /** Fetch block envelope via provider failover for this chain. */
-  protected abstract fetchBlockEnvelope(blockNumber: number): Promise<BlockEnvelope | null>;
+  protected abstract fetchBlockEnvelope(blockNumber: number): Promise<IBlockEnvelope | null>;
 
   /** Fetch latest block number via provider failover for this chain. */
   protected abstract fetchLatestBlockNumber(): Promise<number>;
@@ -80,7 +89,7 @@ export abstract class BaseChainStreamService implements OnModuleInit, OnModuleDe
    * Chain adapters fetch receipts and run their classifier inside this method.
    */
   protected abstract classifyTransaction(
-    matched: MatchedTransaction,
+    matched: IMatchedTransaction,
   ): Promise<ClassifiedEvent | null>;
 
   /** Resolve tracked addresses for this chain. Returns addresses in canonical form. */
@@ -102,7 +111,7 @@ export abstract class BaseChainStreamService implements OnModuleInit, OnModuleDe
   }
 
   /** Hook called on each runtime snapshot update. Override to publish telemetry. */
-  protected onSnapshotUpdated(_snapshot: ChainRuntimeSnapshot): void {
+  protected onSnapshotUpdated(_snapshot: IChainRuntimeSnapshot): void {
     // default no-op
   }
 
@@ -277,13 +286,13 @@ export abstract class BaseChainStreamService implements OnModuleInit, OnModuleDe
       return;
     }
 
-    const blockEnvelope: BlockEnvelope | null = await this.fetchBlockEnvelope(blockNumber);
+    const blockEnvelope: IBlockEnvelope | null = await this.fetchBlockEnvelope(blockNumber);
 
     if (blockEnvelope === null) {
       return;
     }
 
-    const matchedTransactions: readonly MatchedTransaction[] = this.collectMatchedTransactions(
+    const matchedTransactions: readonly IMatchedTransaction[] = this.collectMatchedTransactions(
       blockEnvelope.transactions,
       trackedAddresses,
       blockEnvelope.timestampSec,
@@ -303,11 +312,11 @@ export abstract class BaseChainStreamService implements OnModuleInit, OnModuleDe
   }
 
   private collectMatchedTransactions(
-    transactions: readonly TransactionEnvelope[],
+    transactions: readonly ITransactionEnvelope[],
     trackedAddresses: readonly string[],
     blockTimestampSec: number | null,
-  ): readonly MatchedTransaction[] {
-    const result: MatchedTransaction[] = [];
+  ): readonly IMatchedTransaction[] {
+    const result: IMatchedTransaction[] = [];
 
     for (const transaction of transactions) {
       const matchedAddress: string | null = this.matchTransaction(
@@ -332,7 +341,7 @@ export abstract class BaseChainStreamService implements OnModuleInit, OnModuleDe
     return result;
   }
 
-  private async processMatchedTransaction(matched: MatchedTransaction): Promise<void> {
+  private async processMatchedTransaction(matched: IMatchedTransaction): Promise<void> {
     const config = this.getConfig();
     this.logDebug(
       `processMatchedTransaction start txHash=${matched.txHash} address=${matched.trackedAddress}`,
@@ -378,7 +387,10 @@ export abstract class BaseChainStreamService implements OnModuleInit, OnModuleDe
   private applyQueueOverflowPolicy(blockNumber: number): void {
     const config = this.getConfig();
     const queueMax: number = this.getQueueMax();
-    const retainedWindowSize: number = Math.max(Math.floor(queueMax * 0.3), 10);
+    const retainedWindowSize: number = Math.max(
+      Math.floor(queueMax * QUEUE_RETAIN_RATIO),
+      QUEUE_RETAIN_MIN,
+    );
     const combinedQueue: number[] = [...this.blockQueue, blockNumber];
     const retainedQueue: number[] = combinedQueue.slice(-retainedWindowSize);
     const droppedCount: number = combinedQueue.length - retainedQueue.length;
@@ -408,13 +420,13 @@ export abstract class BaseChainStreamService implements OnModuleInit, OnModuleDe
     const queueMax: number = this.getQueueMax();
     const queueUsageRatio: number = this.blockQueue.length / queueMax;
 
-    if (queueUsageRatio > 0.25) {
+    if (queueUsageRatio > DEGRADATION_EXIT_USAGE_RATIO) {
       return;
     }
 
     const lag: number | null = this.resolveLag();
 
-    if (lag !== null && lag > Math.floor(queueMax * 0.5)) {
+    if (lag !== null && lag > Math.floor(queueMax * DEGRADATION_EXIT_LAG_RATIO)) {
       return;
     }
 
@@ -431,7 +443,9 @@ export abstract class BaseChainStreamService implements OnModuleInit, OnModuleDe
       const lag: number | null = this.resolveLag();
       const backoffMs: number = this.providerFailoverService.getCurrentBackoffMs(config.chainKey);
       const queueMax: number = this.getQueueMax();
-      const queueUsedPercent: number = Math.round((this.blockQueue.length / queueMax) * 100);
+      const queueUsedPercent: number = Math.round(
+        (this.blockQueue.length / queueMax) * PERCENT_MULTIPLIER,
+      );
       const catchupDebt: number = this.resolveCatchupDebt(lag);
 
       this.logInfo(
@@ -497,7 +511,7 @@ export abstract class BaseChainStreamService implements OnModuleInit, OnModuleDe
   }
 }
 
-export interface ChainRuntimeSnapshot {
+export interface IChainRuntimeSnapshot {
   readonly chainKey: ChainKey;
   readonly observedBlock: number | null;
   readonly processedBlock: number | null;

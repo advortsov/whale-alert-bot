@@ -12,6 +12,8 @@ import type {
   UserWalletSubscriptionView,
 } from './subscriptions.repository.interfaces';
 
+const USER_WALLET_SUBSCRIPTIONS_TABLE = 'user_wallet_subscriptions';
+
 @Injectable()
 export class SubscriptionsRepository {
   public constructor(private readonly databaseService: DatabaseService) {}
@@ -27,7 +29,7 @@ export class SubscriptionsRepository {
 
     const insertedSubscription: UserWalletSubscriptionRow | undefined = await this.databaseService
       .getDb()
-      .insertInto('user_wallet_subscriptions')
+      .insertInto(USER_WALLET_SUBSCRIPTIONS_TABLE)
       .values(newSubscription)
       .onConflict((oc) => oc.columns(['user_id', 'wallet_id']).doNothing())
       .returningAll()
@@ -46,7 +48,7 @@ export class SubscriptionsRepository {
       created_at: Date;
     }[] = await this.databaseService
       .getDb()
-      .selectFrom('user_wallet_subscriptions')
+      .selectFrom(USER_WALLET_SUBSCRIPTIONS_TABLE)
       .innerJoin('tracked_wallets', 'tracked_wallets.id', 'user_wallet_subscriptions.wallet_id')
       .select([
         'user_wallet_subscriptions.id',
@@ -75,7 +77,7 @@ export class SubscriptionsRepository {
   public async removeByWalletId(userId: number, walletId: number): Promise<boolean> {
     const result = await this.databaseService
       .getDb()
-      .deleteFrom('user_wallet_subscriptions')
+      .deleteFrom(USER_WALLET_SUBSCRIPTIONS_TABLE)
       .where('user_id', '=', userId)
       .where('wallet_id', '=', walletId)
       .executeTakeFirst();
@@ -108,7 +110,7 @@ export class SubscriptionsRepository {
       .getDb()
       .selectFrom('tracked_wallets')
       .innerJoin(
-        'user_wallet_subscriptions',
+        USER_WALLET_SUBSCRIPTIONS_TABLE,
         'user_wallet_subscriptions.wallet_id',
         'tracked_wallets.id',
       )
@@ -128,7 +130,7 @@ export class SubscriptionsRepository {
       .getDb()
       .selectFrom('tracked_wallets')
       .innerJoin(
-        'user_wallet_subscriptions',
+        USER_WALLET_SUBSCRIPTIONS_TABLE,
         'user_wallet_subscriptions.wallet_id',
         'tracked_wallets.id',
       )
@@ -154,7 +156,7 @@ export class SubscriptionsRepository {
       .getDb()
       .selectFrom('tracked_wallets')
       .innerJoin(
-        'user_wallet_subscriptions',
+        USER_WALLET_SUBSCRIPTIONS_TABLE,
         'user_wallet_subscriptions.wallet_id',
         'tracked_wallets.id',
       )

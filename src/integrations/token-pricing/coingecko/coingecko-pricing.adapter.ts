@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 import type {
-  CoinGeckoPriceCacheEntry,
-  CoinGeckoQuoteResult,
+  ICoinGeckoPriceCacheEntry,
+  ICoinGeckoQuoteResult,
 } from './coingecko-pricing.interfaces';
 import { AppConfigService } from '../../../config/app-config.service';
 import { ChainKey as KnownChainKey } from '../../../core/chains/chain-key.interfaces';
@@ -10,21 +10,23 @@ import type { ChainKey } from '../../../core/chains/chain-key.interfaces';
 import {
   type ITokenPricingPort,
   PriceFailureReason,
-  type PriceQuoteDto,
-  type PriceRequestDto,
+  type IPriceQuoteDto,
+  type IPriceRequestDto,
 } from '../../../core/ports/token-pricing/token-pricing.interfaces';
+
+const HTTP_STATUS_TOO_MANY_REQUESTS = 429;
 
 @Injectable()
 export class CoinGeckoPricingAdapter implements ITokenPricingPort {
   private readonly logger: Logger = new Logger(CoinGeckoPricingAdapter.name);
-  private readonly cache: Map<string, CoinGeckoPriceCacheEntry> = new Map<
+  private readonly cache: Map<string, ICoinGeckoPriceCacheEntry> = new Map<
     string,
-    CoinGeckoPriceCacheEntry
+    ICoinGeckoPriceCacheEntry
   >();
 
   public constructor(private readonly appConfigService: AppConfigService) {}
 
-  public async getUsdQuote(request: PriceRequestDto): Promise<PriceQuoteDto | null> {
+  public async getUsdQuote(request: IPriceRequestDto): Promise<IPriceQuoteDto | null> {
     if (request.chainKey !== KnownChainKey.ETHEREUM_MAINNET) {
       return null;
     }
@@ -35,7 +37,7 @@ export class CoinGeckoPricingAdapter implements ITokenPricingPort {
       request.tokenSymbol,
     );
     const nowEpochMs: number = Date.now();
-    const freshCacheEntry: CoinGeckoPriceCacheEntry | null = this.getFreshCacheEntry(
+    const freshCacheEntry: ICoinGeckoPriceCacheEntry | null = this.getFreshCacheEntry(
       key,
       nowEpochMs,
     );
@@ -44,10 +46,10 @@ export class CoinGeckoPricingAdapter implements ITokenPricingPort {
       return this.mapCacheEntryToQuote(freshCacheEntry, false);
     }
 
-    const quoteResult: CoinGeckoQuoteResult = await this.fetchUsdQuote(request);
+    const quoteResult: ICoinGeckoQuoteResult = await this.fetchUsdQuote(request);
 
     if (quoteResult.usdPrice !== null) {
-      const cacheEntry: CoinGeckoPriceCacheEntry = this.setCacheEntry(
+      const cacheEntry: ICoinGeckoPriceCacheEntry = this.setCacheEntry(
         key,
         request.chainKey,
         request.tokenAddress,
@@ -58,7 +60,7 @@ export class CoinGeckoPricingAdapter implements ITokenPricingPort {
       return this.mapCacheEntryToQuote(cacheEntry, false);
     }
 
-    const staleCacheEntry: CoinGeckoPriceCacheEntry | null = this.getStaleCacheEntry(
+    const staleCacheEntry: ICoinGeckoPriceCacheEntry | null = this.getStaleCacheEntry(
       key,
       nowEpochMs,
     );
@@ -73,7 +75,7 @@ export class CoinGeckoPricingAdapter implements ITokenPricingPort {
     return null;
   }
 
-  private async fetchUsdQuote(request: PriceRequestDto): Promise<CoinGeckoQuoteResult> {
+  private async fetchUsdQuote(request: IPriceRequestDto): Promise<ICoinGeckoQuoteResult> {
     try {
       if (this.isEthereumNative(request.tokenAddress, request.tokenSymbol)) {
         const nativeResponse: Response = await fetch(this.buildNativePriceUrl(), {
@@ -122,8 +124,8 @@ export class CoinGeckoPricingAdapter implements ITokenPricingPort {
     }
   }
 
-  private mapFetchResponse(response: Response, key: string): Promise<CoinGeckoQuoteResult> {
-    if (response.status === 429) {
+  private mapFetchResponse(response: Response, key: string): Promise<ICoinGeckoQuoteResult> {
+    if (response.status === HTTP_STATUS_TOO_MANY_REQUESTS) {
       return Promise.resolve({
         usdPrice: null,
         stale: false,
@@ -141,7 +143,7 @@ export class CoinGeckoPricingAdapter implements ITokenPricingPort {
 
     return response
       .json()
-      .then((payload: unknown): CoinGeckoQuoteResult => {
+      .then((payload: unknown): ICoinGeckoQuoteResult => {
         if (typeof payload !== 'object' || payload === null) {
           return {
             usdPrice: null,
@@ -178,7 +180,7 @@ export class CoinGeckoPricingAdapter implements ITokenPricingPort {
         };
       })
       .catch(
-        (): CoinGeckoQuoteResult => ({
+        (): ICoinGeckoQuoteResult => ({
           usdPrice: null,
           stale: false,
           failureReason: PriceFailureReason.INVALID_RESPONSE,
@@ -193,10 +195,10 @@ export class CoinGeckoPricingAdapter implements ITokenPricingPort {
     tokenSymbol: string | null,
     usdPrice: number,
     nowEpochMs: number,
-  ): CoinGeckoPriceCacheEntry {
+  ): ICoinGeckoPriceCacheEntry {
     const freshTtlMs: number = this.appConfigService.priceCacheFreshTtlSec * 1000;
     const staleTtlMs: number = this.appConfigService.priceCacheStaleTtlSec * 1000;
-    const cacheEntry: CoinGeckoPriceCacheEntry = {
+    const cacheEntry: ICoinGeckoPriceCacheEntry = {
       key,
       chainKey,
       tokenAddress,
@@ -228,8 +230,8 @@ export class CoinGeckoPricingAdapter implements ITokenPricingPort {
     }
   }
 
-  private getFreshCacheEntry(key: string, nowEpochMs: number): CoinGeckoPriceCacheEntry | null {
-    const cacheEntry: CoinGeckoPriceCacheEntry | undefined = this.cache.get(key);
+  private getFreshCacheEntry(key: string, nowEpochMs: number): ICoinGeckoPriceCacheEntry | null {
+    const cacheEntry: ICoinGeckoPriceCacheEntry | undefined = this.cache.get(key);
 
     if (!cacheEntry) {
       return null;
@@ -244,8 +246,8 @@ export class CoinGeckoPricingAdapter implements ITokenPricingPort {
     return cacheEntry;
   }
 
-  private getStaleCacheEntry(key: string, nowEpochMs: number): CoinGeckoPriceCacheEntry | null {
-    const cacheEntry: CoinGeckoPriceCacheEntry | undefined = this.cache.get(key);
+  private getStaleCacheEntry(key: string, nowEpochMs: number): ICoinGeckoPriceCacheEntry | null {
+    const cacheEntry: ICoinGeckoPriceCacheEntry | undefined = this.cache.get(key);
 
     if (!cacheEntry) {
       return null;
@@ -262,9 +264,9 @@ export class CoinGeckoPricingAdapter implements ITokenPricingPort {
   }
 
   private mapCacheEntryToQuote(
-    cacheEntry: CoinGeckoPriceCacheEntry,
+    cacheEntry: ICoinGeckoPriceCacheEntry,
     stale: boolean,
-  ): PriceQuoteDto {
+  ): IPriceQuoteDto {
     return {
       chainKey: cacheEntry.chainKey,
       tokenAddress: cacheEntry.tokenAddress,

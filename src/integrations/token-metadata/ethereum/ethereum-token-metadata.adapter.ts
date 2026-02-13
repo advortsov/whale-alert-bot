@@ -7,19 +7,19 @@ import {
 import { AppConfigService } from '../../../config/app-config.service';
 import type {
   ITokenMetadataAdapter,
-  TokenMetadataDto,
+  ITokenMetadataDto,
 } from '../../../core/ports/token-metadata/token-metadata.interfaces';
 
-interface TokenMetadataCacheEntry {
-  readonly tokenMetadata: TokenMetadataDto;
+interface ITokenMetadataCacheEntry {
+  readonly tokenMetadata: ITokenMetadataDto;
   readonly expiresAtEpochMs: number;
 }
 
 @Injectable()
 export class EthereumTokenMetadataAdapter implements ITokenMetadataAdapter {
-  private readonly metadataCache: Map<string, TokenMetadataCacheEntry> = new Map<
+  private readonly metadataCache: Map<string, ITokenMetadataCacheEntry> = new Map<
     string,
-    TokenMetadataCacheEntry
+    ITokenMetadataCacheEntry
   >();
 
   public constructor(private readonly appConfigService: AppConfigService) {}
@@ -27,7 +27,7 @@ export class EthereumTokenMetadataAdapter implements ITokenMetadataAdapter {
   public getMetadata(
     contractAddress: string | null,
     nowEpochMs: number = Date.now(),
-  ): TokenMetadataDto {
+  ): ITokenMetadataDto {
     if (!contractAddress) {
       return {
         address: 'native_eth',
@@ -37,20 +37,21 @@ export class EthereumTokenMetadataAdapter implements ITokenMetadataAdapter {
     }
 
     const normalizedAddress: string = contractAddress.toLowerCase();
-    const cachedEntry: TokenMetadataCacheEntry | undefined =
+    const cachedEntry: ITokenMetadataCacheEntry | undefined =
       this.metadataCache.get(normalizedAddress);
 
     if (cachedEntry && cachedEntry.expiresAtEpochMs >= nowEpochMs) {
       return cachedEntry.tokenMetadata;
     }
 
-    const knownMetadata: TokenMetadataDto | undefined = KNOWN_TOKEN_METADATA.get(normalizedAddress);
-    const resolvedMetadata: TokenMetadataDto = knownMetadata ?? {
+    const knownMetadata: ITokenMetadataDto | undefined =
+      KNOWN_TOKEN_METADATA.get(normalizedAddress);
+    const resolvedMetadata: ITokenMetadataDto = knownMetadata ?? {
       ...FALLBACK_TOKEN_METADATA,
       address: normalizedAddress,
     };
 
-    const cacheEntry: TokenMetadataCacheEntry = {
+    const cacheEntry: ITokenMetadataCacheEntry = {
       tokenMetadata: resolvedMetadata,
       expiresAtEpochMs: nowEpochMs + this.appConfigService.tokenMetaCacheTtlSec * 1000,
     };

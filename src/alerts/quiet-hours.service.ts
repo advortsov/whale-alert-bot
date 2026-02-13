@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 
-import type { QuietHoursEvaluation } from '../features/alerts/quiet-hours.interfaces';
+import type { IQuietHoursEvaluation } from '../features/alerts/quiet-hours.interfaces';
+
+const MAX_HOUR = 23;
+const MAX_MINUTE = 59;
 
 @Injectable()
 export class QuietHoursService {
@@ -9,7 +12,7 @@ export class QuietHoursService {
     quietTo: string | null,
     timezone: string,
     now: Date = new Date(),
-  ): QuietHoursEvaluation {
+  ): IQuietHoursEvaluation {
     if (quietFrom === null || quietTo === null) {
       return {
         suppressed: false,
@@ -63,7 +66,7 @@ export class QuietHoursService {
       return null;
     }
 
-    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+    if (hour < 0 || hour > MAX_HOUR || minute < 0 || minute > MAX_MINUTE) {
       return null;
     }
 

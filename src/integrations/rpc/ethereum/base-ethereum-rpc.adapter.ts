@@ -7,14 +7,14 @@ import {
 } from 'ethers';
 
 import type {
-  BlockEnvelope,
-  ReceiptEnvelope,
+  IBlockEnvelope,
+  IReceiptEnvelope,
 } from '../../../core/ports/rpc/block-stream.interfaces';
 import type {
   BlockHandler,
   IRpcAdapter,
   ISubscriptionHandle,
-  ProviderHealth,
+  IProviderHealth,
 } from '../../../core/ports/rpc/rpc-adapter.interfaces';
 
 export abstract class BaseEthereumRpcAdapter implements IRpcAdapter {
@@ -57,7 +57,7 @@ export abstract class BaseEthereumRpcAdapter implements IRpcAdapter {
     return wsProvider.getBlockNumber();
   }
 
-  public async getBlockEnvelope(blockNumber: number): Promise<BlockEnvelope | null> {
+  public async getBlockEnvelope(blockNumber: number): Promise<IBlockEnvelope | null> {
     const wsProvider: WebSocketProvider = this.getOrCreateProvider();
     const block: Block | null = await wsProvider.getBlock(blockNumber, true);
 
@@ -88,7 +88,7 @@ export abstract class BaseEthereumRpcAdapter implements IRpcAdapter {
     };
   }
 
-  public async getReceiptEnvelope(txHash: string): Promise<ReceiptEnvelope | null> {
+  public async getReceiptEnvelope(txHash: string): Promise<IReceiptEnvelope | null> {
     const wsProvider: WebSocketProvider = this.getOrCreateProvider();
     const receipt: TransactionReceipt | null = await wsProvider.getTransactionReceipt(txHash);
 
@@ -116,7 +116,7 @@ export abstract class BaseEthereumRpcAdapter implements IRpcAdapter {
     };
   }
 
-  public async healthCheck(): Promise<ProviderHealth> {
+  public async healthCheck(): Promise<IProviderHealth> {
     if (!this.providerUrl) {
       return {
         provider: this.providerName,

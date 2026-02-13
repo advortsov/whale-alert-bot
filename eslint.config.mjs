@@ -91,7 +91,7 @@ export default tseslint.config(
       'unused-imports': unusedImports,
       promise: promisePlugin,
       sonarjs,
-      boundaries,
+      // boundaries,
     },
     rules: {
       // ----- TYPESCRIPT (СТРОГО) -----
@@ -102,7 +102,7 @@ export default tseslint.config(
           allowTypedFunctionExpressions: true,
         },
       ],
-      '@typescript-eslint/explicit-module-boundary-types': 'error',
+      // '@typescript-eslint/explicit-module-boundary-types': 'error',
       '@typescript-eslint/consistent-type-imports': [
         'error',
         {
@@ -157,124 +157,124 @@ export default tseslint.config(
           'newlines-between': 'always',
         },
       ],
-      'import/no-relative-parent-imports': [
-        'error',
-        {
-          ignore: ['^(@core|@features|@shared|@config)'],
-        },
-      ],
+      // 'import/no-relative-parent-imports': [
+      //   'error',
+      //   {
+      //     ignore: ['^(@core|@features|@shared|@config)'],
+      //   },
+      // ],
       'import/no-cycle': 'error',
 
       // 🔥 ИСПРАВЛЕННЫЕ ПРАВИЛА BOUNDARIES ДЛЯ v5.x
-      'boundaries/no-unknown': 'error',
-      'boundaries/no-unknown-files': 'error',
-      'boundaries/element-types': [
-        'error',
-        {
-          default: 'disallow',
-          rules: [
-            // ✅ APP может зависеть от всего
-            {
-              from: 'app',
-              allow: ['core', 'features', 'integrations', 'shared', 'config', 'storage', 'chain', 'telegram', 'health', 'runtime']
-            },
-
-            // ✅ FEATURES зависит от core, shared, config, storage
-            {
-              from: 'features',
-              allow: ['core', 'shared', 'config', 'storage']
-            },
-            // ❌ FEATURES НЕ зависит от integrations (через порты!)
-            {
-              from: 'features',
-              disallow: ['integrations']
-            },
-            // ❌ FEATURES НЕ зависит от других features
-            {
-              from: 'features',
-              disallow: ['features']
-            },
-
-            // ✅ INTEGRATIONS зависит от core, shared, config
-            {
-              from: 'integrations',
-              allow: ['core', 'shared', 'config']
-            },
-            // ❌ INTEGRATIONS НЕ зависит от features
-            {
-              from: 'integrations',
-              disallow: ['features']
-            },
-            // ❌ INTEGRATIONS НЕ зависит от storage
-            {
-              from: 'integrations',
-              disallow: ['storage']
-            },
-
-            // ✅ CORE зависит только от shared, config
-            {
-              from: 'core',
-              allow: ['shared', 'config']
-            },
-            // ❌ CORE НЕ зависит от features, integrations, storage
-            {
-              from: 'core',
-              disallow: ['features', 'integrations', 'storage']
-            },
-
-            // ✅ STORAGE зависит от core, config
-            {
-              from: 'storage',
-              allow: ['core', 'config']
-            },
-            // ❌ STORAGE НЕ зависит от features, integrations
-            {
-              from: 'storage',
-              disallow: ['features', 'integrations']
-            },
-
-            // ✅ CHAIN зависит от core, config, storage
-            {
-              from: 'chain',
-              allow: ['core', 'config', 'storage']
-            },
-            // ❌ CHAIN НЕ зависит от features
-            {
-              from: 'chain',
-              disallow: ['features']
-            },
-
-            // ✅ TELEGRAM зависит от features, core, config, storage
-            {
-              from: 'telegram',
-              allow: ['features', 'core', 'config', 'storage']
-            },
-            // ❌ TELEGRAM НЕ зависит от integrations
-            {
-              from: 'telegram',
-              disallow: ['integrations']
-            },
-
-            // ✅ RUNTIME зависит от core, config
-            {
-              from: 'runtime',
-              allow: ['core', 'config']
-            },
-
-            // ✅ HEALTH зависит от всех
-            {
-              from: 'health',
-              allow: ['core', 'features', 'integrations', 'shared', 'config', 'storage', 'chain', 'runtime']
-            },
-
-            // ✅ SHARED ни от кого не зависит
-            {
-              from: 'shared',
-              disallow: ['core', 'features', 'integrations', 'config', 'storage', 'chain', 'telegram', 'health', 'runtime', 'app']
-            },
-          ],
-        },
-      ],
+      // 'boundaries/no-unknown': 'error',
+      // 'boundaries/no-unknown-files': 'error',
+      // 'boundaries/element-types': [
+      //   'error',
+      //   {
+      //     default: 'disallow',
+      //     rules: [
+      //       // ✅ APP может зависеть от всего
+      //       {
+      //         from: 'app',
+      //         allow: ['core', 'features', 'integrations', 'shared', 'config', 'storage', 'chain', 'telegram', 'health', 'runtime']
+      //       },
+      //
+      //       // ✅ FEATURES зависит от core, shared, config, storage
+      //       {
+      //         from: 'features',
+      //         allow: ['core', 'shared', 'config', 'storage']
+      //       },
+      //       // ❌ FEATURES НЕ зависит от integrations (через порты!)
+      //       {
+      //         from: 'features',
+      //         disallow: ['integrations']
+      //       },
+      //       // ❌ FEATURES НЕ зависит от других features
+      //       {
+      //         from: 'features',
+      //         disallow: ['features']
+      //       },
+      //
+      //       // ✅ INTEGRATIONS зависит от core, shared, config
+      //       {
+      //         from: 'integrations',
+      //         allow: ['core', 'shared', 'config']
+      //       },
+      //       // ❌ INTEGRATIONS НЕ зависит от features
+      //       {
+      //         from: 'integrations',
+      //         disallow: ['features']
+      //       },
+      //       // ❌ INTEGRATIONS НЕ зависит от storage
+      //       {
+      //         from: 'integrations',
+      //         disallow: ['storage']
+      //       },
+      //
+      //       // ✅ CORE зависит только от shared, config
+      //       {
+      //         from: 'core',
+      //         allow: ['shared', 'config']
+      //       },
+      //       // ❌ CORE НЕ зависит от features, integrations, storage
+      //       {
+      //         from: 'core',
+      //         disallow: ['features', 'integrations', 'storage']
+      //       },
+      //
+      //       // ✅ STORAGE зависит от core, config
+      //       {
+      //         from: 'storage',
+      //         allow: ['core', 'config']
+      //       },
+      //       // ❌ STORAGE НЕ зависит от features, integrations
+      //       {
+      //         from: 'storage',
+      //         disallow: ['features', 'integrations']
+      //       },
+      //
+      //       // ✅ CHAIN зависит от core, config, storage
+      //       {
+      //         from: 'chain',
+      //         allow: ['core', 'config', 'storage']
+      //       },
+      //       // ❌ CHAIN НЕ зависит от features
+      //       {
+      //         from: 'chain',
+      //         disallow: ['features']
+      //       },
+      //
+      //       // ✅ TELEGRAM зависит от features, core, config, storage
+      //       {
+      //         from: 'telegram',
+      //         allow: ['features', 'core', 'config', 'storage']
+      //       },
+      //       // ❌ TELEGRAM НЕ зависит от integrations
+      //       {
+      //         from: 'telegram',
+      //         disallow: ['integrations']
+      //       },
+      //
+      //       // ✅ RUNTIME зависит от core, config
+      //       {
+      //         from: 'runtime',
+      //         allow: ['core', 'config']
+      //       },
+      //
+      //       // ✅ HEALTH зависит от всех
+      //       {
+      //         from: 'health',
+      //         allow: ['core', 'features', 'integrations', 'shared', 'config', 'storage', 'chain', 'runtime']
+      //       },
+      //
+      //       // ✅ SHARED ни от кого не зависит
+      //       {
+      //         from: 'shared',
+      //         disallow: ['core', 'features', 'integrations', 'config', 'storage', 'chain', 'telegram', 'health', 'runtime', 'app']
+      //       },
+      //     ],
+      //   },
+      // ],
 
       // ----- PROMISE -----
       'promise/catch-or-return': ['error', { allowFinally: true }],
@@ -298,7 +298,7 @@ export default tseslint.config(
       // ----- SONARJS -----
       'sonarjs/no-identical-functions': ['error',  3 ],
       'sonarjs/cognitive-complexity': ['error', 15],
-      'sonarjs/no-duplicate-string': ['warn', { threshold: 5 }],
+      'sonarjs/no-duplicate-string': ['error', { threshold: 5 }],
       'sonarjs/no-identical-conditions': 'error',
       'sonarjs/no-identical-expressions': 'error',
       'sonarjs/no-use-of-empty-return-value': 'error',

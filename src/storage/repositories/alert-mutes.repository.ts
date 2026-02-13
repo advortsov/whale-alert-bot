@@ -3,13 +3,13 @@ import { Injectable } from '@nestjs/common';
 import type { ChainKey } from '../../core/chains/chain-key.interfaces';
 import { DatabaseService } from '../database.service';
 import type { AlertMuteRow, NewAlertMuteRow } from '../database.types';
-import type { UpsertAlertMuteInput } from './alert-mutes.repository.interfaces';
+import type { IUpsertAlertMuteInput } from './alert-mutes.repository.interfaces';
 
 @Injectable()
 export class AlertMutesRepository {
   public constructor(private readonly databaseService: DatabaseService) {}
 
-  public async upsertMute(input: UpsertAlertMuteInput): Promise<AlertMuteRow> {
+  public async upsertMute(input: IUpsertAlertMuteInput): Promise<AlertMuteRow> {
     const insertRow: NewAlertMuteRow = {
       user_id: input.userId,
       chain_key: input.chainKey,

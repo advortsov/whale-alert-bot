@@ -28,7 +28,7 @@ import type { IHistoryExplorerAdapter } from '../core/ports/explorers/history-ex
 import { AlertCexFlowMode } from '../features/alerts/cex-flow.interfaces';
 import { normalizeDexKey } from '../features/alerts/dex-normalizer.util';
 import { AlertSmartFilterType } from '../features/alerts/smart-filter.interfaces';
-import type { HistoryItemDto, HistoryPageDto } from '../features/tracking/dto/history-item.dto';
+import type { IHistoryItemDto, IHistoryPageDto } from '../features/tracking/dto/history-item.dto';
 import { HistoryDirectionFilter, HistoryKind } from '../features/tracking/dto/history-request.dto';
 import type {
   AlertMuteRow,
@@ -47,12 +47,22 @@ import { UsersRepository } from '../storage/repositories/users.repository';
 import { WalletEventsRepository } from '../storage/repositories/wallet-events.repository';
 import type { WalletEventHistoryView } from '../storage/repositories/wallet-events.repository.interfaces';
 
+const DEFAULT_HISTORY_LIMIT = 5;
+const MAX_HISTORY_LIMIT = 20;
+const WALLET_CARD_RECENT_EVENTS_LIMIT = 3;
+const MINUTES_TO_MS = 60_000;
+const MAX_HISTORY_OFFSET = 10_000;
+const LOCAL_EVENTS_BUFFER = 50;
+const LOCAL_EVENTS_MAX_FETCH = 200;
+const MAX_HOUR = 23;
+const MAX_MINUTE = 59;
+const ASSET_VALUE_PRECISION = 6;
+const SHORT_HASH_PREFIX_LENGTH = 10;
+const SHORT_HASH_SUFFIX_OFFSET = -8;
+
 @Injectable()
 export class TrackingService {
   private readonly logger: Logger = new Logger(TrackingService.name);
-  private static readonly DEFAULT_HISTORY_LIMIT: number = 5;
-  private static readonly MAX_HISTORY_LIMIT: number = 20;
-  private static readonly WALLET_CARD_RECENT_EVENTS_LIMIT: number = 3;
   private static readonly SUPPORTED_TRACK_CHAINS: readonly ChainKey[] = [
     ChainKey.ETHEREUM_MAINNET,
     ChainKey.SOLANA_MAINNET,
@@ -123,7 +133,7 @@ export class TrackingService {
       );
       return [
         `Адрес уже отслеживается: #${wallet.id} [${chainKey}] ${normalizedAddress}.`,
-        `История: /history #${wallet.id} ${TrackingService.DEFAULT_HISTORY_LIMIT}`,
+        `История: /history #${wallet.id} ${DEFAULT_HISTORY_LIMIT}`,
       ].join('\n');
     }
 
@@ -133,14 +143,14 @@ export class TrackingService {
     if (label) {
       return [
         `Добавил адрес #${wallet.id} [${chainKey}] ${normalizedAddress} (${label}).`,
-        `История: /history #${wallet.id} ${TrackingService.DEFAULT_HISTORY_LIMIT}`,
+        `История: /history #${wallet.id} ${DEFAULT_HISTORY_LIMIT}`,
         `Удалить: /untrack #${wallet.id}`,
       ].join('\n');
     }
 
     return [
       `Добавил адрес #${wallet.id} [${chainKey}] ${normalizedAddress}.`,
-      `История: /history #${wallet.id} ${TrackingService.DEFAULT_HISTORY_LIMIT}`,
+      `История: /history #${wallet.id} ${DEFAULT_HISTORY_LIMIT}`,
       `Удалить: /untrack #${wallet.id}`,
     ].join('\n');
   }
@@ -170,7 +180,7 @@ export class TrackingService {
       return [
         `${index + 1}. #${walletIdText}${labelPart}`,
         `   ${subscription.walletAddress}`,
-        `   История: /history #${walletIdText} ${TrackingService.DEFAULT_HISTORY_LIMIT}`,
+        `   История: /history #${walletIdText} ${DEFAULT_HISTORY_LIMIT}`,
         `   Удалить: /untrack #${walletIdText}`,
       ].join('\n');
     });
@@ -235,7 +245,7 @@ export class TrackingService {
         this.walletEventsRepository.listRecentByTrackedAddress(
           matchedSubscription.chainKey,
           matchedSubscription.walletAddress,
-          TrackingService.WALLET_CARD_RECENT_EVENTS_LIMIT,
+          WALLET_CARD_RECENT_EVENTS_LIMIT,
           0,
         ),
       ]);
@@ -264,7 +274,7 @@ export class TrackingService {
       `🌙 Quiet: ${quietText} (${settingsSnapshot.timezone})`,
       `🚫 Ignore 24h до: ${muteStatusText}`,
       '',
-      `🧾 Последние события (${recentEvents.length}/${TrackingService.WALLET_CARD_RECENT_EVENTS_LIMIT}):`,
+      `🧾 Последние события (${recentEvents.length}/${WALLET_CARD_RECENT_EVENTS_LIMIT}):`,
       ...recentEventRows,
       '',
       '👇 Действия доступны кнопками ниже.',
@@ -528,7 +538,7 @@ export class TrackingService {
       throw new Error('mute для кошелька должен быть от 1 до 10080 минут.');
     }
 
-    const muteUntil: Date = new Date(Date.now() + muteMinutes * 60_000);
+    const muteUntil: Date = new Date(Date.now() + muteMinutes * MINUTES_TO_MS);
     const upsertedMute: AlertMuteRow = await this.alertMutesRepository.upsertMute({
       userId: user.id,
       chainKey: walletSubscription.chainKey,
@@ -843,15 +853,17 @@ export class TrackingService {
       this.logger.debug(
         `history_local_miss telegramId=${userRef.telegramId} source=${source} address=${normalizedAddress} limit=${String(limit)}`,
       );
-      const historyPage: HistoryPageDto = await this.historyExplorerAdapter.loadRecentTransactions({
-        chainKey: historyTarget.chainKey,
-        address: normalizedAddress,
-        limit,
-        offset: 0,
-        kind: historyKind,
-        direction: historyDirection,
-        minAmountUsd: null,
-      });
+      const historyPage: IHistoryPageDto = await this.historyExplorerAdapter.loadRecentTransactions(
+        {
+          chainKey: historyTarget.chainKey,
+          address: normalizedAddress,
+          limit,
+          offset: 0,
+          kind: historyKind,
+          direction: historyDirection,
+          minAmountUsd: null,
+        },
+      );
       const historyMessage: string = this.formatHistoryMessage(
         normalizedAddress,
         historyPage.items,
@@ -1072,22 +1084,22 @@ export class TrackingService {
 
   private parseHistoryLimit(rawLimit: string | null): number {
     if (!rawLimit) {
-      return TrackingService.DEFAULT_HISTORY_LIMIT;
+      return DEFAULT_HISTORY_LIMIT;
     }
 
     const normalizedValue: string = rawLimit.trim();
 
     if (!/^\d+$/.test(normalizedValue)) {
       throw new Error(
-        `Неверный limit "${rawLimit}". Используй число от 1 до ${TrackingService.MAX_HISTORY_LIMIT}.`,
+        `Неверный limit "${rawLimit}". Используй число от 1 до ${MAX_HISTORY_LIMIT}.`,
       );
     }
 
     const limit: number = Number.parseInt(normalizedValue, 10);
 
-    if (limit < 1 || limit > TrackingService.MAX_HISTORY_LIMIT) {
+    if (limit < 1 || limit > MAX_HISTORY_LIMIT) {
       throw new Error(
-        `Неверный limit "${rawLimit}". Используй число от 1 до ${TrackingService.MAX_HISTORY_LIMIT}.`,
+        `Неверный limit "${rawLimit}". Используй число от 1 до ${MAX_HISTORY_LIMIT}.`,
       );
     }
 
@@ -1107,7 +1119,7 @@ export class TrackingService {
 
     const offset: number = Number.parseInt(normalizedValue, 10);
 
-    if (offset < 0 || offset > 10_000) {
+    if (offset < 0 || offset > MAX_HISTORY_OFFSET) {
       throw new Error(`Неверный offset "${rawOffset}". Используй значение от 0 до 10000.`);
     }
 
@@ -1166,7 +1178,10 @@ export class TrackingService {
     historyKind: HistoryKind,
     historyDirection: HistoryDirectionFilter,
   ): Promise<readonly WalletEventHistoryView[]> {
-    const rawFetchLimit: number = Math.min(Math.max(offset + limit + 50, limit), 200);
+    const rawFetchLimit: number = Math.min(
+      Math.max(offset + limit + LOCAL_EVENTS_BUFFER, limit),
+      LOCAL_EVENTS_MAX_FETCH,
+    );
     const rawEvents: readonly WalletEventHistoryView[] =
       await this.walletEventsRepository.listRecentByTrackedAddress(
         chainKey,
@@ -1495,7 +1510,7 @@ export class TrackingService {
       return false;
     }
 
-    return hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59;
+    return hour >= 0 && hour <= MAX_HOUR && minute >= 0 && minute <= MAX_MINUTE;
   }
 
   private parseMuteUntil(rawMinutes: string): Date | null {
@@ -1520,12 +1535,12 @@ export class TrackingService {
     }
 
     const now: Date = new Date();
-    return new Date(now.getTime() + minutes * 60_000);
+    return new Date(now.getTime() + minutes * MINUTES_TO_MS);
   }
 
   private formatHistoryMessage(
     normalizedAddress: string,
-    transactions: readonly HistoryItemDto[],
+    transactions: readonly IHistoryItemDto[],
   ): string {
     if (transactions.length === 0) {
       return `История для ${normalizedAddress} пуста.`;
@@ -1640,7 +1655,7 @@ export class TrackingService {
   private formatAssetValue(valueRaw: string, decimals: number): string {
     try {
       const formatted: string = formatUnits(BigInt(valueRaw), decimals);
-      return Number.parseFloat(formatted).toFixed(6);
+      return Number.parseFloat(formatted).toFixed(ASSET_VALUE_PRECISION);
     } catch {
       return '0.000000';
     }
@@ -1717,8 +1732,8 @@ export class TrackingService {
   }
 
   private shortHash(txHash: string): string {
-    const prefix: string = txHash.slice(0, 10);
-    const suffix: string = txHash.slice(-8);
+    const prefix: string = txHash.slice(0, SHORT_HASH_PREFIX_LENGTH);
+    const suffix: string = txHash.slice(SHORT_HASH_SUFFIX_OFFSET);
     return `${prefix}...${suffix}`;
   }
 

@@ -1,11 +1,11 @@
 export {
   EtherscanHistoryAction,
-  type EtherscanHistoryResponse,
-  type EtherscanNormalTransaction,
-  type EtherscanTokenTransaction,
+  type IEtherscanHistoryResponse,
+  type IEtherscanNormalTransaction,
+  type IEtherscanTokenTransaction,
 } from '../integrations/explorers/etherscan/etherscan-history.interfaces';
 
-export interface HistoryTransactionItem {
+export interface IHistoryTransactionItem {
   readonly hash: string;
   readonly timestampSec: number;
   readonly from: string;

@@ -1,45 +1,50 @@
 import { Injectable, Logger } from '@nestjs/common';
 
-import type { SolanaSignatureInfo, SolanaTransactionValue } from './solana-rpc-history.interfaces';
+import type {
+  ISolanaSignatureInfo,
+  ISolanaTransactionValue,
+} from './solana-rpc-history.interfaces';
 import { AppConfigService } from '../../../config/app-config.service';
 import { ChainKey } from '../../../core/chains/chain-key.interfaces';
 import type { IHistoryExplorerAdapter } from '../../../core/ports/explorers/history-explorer.interfaces';
 import {
   HistoryDirection,
   HistoryItemType,
-  type HistoryItemDto,
-  type HistoryPageDto,
+  type IHistoryItemDto,
+  type IHistoryPageDto,
 } from '../../../features/tracking/dto/history-item.dto';
 import {
   HistoryDirectionFilter,
   HistoryKind,
-  type HistoryRequestDto,
+  type IHistoryRequestDto,
 } from '../../../features/tracking/dto/history-request.dto';
+
+const SPL_TOKEN_PROGRAM_SUBSTRING = 'tokenkeg';
+const SOLSCAN_TX_BASE_URL = 'https://solscan.io/tx/';
+const SOLANA_HISTORY_REQUEST_TIMEOUT_MS = 10_000;
+const SPL_TOKEN_DECIMALS = 6;
+const SOL_NATIVE_DECIMALS = 9;
 
 @Injectable()
 export class SolanaRpcHistoryAdapter implements IHistoryExplorerAdapter {
-  private static readonly SPL_TOKEN_PROGRAM_SUBSTRING: string = 'tokenkeg';
-  private static readonly SOLSCAN_TX_BASE_URL: string = 'https://solscan.io/tx/';
-  private static readonly REQUEST_TIMEOUT_MS: number = 10_000;
-
   private readonly logger: Logger = new Logger(SolanaRpcHistoryAdapter.name);
 
   public constructor(private readonly appConfigService: AppConfigService) {}
 
-  public async loadRecentTransactions(request: HistoryRequestDto): Promise<HistoryPageDto> {
+  public async loadRecentTransactions(request: IHistoryRequestDto): Promise<IHistoryPageDto> {
     if (request.chainKey !== ChainKey.SOLANA_MAINNET) {
       throw new Error(`Solana history adapter does not support chain ${request.chainKey}.`);
     }
 
     const endpointUrls: readonly string[] = this.resolveSolanaRpcEndpoints();
     const signaturesLimit: number = Math.max(request.offset + request.limit, request.limit);
-    const signatures: readonly SolanaSignatureInfo[] = await this.callWithFallback(
+    const signatures: readonly ISolanaSignatureInfo[] = await this.callWithFallback(
       endpointUrls,
-      async (endpointUrl: string): Promise<readonly SolanaSignatureInfo[]> =>
+      async (endpointUrl: string): Promise<readonly ISolanaSignatureInfo[]> =>
         this.getSignatures(endpointUrl, request.address, signaturesLimit),
     );
 
-    const pageSignatures: readonly SolanaSignatureInfo[] = signatures.slice(
+    const pageSignatures: readonly ISolanaSignatureInfo[] = signatures.slice(
       request.offset,
       request.offset + request.limit,
     );
@@ -51,12 +56,12 @@ export class SolanaRpcHistoryAdapter implements IHistoryExplorerAdapter {
       };
     }
 
-    const items: HistoryItemDto[] = [];
+    const items: IHistoryItemDto[] = [];
 
     for (const signatureInfo of pageSignatures) {
-      const item: HistoryItemDto | null = await this.callWithFallback(
+      const item: IHistoryItemDto | null = await this.callWithFallback(
         endpointUrls,
-        async (endpointUrl: string): Promise<HistoryItemDto | null> =>
+        async (endpointUrl: string): Promise<IHistoryItemDto | null> =>
           this.mapSignatureToHistoryItem(endpointUrl, request.address, signatureInfo),
       );
 
@@ -111,7 +116,7 @@ export class SolanaRpcHistoryAdapter implements IHistoryExplorerAdapter {
     endpointUrl: string,
     address: string,
     limit: number,
-  ): Promise<readonly SolanaSignatureInfo[]> {
+  ): Promise<readonly ISolanaSignatureInfo[]> {
     const payload: unknown = await this.callRpc(endpointUrl, 'getSignaturesForAddress', [
       address,
       {
@@ -123,10 +128,10 @@ export class SolanaRpcHistoryAdapter implements IHistoryExplorerAdapter {
       throw new Error('Solana getSignaturesForAddress returned invalid payload.');
     }
 
-    return payload.map((value: unknown): SolanaSignatureInfo => this.parseSignatureInfo(value));
+    return payload.map((value: unknown): ISolanaSignatureInfo => this.parseSignatureInfo(value));
   }
 
-  private parseSignatureInfo(value: unknown): SolanaSignatureInfo {
+  private parseSignatureInfo(value: unknown): ISolanaSignatureInfo {
     if (!value || typeof value !== 'object') {
       throw new Error('Solana signature info item is invalid.');
     }
@@ -153,8 +158,8 @@ export class SolanaRpcHistoryAdapter implements IHistoryExplorerAdapter {
   private async mapSignatureToHistoryItem(
     endpointUrl: string,
     address: string,
-    signatureInfo: SolanaSignatureInfo,
-  ): Promise<HistoryItemDto | null> {
+    signatureInfo: ISolanaSignatureInfo,
+  ): Promise<IHistoryItemDto | null> {
     const payload: unknown = await this.callRpc(endpointUrl, 'getTransaction', [
       signatureInfo.signature,
       {
@@ -172,7 +177,7 @@ export class SolanaRpcHistoryAdapter implements IHistoryExplorerAdapter {
       throw new Error('Solana getTransaction returned invalid payload.');
     }
 
-    const value: SolanaTransactionValue = payload as SolanaTransactionValue;
+    const value: ISolanaTransactionValue = payload as ISolanaTransactionValue;
     const accountKeys: readonly string[] = this.extractAccountKeys(value);
     const [fromAddress, toAddress] = this.resolveFromTo(accountKeys);
     const normalizedAddress: string = address.trim();
@@ -200,22 +205,22 @@ export class SolanaRpcHistoryAdapter implements IHistoryExplorerAdapter {
       valueRaw: Math.abs(deltaLamports).toString(),
       isError: hasError || signatureError,
       assetSymbol: isSplTransfer ? 'SPL' : 'SOL',
-      assetDecimals: isSplTransfer ? 6 : 9,
+      assetDecimals: isSplTransfer ? SPL_TOKEN_DECIMALS : SOL_NATIVE_DECIMALS,
       eventType: HistoryItemType.TRANSFER,
       direction,
-      txLink: `${SolanaRpcHistoryAdapter.SOLSCAN_TX_BASE_URL}${signatureInfo.signature}`,
+      txLink: `${SOLSCAN_TX_BASE_URL}${signatureInfo.signature}`,
     };
   }
 
-  private detectSplTransfer(value: SolanaTransactionValue): boolean {
+  private detectSplTransfer(value: ISolanaTransactionValue): boolean {
     const logMessages: readonly string[] = value.meta?.logMessages ?? [];
 
     return logMessages.some((message: string): boolean =>
-      message.toLowerCase().includes(SolanaRpcHistoryAdapter.SPL_TOKEN_PROGRAM_SUBSTRING),
+      message.toLowerCase().includes(SPL_TOKEN_PROGRAM_SUBSTRING),
     );
   }
 
-  private extractAccountKeys(value: SolanaTransactionValue): readonly string[] {
+  private extractAccountKeys(value: ISolanaTransactionValue): readonly string[] {
     const rawAccountKeys: readonly (string | { readonly pubkey?: string })[] =
       value.transaction?.message?.accountKeys ?? [];
 
@@ -242,8 +247,8 @@ export class SolanaRpcHistoryAdapter implements IHistoryExplorerAdapter {
   }
 
   private resolveTimestampSec(
-    value: SolanaTransactionValue,
-    signatureInfo: SolanaSignatureInfo,
+    value: ISolanaTransactionValue,
+    signatureInfo: ISolanaSignatureInfo,
   ): number {
     if (typeof value.blockTime === 'number') {
       return value.blockTime;
@@ -256,7 +261,7 @@ export class SolanaRpcHistoryAdapter implements IHistoryExplorerAdapter {
     return Math.floor(Date.now() / 1000);
   }
 
-  private matchKindFilter(item: HistoryItemDto, kind: HistoryKind): boolean {
+  private matchKindFilter(item: IHistoryItemDto, kind: HistoryKind): boolean {
     if (kind === HistoryKind.ALL) {
       return true;
     }
@@ -268,7 +273,7 @@ export class SolanaRpcHistoryAdapter implements IHistoryExplorerAdapter {
     return item.assetSymbol === 'SPL';
   }
 
-  private matchDirectionFilter(item: HistoryItemDto, direction: HistoryDirectionFilter): boolean {
+  private matchDirectionFilter(item: IHistoryItemDto, direction: HistoryDirectionFilter): boolean {
     if (direction === HistoryDirectionFilter.ALL) {
       return true;
     }
@@ -321,7 +326,7 @@ export class SolanaRpcHistoryAdapter implements IHistoryExplorerAdapter {
         method,
         params,
       }),
-      signal: AbortSignal.timeout(SolanaRpcHistoryAdapter.REQUEST_TIMEOUT_MS),
+      signal: AbortSignal.timeout(SOLANA_HISTORY_REQUEST_TIMEOUT_MS),
     });
 
     if (!response.ok) {

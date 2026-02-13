@@ -5,12 +5,15 @@ import type { ProviderFactory } from './provider.factory';
 import { RpcThrottlerService } from './rpc-throttler.service';
 import type { AppConfigService } from '../../config/app-config.service';
 import { ChainKey } from '../../core/chains/chain-key.interfaces';
-import type { BlockEnvelope, ReceiptEnvelope } from '../../core/ports/rpc/block-stream.interfaces';
+import type {
+  IBlockEnvelope,
+  IReceiptEnvelope,
+} from '../../core/ports/rpc/block-stream.interfaces';
 import type {
   IFallbackRpcAdapter,
   IPrimaryRpcAdapter,
   ISubscriptionHandle,
-  ProviderHealth,
+  IProviderHealth,
 } from '../../core/ports/rpc/rpc-adapter.interfaces';
 
 class RpcConfigStub {
@@ -40,7 +43,7 @@ class PrimaryProviderStub implements IPrimaryRpcAdapter {
     };
   }
 
-  public async getBlockEnvelope(): Promise<BlockEnvelope | null> {
+  public async getBlockEnvelope(): Promise<IBlockEnvelope | null> {
     return null;
   }
 
@@ -48,11 +51,11 @@ class PrimaryProviderStub implements IPrimaryRpcAdapter {
     return 1;
   }
 
-  public async getReceiptEnvelope(): Promise<ReceiptEnvelope | null> {
+  public async getReceiptEnvelope(): Promise<IReceiptEnvelope | null> {
     return null;
   }
 
-  public async healthCheck(): Promise<ProviderHealth> {
+  public async healthCheck(): Promise<IProviderHealth> {
     return { provider: 'primary', ok: true, details: 'ok' };
   }
 
@@ -74,7 +77,7 @@ class FallbackProviderStub implements IFallbackRpcAdapter {
     };
   }
 
-  public async getBlockEnvelope(): Promise<BlockEnvelope | null> {
+  public async getBlockEnvelope(): Promise<IBlockEnvelope | null> {
     return null;
   }
 
@@ -82,11 +85,11 @@ class FallbackProviderStub implements IFallbackRpcAdapter {
     return 1;
   }
 
-  public async getReceiptEnvelope(): Promise<ReceiptEnvelope | null> {
+  public async getReceiptEnvelope(): Promise<IReceiptEnvelope | null> {
     return null;
   }
 
-  public async healthCheck(): Promise<ProviderHealth> {
+  public async healthCheck(): Promise<IProviderHealth> {
     return { provider: 'fallback', ok: true, details: 'ok' };
   }
 

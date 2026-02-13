@@ -4,19 +4,19 @@ import { AlertEnrichmentService } from './alert-enrichment.service';
 import { AlertFilterPolicyService } from './alert-filter-policy.service';
 import { AlertMessageFormatter } from './alert-message.formatter';
 import { AlertSuppressionService } from './alert-suppression.service';
-import { type AlertMessageContext } from './alert.interfaces';
+import { type IAlertMessageContext } from './alert.interfaces';
 import { CexAddressBookService } from './cex-address-book.service';
 import { QuietHoursService } from './quiet-hours.service';
-import { ClassifiedEventType, type ClassifiedEvent } from '../chain/chain.types';
+import { ChainId, ClassifiedEventType, type ClassifiedEvent } from '../chain/chain.types';
 import { AppConfigService } from '../config/app-config.service';
 import { ChainKey } from '../core/chains/chain-key.interfaces';
 import { TOKEN_PRICING_PORT } from '../core/ports/token-pricing/token-pricing-port.tokens';
 import type { ITokenPricingPort } from '../core/ports/token-pricing/token-pricing.interfaces';
-import type { AlertFilterPolicy } from '../features/alerts/alert-filter.interfaces';
-import { AlertCexFlowMode, type AlertCexFlowPolicy } from '../features/alerts/cex-flow.interfaces';
+import type { IAlertFilterPolicy } from '../features/alerts/alert-filter.interfaces';
+import { AlertCexFlowMode, type IAlertCexFlowPolicy } from '../features/alerts/cex-flow.interfaces';
 import {
   AlertSmartFilterType,
-  type AlertSemanticFilterPolicy,
+  type IAlertSemanticFilterPolicy,
 } from '../features/alerts/smart-filter.interfaces';
 import { AlertMutesRepository } from '../storage/repositories/alert-mutes.repository';
 import { SubscriptionsRepository } from '../storage/repositories/subscriptions.repository';
@@ -27,15 +27,15 @@ import { UserWalletAlertPreferencesRepository } from '../storage/repositories/us
 import type { TelegramSendTextOptions } from '../telegram/telegram-sender.service';
 import { TelegramSenderService } from '../telegram/telegram-sender.service';
 
-interface EventUsdContext {
+interface IEventUsdContext {
   readonly usdAmount: number | null;
   readonly usdUnavailable: boolean;
 }
 
-interface DispatchDecision {
+interface IDispatchDecision {
   readonly skip: boolean;
   readonly reason: string | null;
-  readonly messageContext: AlertMessageContext;
+  readonly messageContext: IAlertMessageContext;
 }
 
 @Injectable()
@@ -88,7 +88,7 @@ export class AlertDispatcherService {
     }
 
     const enrichedEvent: ClassifiedEvent = this.alertEnrichmentService.enrich(event);
-    const eventUsdContext: EventUsdContext = await this.resolveUsdContext(enrichedEvent, chainKey);
+    const eventUsdContext: IEventUsdContext = await this.resolveUsdContext(enrichedEvent, chainKey);
 
     this.logger.log(
       `dispatch sending eventType=${event.eventType} recipients=${subscribers.length} txHash=${event.txHash}`,
@@ -97,7 +97,7 @@ export class AlertDispatcherService {
     let successfulDeliveries: number = 0;
 
     for (const subscriber of subscribers) {
-      const decision: DispatchDecision = await this.evaluateRecipient(
+      const decision: IDispatchDecision = await this.evaluateRecipient(
         subscriber,
         enrichedEvent,
         chainKey,
@@ -141,8 +141,8 @@ export class AlertDispatcherService {
     subscriber: SubscriberWalletRecipient,
     event: ClassifiedEvent,
     chainKey: ChainKey,
-    eventUsdContext: EventUsdContext,
-  ): Promise<DispatchDecision> {
+    eventUsdContext: IEventUsdContext,
+  ): Promise<IDispatchDecision> {
     const recipientChainKey: ChainKey = subscriber.chainKey;
     const [preferences, settings, walletPreferences, activeMute] = await Promise.all([
       this.userAlertPreferencesRepository.findOrCreateByUserId(subscriber.userId),
@@ -253,7 +253,7 @@ export class AlertDispatcherService {
 
     const parsedThreshold: number = Number.parseFloat(String(settings.threshold_usd));
     const parsedMinAmount: number = Number.parseFloat(String(settings.min_amount_usd));
-    const policy: AlertFilterPolicy = {
+    const policy: IAlertFilterPolicy = {
       thresholdUsd: Number.isNaN(parsedThreshold) ? 0 : parsedThreshold,
       minAmountUsd: Number.isNaN(parsedMinAmount) ? 0 : parsedMinAmount,
     };
@@ -276,7 +276,7 @@ export class AlertDispatcherService {
 
     const usdWarningEnabled: boolean =
       thresholdDecision.usdUnavailable && (policy.thresholdUsd > 0 || policy.minAmountUsd > 0);
-    const semanticPolicy: AlertSemanticFilterPolicy = this.mapSemanticPolicy(settings);
+    const semanticPolicy: IAlertSemanticFilterPolicy = this.mapSemanticPolicy(settings);
     const semanticDecision = this.alertFilterPolicyService.evaluateSemanticFilters(semanticPolicy, {
       eventType: event.eventType,
       direction: event.direction,
@@ -294,7 +294,7 @@ export class AlertDispatcherService {
       };
     }
 
-    const cexPolicy: AlertCexFlowPolicy = this.mapCexFlowPolicy(settings);
+    const cexPolicy: IAlertCexFlowPolicy = this.mapCexFlowPolicy(settings);
     const counterpartyTag: string | null = this.cexAddressBookService.resolveTag(
       recipientChainKey,
       event.counterpartyAddress,
@@ -330,7 +330,7 @@ export class AlertDispatcherService {
     readonly smart_filter_type?: string | null;
     readonly include_dexes?: readonly string[] | null;
     readonly exclude_dexes?: readonly string[] | null;
-  }): AlertSemanticFilterPolicy {
+  }): IAlertSemanticFilterPolicy {
     const smartFilterType: AlertSmartFilterType = this.parseSmartFilterType(
       settings.smart_filter_type,
     );
@@ -344,7 +344,7 @@ export class AlertDispatcherService {
 
   private mapCexFlowPolicy(settings: {
     readonly cex_flow_mode?: string | null;
-  }): AlertCexFlowPolicy {
+  }): IAlertCexFlowPolicy {
     return {
       mode: this.parseCexFlowMode(settings.cex_flow_mode),
     };
@@ -419,7 +419,7 @@ export class AlertDispatcherService {
   private async resolveUsdContext(
     event: ClassifiedEvent,
     chainKey: ChainKey,
-  ): Promise<EventUsdContext> {
+  ): Promise<IEventUsdContext> {
     const value: number | null = event.valueFormatted
       ? Number.parseFloat(event.valueFormatted)
       : null;
@@ -559,19 +559,15 @@ export class AlertDispatcherService {
     return '🔍 Etherscan';
   }
 
-  private resolveChainKey(chainId: number): ChainKey {
-    if (chainId === 1) {
+  private resolveChainKey(chainId: ChainId): ChainKey {
+    if (chainId === ChainId.ETHEREUM_MAINNET) {
       return ChainKey.ETHEREUM_MAINNET;
     }
 
-    if (chainId === 101) {
+    if (chainId === ChainId.SOLANA_MAINNET) {
       return ChainKey.SOLANA_MAINNET;
     }
 
-    if (chainId === 111) {
-      return ChainKey.TRON_MAINNET;
-    }
-
-    return ChainKey.ETHEREUM_MAINNET;
+    return ChainKey.TRON_MAINNET;
   }
 }

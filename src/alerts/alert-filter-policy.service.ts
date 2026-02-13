@@ -2,30 +2,30 @@ import { Injectable } from '@nestjs/common';
 
 import { ClassifiedEventType, EventDirection } from '../chain/chain.types';
 import type {
-  AlertFilterPolicy,
-  ThresholdDecision,
+  IAlertFilterPolicy,
+  IThresholdDecision,
 } from '../features/alerts/alert-filter.interfaces';
 import type {
-  AlertCexFlowContext,
-  AlertCexFlowDecision,
-  AlertCexFlowPolicy,
+  IAlertCexFlowContext,
+  IAlertCexFlowDecision,
+  IAlertCexFlowPolicy,
 } from '../features/alerts/cex-flow.interfaces';
 import { AlertCexFlowMode } from '../features/alerts/cex-flow.interfaces';
 import { normalizeDexKey } from '../features/alerts/dex-normalizer.util';
 import type {
-  AlertSemanticEventContext,
-  AlertSemanticFilterPolicy,
-  SemanticFilterDecision,
+  IAlertSemanticEventContext,
+  IAlertSemanticFilterPolicy,
+  ISemanticFilterDecision,
 } from '../features/alerts/smart-filter.interfaces';
 import { AlertSmartFilterType } from '../features/alerts/smart-filter.interfaces';
 
 @Injectable()
 export class AlertFilterPolicyService {
   public evaluateUsdThreshold(
-    policy: AlertFilterPolicy,
+    policy: IAlertFilterPolicy,
     usdAmount: number | null,
     usdUnavailable: boolean,
-  ): ThresholdDecision {
+  ): IThresholdDecision {
     const thresholdUsd: number = policy.thresholdUsd > 0 ? policy.thresholdUsd : 0;
     const legacyMinAmountUsd: number = policy.minAmountUsd > 0 ? policy.minAmountUsd : 0;
     const effectiveThresholdUsd: number = Math.max(thresholdUsd, legacyMinAmountUsd);
@@ -66,9 +66,9 @@ export class AlertFilterPolicyService {
   }
 
   public evaluateSemanticFilters(
-    policy: AlertSemanticFilterPolicy,
-    eventContext: AlertSemanticEventContext,
-  ): SemanticFilterDecision {
+    policy: IAlertSemanticFilterPolicy,
+    eventContext: IAlertSemanticEventContext,
+  ): ISemanticFilterDecision {
     const normalizedDex: string | null = normalizeDexKey(eventContext.dex);
     const normalizedType: AlertSmartFilterType = policy.type;
 
@@ -138,9 +138,9 @@ export class AlertFilterPolicyService {
   }
 
   public evaluateCexFlow(
-    policy: AlertCexFlowPolicy,
-    context: AlertCexFlowContext,
-  ): AlertCexFlowDecision {
+    policy: IAlertCexFlowPolicy,
+    context: IAlertCexFlowContext,
+  ): IAlertCexFlowDecision {
     if (policy.mode === AlertCexFlowMode.OFF) {
       return {
         allowed: true,

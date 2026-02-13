@@ -5,13 +5,13 @@ export enum AlertActionType {
   IGNORE_24H = 'ignore_24h',
 }
 
-export interface AlertActionPayload {
+export interface IAlertActionPayload {
   readonly action: AlertActionType;
   readonly walletId: number;
   readonly chainKey: string;
 }
 
-export interface IgnoreMuteRequestDto {
+export interface IIgnoreMuteRequestDto {
   readonly userId: number;
   readonly walletId: number;
   readonly chainKey: string;

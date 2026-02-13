@@ -1,16 +1,18 @@
 import { Logger } from '@nestjs/common';
 
+const RADIX_HEX = 16;
+
 import type {
-  BlockEnvelope,
-  ReceiptEnvelope,
-  ReceiptLogEnvelope,
-  TransactionEnvelope,
+  IBlockEnvelope,
+  IReceiptEnvelope,
+  IReceiptLogEnvelope,
+  ITransactionEnvelope,
 } from '../../../core/ports/rpc/block-stream.interfaces';
 import type {
   BlockHandler,
   IRpcAdapter,
   ISubscriptionHandle,
-  ProviderHealth,
+  IProviderHealth,
 } from '../../../core/ports/rpc/rpc-adapter.interfaces';
 import type { TronAddressCodec } from '../../address/tron/tron-address.codec';
 
@@ -175,7 +177,7 @@ export abstract class BaseTronRpcAdapter implements IRpcAdapter {
     return blockNumber;
   }
 
-  public async getBlockEnvelope(blockNumber: number): Promise<BlockEnvelope | null> {
+  public async getBlockEnvelope(blockNumber: number): Promise<IBlockEnvelope | null> {
     const payload: TronGetBlockByNumResponse = await this.callEndpoint<TronGetBlockByNumResponse>(
       '/wallet/getblockbynum',
       {
@@ -192,8 +194,8 @@ export abstract class BaseTronRpcAdapter implements IRpcAdapter {
     const timestampMs: number | null = this.resolveTimestampMs(payload.block_header);
     const timestampSec: number | null =
       typeof timestampMs === 'number' ? Math.floor(timestampMs / 1000) : null;
-    const transactions: readonly TransactionEnvelope[] = (payload.transactions ?? []).map(
-      (transaction: TronTransaction, index: number): TransactionEnvelope => {
+    const transactions: readonly ITransactionEnvelope[] = (payload.transactions ?? []).map(
+      (transaction: TronTransaction, index: number): ITransactionEnvelope => {
         const txHash: string =
           typeof transaction.txID === 'string' && transaction.txID.length > 0
             ? transaction.txID
@@ -222,7 +224,7 @@ export abstract class BaseTronRpcAdapter implements IRpcAdapter {
     };
   }
 
-  public async getReceiptEnvelope(txHash: string): Promise<ReceiptEnvelope | null> {
+  public async getReceiptEnvelope(txHash: string): Promise<IReceiptEnvelope | null> {
     const payload: TronGetTransactionInfoResponse =
       await this.callEndpoint<TronGetTransactionInfoResponse>('/wallet/gettransactioninfobyid', {
         value: txHash,
@@ -238,19 +240,19 @@ export abstract class BaseTronRpcAdapter implements IRpcAdapter {
       return null;
     }
 
-    const baseLogs: ReceiptLogEnvelope[] = (payload.log ?? []).map(
-      (log: TronTransactionInfoLog, index: number): ReceiptLogEnvelope => ({
+    const baseLogs: IReceiptLogEnvelope[] = (payload.log ?? []).map(
+      (log: TronTransactionInfoLog, index: number): IReceiptLogEnvelope => ({
         address: this.resolveLogAddress(log.address),
         topics: this.resolveTopics(log.topics),
         data: this.resolveData(log.data),
         logIndex: index,
       }),
     );
-    const hintLog: ReceiptLogEnvelope | null = this.buildContractHintLog(
+    const hintLog: IReceiptLogEnvelope | null = this.buildContractHintLog(
       txPayload,
       baseLogs.length,
     );
-    const logs: readonly ReceiptLogEnvelope[] =
+    const logs: readonly IReceiptLogEnvelope[] =
       hintLog === null ? baseLogs : [...baseLogs, hintLog];
 
     return {
@@ -259,7 +261,7 @@ export abstract class BaseTronRpcAdapter implements IRpcAdapter {
     };
   }
 
-  public async healthCheck(): Promise<ProviderHealth> {
+  public async healthCheck(): Promise<IProviderHealth> {
     if (this.httpUrl === null) {
       return {
         provider: this.providerName,
@@ -433,7 +435,7 @@ export abstract class BaseTronRpcAdapter implements IRpcAdapter {
   private buildContractHintLog(
     transactionPayload: TronGetTransactionByIdResponse,
     logIndex: number,
-  ): ReceiptLogEnvelope | null {
+  ): IReceiptLogEnvelope | null {
     const contracts: readonly TronTransactionByIdContract[] =
       transactionPayload.raw_data?.contract ?? [];
     const firstContract: TronTransactionByIdContract | undefined = contracts[0];
@@ -501,7 +503,7 @@ export abstract class BaseTronRpcAdapter implements IRpcAdapter {
 
   private toHexAmount(amountRaw: string): string {
     try {
-      return `0x${BigInt(amountRaw).toString(16)}`;
+      return `0x${BigInt(amountRaw).toString(RADIX_HEX)}`;
     } catch {
       return '0x0';
     }

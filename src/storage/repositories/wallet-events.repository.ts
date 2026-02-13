@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
+import { ChainId } from '../../chain/chain.types';
 import { ChainKey } from '../../core/chains/chain-key.interfaces';
 import { DatabaseService } from '../database.service';
 import type { NewWalletEventRow } from '../database.types';
@@ -120,19 +121,15 @@ export class WalletEventsRepository {
     );
   }
 
-  private mapChainIdToChainKey(chainId: number): ChainKey {
-    if (chainId === 1) {
+  private mapChainIdToChainKey(chainId: ChainId): ChainKey {
+    if (chainId === ChainId.ETHEREUM_MAINNET) {
       return ChainKey.ETHEREUM_MAINNET;
     }
 
-    if (chainId === 101) {
+    if (chainId === ChainId.SOLANA_MAINNET) {
       return ChainKey.SOLANA_MAINNET;
     }
 
-    if (chainId === 111) {
-      return ChainKey.TRON_MAINNET;
-    }
-
-    return ChainKey.ETHEREUM_MAINNET;
+    return ChainKey.TRON_MAINNET;
   }
 }

@@ -1,12 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 import type {
-  TronGridListResponse,
-  TronGridNativeContractItem,
-  TronGridNativeRetItem,
-  TronGridNativeTransactionItem,
-  TronGridTrc20TokenInfo,
-  TronGridTrc20TransactionItem,
+  ITronGridListResponse,
+  ITronGridNativeContractItem,
+  ITronGridNativeRetItem,
+  ITronGridNativeTransactionItem,
+  ITronGridTrc20TokenInfo,
+  ITronGridTrc20TransactionItem,
 } from './tron-grid-history.interfaces';
 import { AppConfigService } from '../../../config/app-config.service';
 import { ChainKey } from '../../../core/chains/chain-key.interfaces';
@@ -14,84 +14,88 @@ import type { IHistoryExplorerAdapter } from '../../../core/ports/explorers/hist
 import {
   HistoryDirection,
   HistoryItemType,
-  type HistoryItemDto,
-  type HistoryPageDto,
+  type IHistoryItemDto,
+  type IHistoryPageDto,
 } from '../../../features/tracking/dto/history-item.dto';
 import {
   HistoryDirectionFilter,
   HistoryKind,
-  type HistoryRequestDto,
+  type IHistoryRequestDto,
 } from '../../../features/tracking/dto/history-request.dto';
 import { TronAddressCodec } from '../../address/tron/tron-address.codec';
 
-interface TronGridPageRequestOptions {
+interface ITronGridPageRequestOptions {
   readonly path: string;
   readonly pageSize: number;
   readonly fingerprint: string | null;
 }
 
-interface TronGridPageLoadResult<TItem> {
+interface ITronGridPageLoadResult<TItem> {
   readonly items: readonly TItem[];
   readonly nextFingerprint: string | null;
 }
 
-interface TronGridRequestQueryPolicy {
+interface ITronGridRequestQueryPolicy {
   readonly includeOnlyConfirmed: boolean;
   readonly includeOrderBy: boolean;
 }
 
+const TRON_HISTORY_REQUEST_TIMEOUT_MS = 10_000;
+const TRON_MAX_PAGE_SIZE = 200;
+const TRON_MAX_PAGE_REQUESTS = 20;
+const HTTP_STATUS_BAD_REQUEST = 400;
+const RESPONSE_PREVIEW_MAX_LENGTH = 300;
+const TRX_NATIVE_DECIMALS = 6;
+
+const QUERY_POLICIES: readonly ITronGridRequestQueryPolicy[] = [
+  {
+    includeOnlyConfirmed: true,
+    includeOrderBy: true,
+  },
+  {
+    includeOnlyConfirmed: true,
+    includeOrderBy: false,
+  },
+  {
+    includeOnlyConfirmed: false,
+    includeOrderBy: false,
+  },
+];
+
 @Injectable()
 export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
-  private static readonly REQUEST_TIMEOUT_MS: number = 10_000;
-  private static readonly MAX_PAGE_SIZE: number = 200;
-  private static readonly MAX_PAGE_REQUESTS: number = 20;
-
   private readonly logger: Logger = new Logger(TronGridHistoryAdapter.name);
-  private static readonly QUERY_POLICIES: readonly TronGridRequestQueryPolicy[] = [
-    {
-      includeOnlyConfirmed: true,
-      includeOrderBy: true,
-    },
-    {
-      includeOnlyConfirmed: true,
-      includeOrderBy: false,
-    },
-    {
-      includeOnlyConfirmed: false,
-      includeOrderBy: false,
-    },
-  ];
 
   public constructor(
     private readonly appConfigService: AppConfigService,
     private readonly tronAddressCodec: TronAddressCodec,
   ) {}
 
-  public async loadRecentTransactions(request: HistoryRequestDto): Promise<HistoryPageDto> {
+  public async loadRecentTransactions(request: IHistoryRequestDto): Promise<IHistoryPageDto> {
     if (request.chainKey !== ChainKey.TRON_MAINNET) {
       throw new Error(`TRON history adapter does not support chain ${request.chainKey}.`);
     }
 
     const targetItemsCount: number = request.offset + request.limit + 1;
-    const nativeItems: readonly HistoryItemDto[] =
+    const nativeItems: readonly IHistoryItemDto[] =
       request.kind === HistoryKind.ERC20
         ? []
         : await this.loadNativeTransactions(request.address, targetItemsCount);
-    const tokenItems: readonly HistoryItemDto[] =
+    const tokenItems: readonly IHistoryItemDto[] =
       request.kind === HistoryKind.ETH
         ? []
         : await this.loadTrc20Transactions(request.address, targetItemsCount);
-    const mergedItems: HistoryItemDto[] = [...nativeItems, ...tokenItems];
+    const mergedItems: IHistoryItemDto[] = [...nativeItems, ...tokenItems];
     mergedItems.sort(
-      (leftItem: HistoryItemDto, rightItem: HistoryItemDto): number =>
+      (leftItem: IHistoryItemDto, rightItem: IHistoryItemDto): number =>
         rightItem.timestampSec - leftItem.timestampSec,
     );
 
-    const filteredItems: readonly HistoryItemDto[] = this.applyDirectionFilter(
+    const filteredItems: readonly IHistoryItemDto[] = this.applyDirectionFilter(
       mergedItems,
       request.direction,
     );
-    const pagedItems: readonly HistoryItemDto[] = filteredItems.slice(
+    const pagedItems: readonly IHistoryItemDto[] = filteredItems.slice(
       request.offset,
       request.offset + request.limit,
     );
@@ -106,17 +110,14 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
   private async loadNativeTransactions(
     address: string,
     targetItemsCount: number,
-  ): Promise<readonly HistoryItemDto[]> {
-    const results: HistoryItemDto[] = [];
+  ): Promise<readonly IHistoryItemDto[]> {
+    const results: IHistoryItemDto[] = [];
     let fingerprint: string | null = null;
     let requestCount: number = 0;
 
-    while (
-      results.length < targetItemsCount &&
-      requestCount < TronGridHistoryAdapter.MAX_PAGE_REQUESTS
-    ) {
+    while (results.length < targetItemsCount && requestCount < TRON_MAX_PAGE_REQUESTS) {
       const pageSize: number = this.resolvePageSize(targetItemsCount, results.length);
-      const page: TronGridPageLoadResult<TronGridNativeTransactionItem> =
+      const page: ITronGridPageLoadResult<ITronGridNativeTransactionItem> =
         await this.requestNativePage({
           path: `/v1/accounts/${address}/transactions`,
           pageSize,
@@ -128,7 +129,7 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
       }
 
       for (const item of page.items) {
-        const mappedItem: HistoryItemDto | null = this.mapNativeTransaction(item, address);
+        const mappedItem: IHistoryItemDto | null = this.mapNativeTransaction(item, address);
 
         if (mappedItem !== null) {
           results.push(mappedItem);
@@ -153,17 +154,14 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
   private async loadTrc20Transactions(
     address: string,
     targetItemsCount: number,
-  ): Promise<readonly HistoryItemDto[]> {
-    const results: HistoryItemDto[] = [];
+  ): Promise<readonly IHistoryItemDto[]> {
+    const results: IHistoryItemDto[] = [];
     let fingerprint: string | null = null;
     let requestCount: number = 0;
 
-    while (
-      results.length < targetItemsCount &&
-      requestCount < TronGridHistoryAdapter.MAX_PAGE_REQUESTS
-    ) {
+    while (results.length < targetItemsCount && requestCount < TRON_MAX_PAGE_REQUESTS) {
       const pageSize: number = this.resolvePageSize(targetItemsCount, results.length);
-      const page: TronGridPageLoadResult<TronGridTrc20TransactionItem> =
+      const page: ITronGridPageLoadResult<ITronGridTrc20TransactionItem> =
         await this.requestTrc20Page({
           path: `/v1/accounts/${address}/transactions/trc20`,
           pageSize,
@@ -175,7 +173,7 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
       }
 
       for (const item of page.items) {
-        const mappedItem: HistoryItemDto | null = this.mapTrc20Transaction(item, address);
+        const mappedItem: IHistoryItemDto | null = this.mapTrc20Transaction(item, address);
 
         if (mappedItem !== null) {
           results.push(mappedItem);
@@ -198,25 +196,22 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
   }
 
   private resolvePageSize(targetItemsCount: number, currentItemsCount: number): number {
-    return Math.min(
-      TronGridHistoryAdapter.MAX_PAGE_SIZE,
-      Math.max(targetItemsCount - currentItemsCount, 1),
-    );
+    return Math.min(TRON_MAX_PAGE_SIZE, Math.max(targetItemsCount - currentItemsCount, 1));
   }
 
   private async requestNativePage(
-    options: TronGridPageRequestOptions,
-  ): Promise<TronGridPageLoadResult<TronGridNativeTransactionItem>> {
-    const payload: TronGridListResponse<unknown> = await this.requestPage(options);
+    options: ITronGridPageRequestOptions,
+  ): Promise<ITronGridPageLoadResult<ITronGridNativeTransactionItem>> {
+    const payload: ITronGridListResponse<unknown> = await this.requestPage(options);
     const rawItems: readonly unknown[] = this.resolveResponseData(payload);
-    const parsedItems: TronGridNativeTransactionItem[] = rawItems
-      .map((item: unknown): TronGridNativeTransactionItem | null =>
+    const parsedItems: ITronGridNativeTransactionItem[] = rawItems
+      .map((item: unknown): ITronGridNativeTransactionItem | null =>
         this.parseNativeTransactionItem(item),
       )
       .filter(
         (
-          parsedItem: TronGridNativeTransactionItem | null,
-        ): parsedItem is TronGridNativeTransactionItem => parsedItem !== null,
+          parsedItem: ITronGridNativeTransactionItem | null,
+        ): parsedItem is ITronGridNativeTransactionItem => parsedItem !== null,
       );
 
     return {
@@ -226,18 +221,18 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
   }
 
   private async requestTrc20Page(
-    options: TronGridPageRequestOptions,
-  ): Promise<TronGridPageLoadResult<TronGridTrc20TransactionItem>> {
-    const payload: TronGridListResponse<unknown> = await this.requestPage(options);
+    options: ITronGridPageRequestOptions,
+  ): Promise<ITronGridPageLoadResult<ITronGridTrc20TransactionItem>> {
+    const payload: ITronGridListResponse<unknown> = await this.requestPage(options);
     const rawItems: readonly unknown[] = this.resolveResponseData(payload);
-    const parsedItems: TronGridTrc20TransactionItem[] = rawItems
-      .map((item: unknown): TronGridTrc20TransactionItem | null =>
+    const parsedItems: ITronGridTrc20TransactionItem[] = rawItems
+      .map((item: unknown): ITronGridTrc20TransactionItem | null =>
         this.parseTrc20TransactionItem(item),
       )
       .filter(
         (
-          parsedItem: TronGridTrc20TransactionItem | null,
-        ): parsedItem is TronGridTrc20TransactionItem => parsedItem !== null,
+          parsedItem: ITronGridTrc20TransactionItem | null,
+        ): parsedItem is ITronGridTrc20TransactionItem => parsedItem !== null,
       );
 
     return {
@@ -247,8 +242,8 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
   }
 
   private async requestPage(
-    options: TronGridPageRequestOptions,
-  ): Promise<TronGridListResponse<unknown>> {
+    options: ITronGridPageRequestOptions,
+  ): Promise<ITronGridListResponse<unknown>> {
     const headers: Record<string, string> = {};
 
     if (this.appConfigService.tronGridApiKey !== null) {
@@ -257,14 +252,14 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
 
     let lastError: Error | null = null;
 
-    for (const queryPolicy of TronGridHistoryAdapter.QUERY_POLICIES) {
+    for (const queryPolicy of QUERY_POLICIES) {
       const requestUrl: URL = this.buildRequestUrl(options, queryPolicy);
       this.logger.debug(`tron history request url=${requestUrl.toString()}`);
 
       const response: Response = await fetch(requestUrl, {
         method: 'GET',
         headers,
-        signal: AbortSignal.timeout(TronGridHistoryAdapter.REQUEST_TIMEOUT_MS),
+        signal: AbortSignal.timeout(TRON_HISTORY_REQUEST_TIMEOUT_MS),
       });
 
       if (response.ok) {
@@ -274,7 +269,7 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
           throw new Error('TRON history response is not an object.');
         }
 
-        return payload as TronGridListResponse<unknown>;
+        return payload as ITronGridListResponse<unknown>;
       }
 
       const responseDetails: string = await this.readResponseDetails(response);
@@ -282,7 +277,7 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
         `TRON history HTTP ${response.status}${responseDetails.length > 0 ? `: ${responseDetails}` : ''}`,
       );
 
-      if (response.status !== 400) {
+      if (response.status !== HTTP_STATUS_BAD_REQUEST) {
         throw lastError;
       }
 
@@ -295,8 +290,8 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
   }
 
   private buildRequestUrl(
-    options: TronGridPageRequestOptions,
-    queryPolicy: TronGridRequestQueryPolicy,
+    options: ITronGridPageRequestOptions,
+    queryPolicy: ITronGridRequestQueryPolicy,
   ): URL {
     const requestUrl: URL = new URL(options.path, this.appConfigService.tronGridApiBaseUrl);
     requestUrl.searchParams.set('limit', String(options.pageSize));
@@ -325,13 +320,13 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
       }
 
       const normalizedResponseText: string = responseText.replace(/\s+/g, ' ');
-      return normalizedResponseText.slice(0, 300);
+      return normalizedResponseText.slice(0, RESPONSE_PREVIEW_MAX_LENGTH);
     } catch {
       return '';
     }
   }
 
-  private resolveResponseData(payload: TronGridListResponse<unknown>): readonly unknown[] {
+  private resolveResponseData(payload: ITronGridListResponse<unknown>): readonly unknown[] {
     if (!Array.isArray(payload.data)) {
       throw new Error('TRON history response payload has invalid data field.');
     }
@@ -339,7 +334,7 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
     return payload.data;
   }
 
-  private resolveNextFingerprint(payload: TronGridListResponse<unknown>): string | null {
+  private resolveNextFingerprint(payload: ITronGridListResponse<unknown>): string | null {
     const directFingerprint: string | null = this.normalizeString(payload.meta?.fingerprint);
 
     if (directFingerprint !== null) {
@@ -366,7 +361,7 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
     }
   }
 
-  private parseNativeTransactionItem(value: unknown): TronGridNativeTransactionItem | null {
+  private parseNativeTransactionItem(value: unknown): ITronGridNativeTransactionItem | null {
     const record: Record<string, unknown> | null = this.parseRecord(value);
 
     if (record === null) {
@@ -382,17 +377,17 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
       return null;
     }
 
-    const contracts: TronGridNativeContractItem[] = contractRaw
-      .map((contractItem: unknown): TronGridNativeContractItem | null =>
+    const contracts: ITronGridNativeContractItem[] = contractRaw
+      .map((contractItem: unknown): ITronGridNativeContractItem | null =>
         this.parseNativeContractItem(contractItem),
       )
       .filter(
         (
-          contractItem: TronGridNativeContractItem | null,
-        ): contractItem is TronGridNativeContractItem => contractItem !== null,
+          contractItem: ITronGridNativeContractItem | null,
+        ): contractItem is ITronGridNativeContractItem => contractItem !== null,
       );
     const retRaw: unknown = record['ret'];
-    const ret: readonly TronGridNativeRetItem[] | undefined = this.parseRetItems(retRaw);
+    const ret: readonly ITronGridNativeRetItem[] | undefined = this.parseRetItems(retRaw);
 
     return {
       txID: txId,
@@ -404,7 +399,7 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
     };
   }
 
-  private parseNativeContractItem(value: unknown): TronGridNativeContractItem | null {
+  private parseNativeContractItem(value: unknown): ITronGridNativeContractItem | null {
     const record: Record<string, unknown> | null = this.parseRecord(value);
 
     if (record === null) {
@@ -435,13 +430,13 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
     };
   }
 
-  private parseRetItems(value: unknown): readonly TronGridNativeRetItem[] | undefined {
+  private parseRetItems(value: unknown): readonly ITronGridNativeRetItem[] | undefined {
     if (!Array.isArray(value)) {
       return undefined;
     }
 
     return value
-      .map((retValue: unknown): TronGridNativeRetItem | null => {
+      .map((retValue: unknown): ITronGridNativeRetItem | null => {
         const retRecord: Record<string, unknown> | null = this.parseRecord(retValue);
 
         if (retRecord === null) {
@@ -459,12 +454,12 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
         };
       })
       .filter(
-        (retItem: TronGridNativeRetItem | null): retItem is TronGridNativeRetItem =>
+        (retItem: ITronGridNativeRetItem | null): retItem is ITronGridNativeRetItem =>
           retItem !== null,
       );
   }
 
-  private parseTrc20TransactionItem(value: unknown): TronGridTrc20TransactionItem | null {
+  private parseTrc20TransactionItem(value: unknown): ITronGridTrc20TransactionItem | null {
     const record: Record<string, unknown> | null = this.parseRecord(value);
 
     if (record === null) {
@@ -488,7 +483,7 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
     };
   }
 
-  private parseTokenInfo(value: unknown): TronGridTrc20TokenInfo | undefined {
+  private parseTokenInfo(value: unknown): ITronGridTrc20TokenInfo | undefined {
     const record: Record<string, unknown> | null = this.parseRecord(value);
 
     if (record === null) {
@@ -502,12 +497,12 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
   }
 
   private mapNativeTransaction(
-    item: TronGridNativeTransactionItem,
+    item: ITronGridNativeTransactionItem,
     trackedAddress: string,
-  ): HistoryItemDto | null {
+  ): IHistoryItemDto | null {
     const txHash: string | null = this.normalizeString(item.txID);
     const blockTimestampMs: number | null = this.normalizeTimestampMs(item.block_timestamp);
-    const contract: TronGridNativeContractItem | null = this.resolvePrimaryContract(item);
+    const contract: ITronGridNativeContractItem | null = this.resolvePrimaryContract(item);
 
     if (txHash === null || blockTimestampMs === null || contract === null) {
       return null;
@@ -542,7 +537,7 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
       valueRaw: txValueRaw,
       isError: this.resolveIsError(item.ret),
       assetSymbol: 'TRX',
-      assetDecimals: 6,
+      assetDecimals: TRX_NATIVE_DECIMALS,
       eventType: HistoryItemType.TRANSFER,
       direction: this.resolveDirection(trackedAddress, fromAddress, toAddress),
       txLink: `${this.appConfigService.tronscanTxBaseUrl}${txHash}`,
@@ -550,9 +545,9 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
   }
 
   private mapTrc20Transaction(
-    item: TronGridTrc20TransactionItem,
+    item: ITronGridTrc20TransactionItem,
     trackedAddress: string,
-  ): HistoryItemDto | null {
+  ): IHistoryItemDto | null {
     const txHash: string | null = this.normalizeString(item.transaction_id);
     const blockTimestampMs: number | null = this.normalizeTimestampMs(item.block_timestamp);
 
@@ -582,9 +577,9 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
   }
 
   private resolvePrimaryContract(
-    item: TronGridNativeTransactionItem,
-  ): TronGridNativeContractItem | null {
-    const contracts: readonly TronGridNativeContractItem[] | undefined = item.raw_data?.contract;
+    item: ITronGridNativeTransactionItem,
+  ): ITronGridNativeContractItem | null {
+    const contracts: readonly ITronGridNativeContractItem[] | undefined = item.raw_data?.contract;
 
     if (!contracts || contracts.length === 0) {
       return null;
@@ -617,7 +612,7 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
     return HistoryDirection.UNKNOWN;
   }
 
-  private resolveIsError(retItems: readonly TronGridNativeRetItem[] | undefined): boolean {
+  private resolveIsError(retItems: readonly ITronGridNativeRetItem[] | undefined): boolean {
     if (!retItems || retItems.length === 0) {
       return false;
     }
@@ -702,9 +697,9 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
   }
 
   private applyDirectionFilter(
-    items: readonly HistoryItemDto[],
+    items: readonly IHistoryItemDto[],
     directionFilter: HistoryDirectionFilter,
-  ): readonly HistoryItemDto[] {
+  ): readonly IHistoryItemDto[] {
     if (directionFilter === HistoryDirectionFilter.ALL) {
       return items;
     }
@@ -712,6 +707,6 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
     const targetDirection: HistoryDirection =
       directionFilter === HistoryDirectionFilter.IN ? HistoryDirection.IN : HistoryDirection.OUT;
 
-    return items.filter((item: HistoryItemDto): boolean => item.direction === targetDirection);
+    return items.filter((item: IHistoryItemDto): boolean => item.direction === targetDirection);
   }
 }

@@ -12,10 +12,13 @@ import {
 import type { ProviderFailoverService } from '../../chain/providers/provider-failover.service';
 import type { AppConfigService } from '../../config/app-config.service';
 import { ChainKey } from '../../core/chains/chain-key.interfaces';
-import type { BlockEnvelope, ReceiptEnvelope } from '../../core/ports/rpc/block-stream.interfaces';
+import type {
+  IBlockEnvelope,
+  IReceiptEnvelope,
+} from '../../core/ports/rpc/block-stream.interfaces';
 import type {
   ISubscriptionHandle,
-  ProviderHealth,
+  IProviderHealth,
   ProviderOperation,
 } from '../../core/ports/rpc/rpc-adapter.interfaces';
 import { TronAddressCodec } from '../../integrations/address/tron/tron-address.codec';
@@ -27,14 +30,17 @@ import type { WalletEventsRepository } from '../../storage/repositories/wallet-e
 class TronProviderStub {
   public blockHandler: ((blockNumber: number) => Promise<void>) | null = null;
   public latestBlockNumber: number = 888_888;
-  private readonly blockByNumber: Map<number, BlockEnvelope> = new Map<number, BlockEnvelope>();
-  private readonly receiptByHash: Map<string, ReceiptEnvelope> = new Map<string, ReceiptEnvelope>();
+  private readonly blockByNumber: Map<number, IBlockEnvelope> = new Map<number, IBlockEnvelope>();
+  private readonly receiptByHash: Map<string, IReceiptEnvelope> = new Map<
+    string,
+    IReceiptEnvelope
+  >();
 
-  public setBlock(blockNumber: number, block: BlockEnvelope): void {
+  public setBlock(blockNumber: number, block: IBlockEnvelope): void {
     this.blockByNumber.set(blockNumber, block);
   }
 
-  public setReceipt(txHash: string, receipt: ReceiptEnvelope): void {
+  public setReceipt(txHash: string, receipt: IReceiptEnvelope): void {
     this.receiptByHash.set(txHash, receipt);
   }
 
@@ -55,15 +61,15 @@ class TronProviderStub {
     return this.latestBlockNumber;
   }
 
-  public async getBlockEnvelope(blockNumber: number): Promise<BlockEnvelope | null> {
+  public async getBlockEnvelope(blockNumber: number): Promise<IBlockEnvelope | null> {
     return this.blockByNumber.get(blockNumber) ?? null;
   }
 
-  public async getReceiptEnvelope(txHash: string): Promise<ReceiptEnvelope | null> {
+  public async getReceiptEnvelope(txHash: string): Promise<IReceiptEnvelope | null> {
     return this.receiptByHash.get(txHash) ?? null;
   }
 
-  public async healthCheck(): Promise<ProviderHealth> {
+  public async healthCheck(): Promise<IProviderHealth> {
     return {
       provider: 'tron-provider-stub',
       ok: true,

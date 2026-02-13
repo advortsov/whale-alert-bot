@@ -1,12 +1,12 @@
 import { ChainKey } from '../../core/chains/chain-key.interfaces';
 
-export interface KnownCexAddressEntry {
+export interface IKnownCexAddressEntry {
   readonly chainKey: ChainKey;
   readonly address: string;
   readonly tag: string;
 }
 
-export const KNOWN_CEX_ADDRESS_BOOK: readonly KnownCexAddressEntry[] = [
+export const KNOWN_CEX_ADDRESS_BOOK: readonly IKnownCexAddressEntry[] = [
   {
     chainKey: ChainKey.ETHEREUM_MAINNET,
     address: '0x28c6c06298d514db089934071355e5743bf21d60',

@@ -10,7 +10,7 @@ export type AlertPayload = {
   readonly message: string;
 };
 
-export interface AlertMessageContext {
+export interface IAlertMessageContext {
   readonly usdAmount: number | null;
   readonly usdUnavailable: boolean;
 }

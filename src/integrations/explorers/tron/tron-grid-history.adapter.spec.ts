@@ -7,7 +7,7 @@ import { HistoryDirection, HistoryItemType } from '../../../features/tracking/dt
 import {
   HistoryDirectionFilter,
   HistoryKind,
-  type HistoryRequestDto,
+  type IHistoryRequestDto,
 } from '../../../features/tracking/dto/history-request.dto';
 import { TronAddressCodec } from '../../address/tron/tron-address.codec';
 
@@ -17,7 +17,7 @@ type AppConfigStub = {
   readonly tronscanTxBaseUrl: string;
 };
 
-const createRequest = (overrides: Partial<HistoryRequestDto> = {}): HistoryRequestDto => ({
+const createRequest = (overrides: Partial<IHistoryRequestDto> = {}): IHistoryRequestDto => ({
   chainKey: ChainKey.TRON_MAINNET,
   address: 'TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7',
   limit: 5,

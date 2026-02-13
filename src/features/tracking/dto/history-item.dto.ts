@@ -10,7 +10,7 @@ export enum HistoryDirection {
   UNKNOWN = 'UNKNOWN',
 }
 
-export interface HistoryItemDto {
+export interface IHistoryItemDto {
   readonly txHash: string;
   readonly timestampSec: number;
   readonly from: string;
@@ -24,7 +24,7 @@ export interface HistoryItemDto {
   readonly txLink: string | null;
 }
 
-export interface HistoryPageDto {
-  readonly items: readonly HistoryItemDto[];
+export interface IHistoryPageDto {
+  readonly items: readonly IHistoryItemDto[];
   readonly nextOffset: number | null;
 }

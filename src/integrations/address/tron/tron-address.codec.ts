@@ -15,6 +15,19 @@ const TRON_HEX_WITH_PREFIX_PATTERN: RegExp = /^41[0-9a-fA-F]{40}$/;
 const TRON_HEX_WITHOUT_PREFIX_PATTERN: RegExp = /^[0-9a-fA-F]{40}$/;
 const ETHEREUM_STYLE_HEX_PATTERN: RegExp = /^0x[0-9a-fA-F]{40}$/;
 const TRON_ADDRESS_PREFIX: number = 0x41;
+const SHORT_FORMAT_MIN_LENGTH = 14;
+const SHORT_FORMAT_PREFIX_LENGTH = 7;
+const SHORT_FORMAT_SUFFIX_OFFSET = -6;
+const BASE58_CHECK_FULL_LENGTH = 25;
+const BASE58_CHECK_PAYLOAD_END = 21;
+const BASE58_CHECK_CHECKSUM_END = 25;
+const PAYLOAD_BYTE_LENGTH = 21;
+const CHECKSUM_BYTE_LENGTH = 4;
+const BASE58_RADIX = 58n;
+const BASE256_RADIX = 256n;
+const BIGINT_ZERO = 0n;
+const BYTE_MASK = 0xffn;
+const BYTE_SHIFT = 8n;
 
 @Injectable()
 export class TronAddressCodec implements IAddressCodec {
@@ -45,22 +58,25 @@ export class TronAddressCodec implements IAddressCodec {
   public formatShort(address: string): string {
     const normalizedAddress: string = address.trim();
 
-    if (normalizedAddress.length <= 14) {
+    if (normalizedAddress.length <= SHORT_FORMAT_MIN_LENGTH) {
       return normalizedAddress;
     }
 
-    return `${normalizedAddress.slice(0, 7)}...${normalizedAddress.slice(-6)}`;
+    return `${normalizedAddress.slice(0, SHORT_FORMAT_PREFIX_LENGTH)}...${normalizedAddress.slice(SHORT_FORMAT_SUFFIX_OFFSET)}`;
   }
 
   private validateBase58Address(rawAddress: string): boolean {
     const decodedBytes: Buffer | null = this.decodeBase58(rawAddress);
 
-    if (decodedBytes?.length !== 25) {
+    if (decodedBytes?.length !== BASE58_CHECK_FULL_LENGTH) {
       return false;
     }
 
-    const payload: Buffer = decodedBytes.subarray(0, 21);
-    const checksum: Buffer = decodedBytes.subarray(21, 25);
+    const payload: Buffer = decodedBytes.subarray(0, BASE58_CHECK_PAYLOAD_END);
+    const checksum: Buffer = decodedBytes.subarray(
+      BASE58_CHECK_PAYLOAD_END,
+      BASE58_CHECK_CHECKSUM_END,
+    );
 
     if (payload[0] !== TRON_ADDRESS_PREFIX) {
       return false;
@@ -86,7 +102,7 @@ export class TronAddressCodec implements IAddressCodec {
     }
 
     const payload: Buffer = Buffer.from(normalizedHex, 'hex');
-    return payload.length === 21 ? payload : null;
+    return payload.length === PAYLOAD_BYTE_LENGTH ? payload : null;
   }
 
   private encodeBase58Check(payload: Buffer): string {
@@ -100,7 +116,7 @@ export class TronAddressCodec implements IAddressCodec {
     const hashOnce: Buffer = createHash('sha256').update(payload).digest();
     const hashTwice: Buffer = createHash('sha256').update(hashOnce).digest();
 
-    return hashTwice.subarray(0, 4);
+    return hashTwice.subarray(0, CHECKSUM_BYTE_LENGTH);
   }
 
   private decodeBase58(value: string): Buffer | null {
@@ -108,7 +124,7 @@ export class TronAddressCodec implements IAddressCodec {
       return null;
     }
 
-    let numericValue: bigint = 0n;
+    let numericValue: bigint = BIGINT_ZERO;
 
     for (const character of value) {
       const charValue: number | undefined = BASE58_MAP.get(character);
@@ -117,7 +133,7 @@ export class TronAddressCodec implements IAddressCodec {
         return null;
       }
 
-      numericValue = numericValue * 58n + BigInt(charValue);
+      numericValue = numericValue * BASE58_RADIX + BigInt(charValue);
     }
 
     let leadingZeroes: number = 0;
@@ -128,10 +144,10 @@ export class TronAddressCodec implements IAddressCodec {
 
     const decodedBytes: number[] = [];
 
-    while (numericValue > 0n) {
-      const byteValue: number = Number(numericValue & 0xffn);
+    while (numericValue > BIGINT_ZERO) {
+      const byteValue: number = Number(numericValue & BYTE_MASK);
       decodedBytes.push(byteValue);
-      numericValue >>= 8n;
+      numericValue >>= BYTE_SHIFT;
     }
 
     decodedBytes.reverse();
@@ -151,18 +167,18 @@ export class TronAddressCodec implements IAddressCodec {
       leadingZeroes += 1;
     }
 
-    let numericValue: bigint = 0n;
+    let numericValue: bigint = BIGINT_ZERO;
 
     for (const byteValue of bytes) {
-      numericValue = numericValue * 256n + BigInt(byteValue);
+      numericValue = numericValue * BASE256_RADIX + BigInt(byteValue);
     }
 
     let encoded: string = '';
 
-    while (numericValue > 0n) {
-      const remainder: number = Number(numericValue % 58n);
+    while (numericValue > BIGINT_ZERO) {
+      const remainder: number = Number(numericValue % BASE58_RADIX);
       encoded = `${BASE58_ALPHABET[remainder]}${encoded}`;
-      numericValue /= 58n;
+      numericValue /= BASE58_RADIX;
     }
 
     if (leadingZeroes > 0) {

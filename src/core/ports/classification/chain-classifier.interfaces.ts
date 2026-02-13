@@ -1,19 +1,19 @@
 import type { ChainId, ClassifiedEvent } from '../../../chain/chain.types';
-import type { ReceiptEnvelope } from '../rpc/block-stream.interfaces';
+import type { IReceiptEnvelope } from '../rpc/block-stream.interfaces';
 
-export interface ClassificationContextDto {
+export interface IClassificationContextDto {
   readonly chainId: ChainId;
   readonly txHash: string;
   readonly trackedAddress: string;
   readonly txFrom: string;
   readonly txTo: string | null;
-  readonly receiptEnvelope: ReceiptEnvelope | null;
+  readonly receiptEnvelope: IReceiptEnvelope | null;
 }
 
-export interface ClassificationResultDto {
+export interface IClassificationResultDto {
   readonly event: ClassifiedEvent;
 }
 
 export interface IChainEventClassifier {
-  classify(context: ClassificationContextDto): ClassificationResultDto;
+  classify(context: IClassificationContextDto): IClassificationResultDto;
 }

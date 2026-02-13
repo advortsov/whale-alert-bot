@@ -5,20 +5,20 @@ import type {
   RuntimeTelemetry,
   WatcherRuntimeSnapshot,
 } from './runtime-status.interfaces';
-import type { ChainRuntimeSnapshot } from '../chain/base-chain-stream.service';
+import type { IChainRuntimeSnapshot } from '../chain/base-chain-stream.service';
 import { AppConfigService } from '../config/app-config.service';
 import type { ChainKey } from '../core/chains/chain-key.interfaces';
 
-interface SloThresholds {
+interface ISloThresholds {
   readonly maxLagWarn: number;
   readonly maxQueueWarn: number;
   readonly maxBackoffWarnMs: number;
 }
 
+const WARN_COOLDOWN_MS = 60_000;
+
 @Injectable()
 export class RuntimeStatusService {
-  private static readonly WARN_COOLDOWN_MS: number = 60_000;
-
   private readonly logger: Logger = new Logger(RuntimeStatusService.name);
   private snapshot: WatcherRuntimeSnapshot = {
     observedBlock: null,
@@ -47,7 +47,7 @@ export class RuntimeStatusService {
     return this.snapshot;
   }
 
-  public setChainSnapshot(chainSnapshot: ChainRuntimeSnapshot): void {
+  public setChainSnapshot(chainSnapshot: IChainRuntimeSnapshot): void {
     const entry: ChainRuntimeEntry = {
       chainKey: chainSnapshot.chainKey,
       observedBlock: chainSnapshot.observedBlock,
@@ -78,7 +78,7 @@ export class RuntimeStatusService {
   }
 
   private evaluateSloThresholds(entry: ChainRuntimeEntry): void {
-    const thresholds: SloThresholds = {
+    const thresholds: ISloThresholds = {
       maxLagWarn: this.appConfigService.chainMaxLagWarn,
       maxQueueWarn: this.appConfigService.chainMaxQueueWarn,
       maxBackoffWarnMs: this.appConfigService.chainMaxBackoffWarnMs,
@@ -110,7 +110,7 @@ export class RuntimeStatusService {
     const now: number = Date.now();
     const lastEmittedAt: number = this.lastWarnTimestamps.get(key) ?? 0;
 
-    if (now - lastEmittedAt < RuntimeStatusService.WARN_COOLDOWN_MS) {
+    if (now - lastEmittedAt < WARN_COOLDOWN_MS) {
       return;
     }
 

@@ -7,10 +7,12 @@ import {
   type ClassifiedEvent,
 } from '../../chain/chain.types';
 import type {
-  ClassificationContextDto,
-  ClassificationResultDto,
+  IClassificationContextDto,
+  IClassificationResultDto,
   IChainEventClassifier,
 } from '../../core/ports/classification/chain-classifier.interfaces';
+
+const SOL_NATIVE_DECIMALS = 9;
 
 @Injectable()
 export class SolanaEventClassifierService implements IChainEventClassifier {
@@ -22,7 +24,7 @@ export class SolanaEventClassifierService implements IChainEventClassifier {
     'instruction: transferchecked',
   ];
 
-  public classify(context: ClassificationContextDto): ClassificationResultDto {
+  public classify(context: IClassificationContextDto): IClassificationResultDto {
     const direction: EventDirection = this.resolveDirection(
       context.txFrom,
       context.txTo,
@@ -51,7 +53,7 @@ export class SolanaEventClassifierService implements IChainEventClassifier {
       contractAddress: isSplTransfer ? SolanaEventClassifierService.SPL_TOKEN_PROGRAM : null,
       tokenAddress: null,
       tokenSymbol: isSplTransfer ? 'SPL' : 'SOL',
-      tokenDecimals: isSplTransfer ? null : 9,
+      tokenDecimals: isSplTransfer ? null : SOL_NATIVE_DECIMALS,
       tokenAmountRaw,
       valueFormatted: null,
       counterpartyAddress,
@@ -78,7 +80,7 @@ export class SolanaEventClassifierService implements IChainEventClassifier {
     return EventDirection.UNKNOWN;
   }
 
-  private isSplTransfer(receiptEnvelope: ClassificationContextDto['receiptEnvelope']): boolean {
+  private isSplTransfer(receiptEnvelope: IClassificationContextDto['receiptEnvelope']): boolean {
     if (receiptEnvelope === null) {
       return false;
     }
@@ -92,7 +94,7 @@ export class SolanaEventClassifierService implements IChainEventClassifier {
   }
 
   private extractAmountRaw(
-    receiptEnvelope: ClassificationContextDto['receiptEnvelope'],
+    receiptEnvelope: IClassificationContextDto['receiptEnvelope'],
   ): string | null {
     if (receiptEnvelope === null) {
       return null;
