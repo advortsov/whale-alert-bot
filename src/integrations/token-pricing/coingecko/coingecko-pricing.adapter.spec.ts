@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CoinGeckoPricingAdapter } from './coingecko-pricing.adapter';
 import type { AppConfigService } from '../../../config/app-config.service';
 import { ChainKey } from '../../../core/chains/chain-key.interfaces';
+import type { BottleneckRateLimiterService } from '../../../rate-limiting/bottleneck-rate-limiter.service';
 
 type AppConfigServiceStub = {
   readonly coingeckoApiBaseUrl: string;
@@ -40,6 +41,9 @@ describe('CoinGeckoPricingAdapter', (): void => {
     vi.stubGlobal('fetch', fetchMock);
     const adapter: CoinGeckoPricingAdapter = new CoinGeckoPricingAdapter(
       createConfigStub() as unknown as AppConfigService,
+      {
+        schedule: async (_k: unknown, op: () => Promise<unknown>): Promise<unknown> => op(),
+      } as unknown as BottleneckRateLimiterService,
     );
 
     const first = await adapter.getUsdQuote({
@@ -79,6 +83,9 @@ describe('CoinGeckoPricingAdapter', (): void => {
     vi.stubGlobal('fetch', fetchMock);
     const adapter: CoinGeckoPricingAdapter = new CoinGeckoPricingAdapter(
       createConfigStub() as unknown as AppConfigService,
+      {
+        schedule: async (_k: unknown, op: () => Promise<unknown>): Promise<unknown> => op(),
+      } as unknown as BottleneckRateLimiterService,
     );
 
     const first = await adapter.getUsdQuote({
@@ -119,6 +126,9 @@ describe('CoinGeckoPricingAdapter', (): void => {
     vi.stubGlobal('fetch', fetchMock);
     const adapter: CoinGeckoPricingAdapter = new CoinGeckoPricingAdapter(
       createConfigStub() as unknown as AppConfigService,
+      {
+        schedule: async (_k: unknown, op: () => Promise<unknown>): Promise<unknown> => op(),
+      } as unknown as BottleneckRateLimiterService,
     );
 
     await adapter.getUsdQuote({

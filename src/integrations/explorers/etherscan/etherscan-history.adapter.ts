@@ -20,6 +20,11 @@ import {
   HistoryKind,
   type IHistoryRequestDto,
 } from '../../../features/tracking/dto/history-request.dto';
+import {
+  LimiterKey,
+  RequestPriority,
+} from '../../../rate-limiting/bottleneck-rate-limiter.interfaces';
+import { BottleneckRateLimiterService } from '../../../rate-limiting/bottleneck-rate-limiter.service';
 
 const ETHERSCAN_FETCH_TIMEOUT_MS = 10_000;
 
@@ -27,7 +32,10 @@ const ETHERSCAN_FETCH_TIMEOUT_MS = 10_000;
 export class EtherscanHistoryAdapter implements IHistoryExplorerAdapter {
   private readonly logger: Logger = new Logger(EtherscanHistoryAdapter.name);
 
-  public constructor(private readonly appConfigService: AppConfigService) {}
+  public constructor(
+    private readonly appConfigService: AppConfigService,
+    private readonly rateLimiterService: BottleneckRateLimiterService,
+  ) {}
 
   public async loadRecentTransactions(request: IHistoryRequestDto): Promise<IHistoryPageDto> {
     if (request.chainKey !== ChainKey.ETHEREUM_MAINNET) {
@@ -152,10 +160,15 @@ export class EtherscanHistoryAdapter implements IHistoryExplorerAdapter {
     url.searchParams.set('sort', 'desc');
     url.searchParams.set('apikey', apiKey);
 
-    const response: Response = await fetch(url, {
-      method: 'GET',
-      signal: AbortSignal.timeout(ETHERSCAN_FETCH_TIMEOUT_MS),
-    });
+    const response: Response = await this.rateLimiterService.schedule(
+      LimiterKey.ETHERSCAN,
+      async (): Promise<Response> =>
+        fetch(url, {
+          method: 'GET',
+          signal: AbortSignal.timeout(ETHERSCAN_FETCH_TIMEOUT_MS),
+        }),
+      RequestPriority.NORMAL,
+    );
 
     if (!response.ok) {
       throw new Error(`Etherscan HTTP ${response.status}`);

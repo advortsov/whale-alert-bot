@@ -28,14 +28,14 @@ import { SolanaHeliusPrimaryAdapter } from '../integrations/rpc/solana/solana-he
 import { SolanaPublicFallbackAdapter } from '../integrations/rpc/solana/solana-public-fallback.adapter';
 import { TronGridPrimaryAdapter } from '../integrations/rpc/tron/tron-grid-primary.adapter';
 import { TronPublicFallbackAdapter } from '../integrations/rpc/tron/tron-public-fallback.adapter';
+import { RateLimitingModule } from '../rate-limiting/rate-limiting.module';
 import { RuntimeModule } from '../runtime/runtime.module';
 import { StorageModule } from '../storage/storage.module';
 import { ProviderFailoverService } from './providers/provider-failover.service';
 import { ProviderFactory } from './providers/provider.factory';
-import { RpcThrottlerService } from './providers/rpc-throttler.service';
 
 @Module({
-  imports: [StorageModule, AlertsModule, RuntimeModule],
+  imports: [StorageModule, AlertsModule, RuntimeModule, RateLimitingModule],
   providers: [
     AlchemyPrimaryAdapter,
     InfuraFallbackAdapter,
@@ -69,7 +69,6 @@ import { RpcThrottlerService } from './providers/rpc-throttler.service';
       useExisting: TronPublicFallbackAdapter,
     },
     ProviderFactory,
-    RpcThrottlerService,
     ProviderFailoverService,
     EventClassifierService,
     SolanaEventClassifierService,

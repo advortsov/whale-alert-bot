@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 import { ProviderFactory } from './provider.factory';
-import { RpcThrottlerService } from './rpc-throttler.service';
+import { AppConfigService } from '../../config/app-config.service';
 import { ChainKey } from '../../core/chains/chain-key.interfaces';
 import type {
   IFallbackRpcAdapter,
@@ -9,49 +9,90 @@ import type {
   IProviderFailoverService,
   ProviderOperation,
 } from '../../core/ports/rpc/rpc-adapter.interfaces';
+import {
+  LimiterKey,
+  RequestPriority,
+} from '../../rate-limiting/bottleneck-rate-limiter.interfaces';
+import { BottleneckRateLimiterService } from '../../rate-limiting/bottleneck-rate-limiter.service';
 
 const PRIMARY_BACKOFF_RESET_SUCCESS_STREAK = 3;
+
+interface IBackoffState {
+  currentBackoffMs: number;
+}
+
+interface IFallbackOnlyOptions<T> {
+  readonly fallbackLimiterKey: LimiterKey;
+  readonly fallbackBackoffKey: string;
+  readonly chainKey: ChainKey;
+  readonly fallbackProvider: IFallbackRpcAdapter;
+  readonly operation: ProviderOperation<T>;
+  readonly priority: RequestPriority;
+}
 
 @Injectable()
 export class ProviderFailoverService implements IProviderFailoverService {
   private readonly logger: Logger = new Logger(ProviderFailoverService.name);
   private readonly primaryCooldownUntilByChain: Map<ChainKey, number> = new Map<ChainKey, number>();
   private readonly primarySuccessStreakByChain: Map<ChainKey, number> = new Map<ChainKey, number>();
+  private readonly backoffStates: Map<string, IBackoffState> = new Map<string, IBackoffState>();
+  private readonly backoffBaseMs: number;
+  private readonly solanaBackoffBaseMs: number;
+  private readonly backoffMaxMs: number;
 
   public constructor(
     private readonly providerFactory: ProviderFactory,
-    private readonly rpcThrottlerService: RpcThrottlerService,
-  ) {}
+    private readonly rateLimiterService: BottleneckRateLimiterService,
+    private readonly appConfigService: AppConfigService,
+  ) {
+    this.backoffBaseMs = this.appConfigService.chainBackoffBaseMs;
+    this.solanaBackoffBaseMs = this.appConfigService.chainSolanaBackoffBaseMs;
+    this.backoffMaxMs = this.appConfigService.chainBackoffMaxMs;
+  }
 
   public async execute<T>(operation: ProviderOperation<T>): Promise<T> {
     return this.executeForChain(ChainKey.ETHEREUM_MAINNET, operation);
   }
 
-  public async executeForChain<T>(chainKey: ChainKey, operation: ProviderOperation<T>): Promise<T> {
-    const primaryThrottleKey: string = this.getPrimaryThrottleKey(chainKey);
-    const fallbackThrottleKey: string = this.getFallbackThrottleKey(chainKey);
+  public async executeForChain<T>(
+    chainKey: ChainKey,
+    operation: ProviderOperation<T>,
+    priority: RequestPriority = RequestPriority.NORMAL,
+  ): Promise<T> {
+    const primaryLimiterKey: LimiterKey = this.getPrimaryLimiterKey(chainKey);
+    const fallbackLimiterKey: LimiterKey = this.getFallbackLimiterKey(chainKey);
+    const primaryBackoffKey: string = `primary:${chainKey}`;
+    const fallbackBackoffKey: string = `fallback:${chainKey}`;
 
     if (this.isPrimaryOnCooldown(chainKey)) {
       const fallbackProvider: IFallbackRpcAdapter = this.providerFactory.createFallback(chainKey);
 
-      return this.executeFallbackOnly(fallbackThrottleKey, chainKey, fallbackProvider, operation);
+      return this.executeFallbackOnly({
+        fallbackLimiterKey,
+        fallbackBackoffKey,
+        chainKey,
+        fallbackProvider,
+        operation,
+        priority,
+      });
     }
 
     const primaryProvider: IPrimaryRpcAdapter = this.providerFactory.createPrimary(chainKey);
 
     try {
-      const primaryResult: T = await this.rpcThrottlerService.scheduleForKey(
-        primaryThrottleKey,
+      const primaryResult: T = await this.rateLimiterService.schedule(
+        primaryLimiterKey,
         async (): Promise<T> => operation(primaryProvider),
+        priority,
       );
-      this.handlePrimarySuccess(chainKey, primaryThrottleKey);
+      this.handlePrimarySuccess(chainKey, primaryBackoffKey);
       return primaryResult;
     } catch (primaryError: unknown) {
       const primaryErrorMessage: string =
         primaryError instanceof Error ? primaryError.message : String(primaryError);
       this.primarySuccessStreakByChain.delete(chainKey);
       this.applyPrimaryBackoffIfNeeded(
-        primaryThrottleKey,
+        primaryBackoffKey,
         chainKey,
         primaryError,
         `primary:${primaryProvider.getName()}`,
@@ -63,18 +104,19 @@ export class ProviderFailoverService implements IProviderFailoverService {
       const fallbackProvider: IFallbackRpcAdapter = this.providerFactory.createFallback(chainKey);
 
       try {
-        const fallbackResult: T = await this.rpcThrottlerService.scheduleForKey(
-          fallbackThrottleKey,
+        const fallbackResult: T = await this.rateLimiterService.schedule(
+          fallbackLimiterKey,
           async (): Promise<T> => operation(fallbackProvider),
+          priority,
         );
-        this.rpcThrottlerService.resetBackoffForKey(fallbackThrottleKey);
+        this.resetBackoff(fallbackBackoffKey);
         return fallbackResult;
       } catch (fallbackError: unknown) {
         const fallbackErrorMessage: string =
           fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
 
         this.applyFallbackBackoffIfNeeded(
-          fallbackThrottleKey,
+          fallbackBackoffKey,
           fallbackError,
           `fallback:${fallbackProvider.getName()}`,
         );
@@ -86,31 +128,32 @@ export class ProviderFailoverService implements IProviderFailoverService {
   }
 
   public getCurrentBackoffMs(chainKey: ChainKey = ChainKey.ETHEREUM_MAINNET): number {
-    const primaryBackoffMs: number = this.rpcThrottlerService.getCurrentBackoffMsForKey(
-      this.getPrimaryThrottleKey(chainKey),
-    );
-    const fallbackBackoffMs: number = this.rpcThrottlerService.getCurrentBackoffMsForKey(
-      this.getFallbackThrottleKey(chainKey),
-    );
+    const primaryBackoffMs: number = this.getBackoffMs(`primary:${chainKey}`);
+    const fallbackBackoffMs: number = this.getBackoffMs(`fallback:${chainKey}`);
     return Math.max(primaryBackoffMs, fallbackBackoffMs);
   }
 
-  private async executeFallbackOnly<T>(
-    fallbackThrottleKey: string,
-    chainKey: ChainKey,
-    fallbackProvider: IFallbackRpcAdapter,
-    operation: ProviderOperation<T>,
-  ): Promise<T> {
+  private async executeFallbackOnly<T>(options: IFallbackOnlyOptions<T>): Promise<T> {
+    const {
+      fallbackLimiterKey,
+      fallbackBackoffKey,
+      chainKey,
+      fallbackProvider,
+      operation,
+      priority,
+    } = options;
+
     try {
-      return await this.rpcThrottlerService.scheduleForKey(
-        fallbackThrottleKey,
+      return await this.rateLimiterService.schedule(
+        fallbackLimiterKey,
         async (): Promise<T> => operation(fallbackProvider),
+        priority,
       );
     } catch (fallbackError: unknown) {
       const fallbackErrorMessage: string =
         fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
       this.applyFallbackBackoffIfNeeded(
-        fallbackThrottleKey,
+        fallbackBackoffKey,
         fallbackError,
         `fallback:${fallbackProvider.getName()}`,
       );
@@ -121,7 +164,7 @@ export class ProviderFailoverService implements IProviderFailoverService {
   }
 
   private applyPrimaryBackoffIfNeeded(
-    primaryThrottleKey: string,
+    backoffKey: string,
     chainKey: ChainKey,
     error: unknown,
     source: string,
@@ -130,25 +173,73 @@ export class ProviderFailoverService implements IProviderFailoverService {
       return;
     }
 
-    this.rpcThrottlerService.increaseBackoffForKey(primaryThrottleKey, source);
-    this.updatePrimaryCooldownByBackoff(chainKey, primaryThrottleKey);
+    this.increaseBackoff(backoffKey, chainKey, source);
+    this.updatePrimaryCooldownByBackoff(chainKey, backoffKey);
   }
 
-  private applyFallbackBackoffIfNeeded(
-    fallbackThrottleKey: string,
-    error: unknown,
-    source: string,
-  ): void {
+  private applyFallbackBackoffIfNeeded(backoffKey: string, error: unknown, source: string): void {
     if (!this.isRateLimitOrTimeoutError(error)) {
       return;
     }
 
-    this.rpcThrottlerService.increaseBackoffForKey(fallbackThrottleKey, source);
+    this.increaseBackoff(backoffKey, null, source);
   }
 
-  private updatePrimaryCooldownByBackoff(chainKey: ChainKey, primaryThrottleKey: string): void {
-    const backoffMs: number =
-      this.rpcThrottlerService.getCurrentBackoffMsForKey(primaryThrottleKey);
+  private increaseBackoff(backoffKey: string, chainKey: ChainKey | null, reason: string): void {
+    const state: IBackoffState = this.getOrCreateBackoffState(backoffKey);
+    const baseBackoffMs: number = this.getBaseBackoffMs(backoffKey);
+    const nextBackoffMs: number =
+      state.currentBackoffMs === 0
+        ? baseBackoffMs
+        : Math.min(state.currentBackoffMs * 2, this.backoffMaxMs);
+
+    if (nextBackoffMs === state.currentBackoffMs) {
+      return;
+    }
+
+    state.currentBackoffMs = nextBackoffMs;
+    this.logger.warn(
+      `RPC backoff increased to ${state.currentBackoffMs}ms, key=${backoffKey}, reason=${reason}`,
+    );
+  }
+
+  private resetBackoff(backoffKey: string): void {
+    const state: IBackoffState | undefined = this.backoffStates.get(backoffKey);
+
+    if (state === undefined || state.currentBackoffMs === 0) {
+      return;
+    }
+
+    this.logger.log(`RPC backoff reset from ${state.currentBackoffMs}ms to 0ms, key=${backoffKey}`);
+    state.currentBackoffMs = 0;
+  }
+
+  private getBackoffMs(backoffKey: string): number {
+    return this.backoffStates.get(backoffKey)?.currentBackoffMs ?? 0;
+  }
+
+  private getOrCreateBackoffState(backoffKey: string): IBackoffState {
+    const existing: IBackoffState | undefined = this.backoffStates.get(backoffKey);
+
+    if (existing !== undefined) {
+      return existing;
+    }
+
+    const created: IBackoffState = { currentBackoffMs: 0 };
+    this.backoffStates.set(backoffKey, created);
+    return created;
+  }
+
+  private getBaseBackoffMs(backoffKey: string): number {
+    if (backoffKey.includes(`:${ChainKey.SOLANA_MAINNET}`)) {
+      return this.solanaBackoffBaseMs;
+    }
+
+    return this.backoffBaseMs;
+  }
+
+  private updatePrimaryCooldownByBackoff(chainKey: ChainKey, backoffKey: string): void {
+    const backoffMs: number = this.getBackoffMs(backoffKey);
 
     if (backoffMs <= 0) {
       return;
@@ -161,10 +252,9 @@ export class ProviderFailoverService implements IProviderFailoverService {
     this.primaryCooldownUntilByChain.delete(chainKey);
   }
 
-  private handlePrimarySuccess(chainKey: ChainKey, primaryThrottleKey: string): void {
+  private handlePrimarySuccess(chainKey: ChainKey, backoffKey: string): void {
     this.clearPrimaryCooldown(chainKey);
-    const currentBackoffMs: number =
-      this.rpcThrottlerService.getCurrentBackoffMsForKey(primaryThrottleKey);
+    const currentBackoffMs: number = this.getBackoffMs(backoffKey);
 
     if (currentBackoffMs <= 0) {
       this.primarySuccessStreakByChain.delete(chainKey);
@@ -183,7 +273,7 @@ export class ProviderFailoverService implements IProviderFailoverService {
       return;
     }
 
-    this.rpcThrottlerService.resetBackoffForKey(primaryThrottleKey);
+    this.resetBackoff(backoffKey);
     this.primarySuccessStreakByChain.delete(chainKey);
     this.logger.log(
       `Primary backoff reset after ${String(PRIMARY_BACKOFF_RESET_SUCCESS_STREAK)} consecutive successful calls. chain=${chainKey}`,
@@ -205,12 +295,26 @@ export class ProviderFailoverService implements IProviderFailoverService {
     return true;
   }
 
-  private getPrimaryThrottleKey(chainKey: ChainKey): string {
-    return `primary:${chainKey}`;
+  private getPrimaryLimiterKey(chainKey: ChainKey): LimiterKey {
+    switch (chainKey) {
+      case ChainKey.ETHEREUM_MAINNET:
+        return LimiterKey.ETHEREUM_PRIMARY;
+      case ChainKey.SOLANA_MAINNET:
+        return LimiterKey.SOLANA_HELIUS;
+      case ChainKey.TRON_MAINNET:
+        return LimiterKey.TRON_GRID;
+    }
   }
 
-  private getFallbackThrottleKey(chainKey: ChainKey): string {
-    return `fallback:${chainKey}`;
+  private getFallbackLimiterKey(chainKey: ChainKey): LimiterKey {
+    switch (chainKey) {
+      case ChainKey.ETHEREUM_MAINNET:
+        return LimiterKey.ETHEREUM_FALLBACK;
+      case ChainKey.SOLANA_MAINNET:
+        return LimiterKey.SOLANA_PUBLIC;
+      case ChainKey.TRON_MAINNET:
+        return LimiterKey.TRON_PUBLIC;
+    }
   }
 
   private isRateLimitOrTimeoutError(error: unknown): boolean {

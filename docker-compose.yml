@@ -58,6 +58,17 @@ services:
       TRON_GRID_API_BASE_URL: ${TRON_GRID_API_BASE_URL:-https://api.trongrid.io}
       TRON_GRID_API_KEY: ${TRON_GRID_API_KEY:-}
       TRONSCAN_TX_BASE_URL: ${TRONSCAN_TX_BASE_URL:-https://tronscan.org/#/transaction/}
+      METRICS_ENABLED: ${METRICS_ENABLED:-true}
+      RATE_LIMIT_ETHERSCAN_MIN_TIME_MS: ${RATE_LIMIT_ETHERSCAN_MIN_TIME_MS:-200}
+      RATE_LIMIT_ETHERSCAN_MAX_CONCURRENT: ${RATE_LIMIT_ETHERSCAN_MAX_CONCURRENT:-1}
+      RATE_LIMIT_SOLANA_HELIUS_MIN_TIME_MS: ${RATE_LIMIT_SOLANA_HELIUS_MIN_TIME_MS:-40}
+      RATE_LIMIT_SOLANA_HELIUS_MAX_CONCURRENT: ${RATE_LIMIT_SOLANA_HELIUS_MAX_CONCURRENT:-5}
+      RATE_LIMIT_TRON_GRID_MIN_TIME_MS: ${RATE_LIMIT_TRON_GRID_MIN_TIME_MS:-1000}
+      RATE_LIMIT_TRON_GRID_MAX_CONCURRENT: ${RATE_LIMIT_TRON_GRID_MAX_CONCURRENT:-1}
+      RATE_LIMIT_COINGECKO_MIN_TIME_MS: ${RATE_LIMIT_COINGECKO_MIN_TIME_MS:-2000}
+      RATE_LIMIT_COINGECKO_MAX_CONCURRENT: ${RATE_LIMIT_COINGECKO_MAX_CONCURRENT:-1}
+      RATE_LIMIT_ETH_RPC_MIN_TIME_MS: ${RATE_LIMIT_ETH_RPC_MIN_TIME_MS:-350}
+      RATE_LIMIT_ETH_RPC_MAX_CONCURRENT: ${RATE_LIMIT_ETH_RPC_MAX_CONCURRENT:-2}
     ports:
       - '3000:3000'
     restart: unless-stopped
@@ -65,5 +76,18 @@ services:
       postgres:
         condition: service_healthy
 
+  prometheus:
+    image: prom/prometheus:v2.55.0
+    container_name: whale-alert-prometheus
+    ports:
+      - '9090:9090'
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    restart: unless-stopped
+    depends_on:
+      - app
+
 volumes:
   postgres_data:
+  prometheus_data:

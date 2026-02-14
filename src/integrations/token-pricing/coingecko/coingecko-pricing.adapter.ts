@@ -13,6 +13,11 @@ import {
   type IPriceQuoteDto,
   type IPriceRequestDto,
 } from '../../../core/ports/token-pricing/token-pricing.interfaces';
+import {
+  LimiterKey,
+  RequestPriority,
+} from '../../../rate-limiting/bottleneck-rate-limiter.interfaces';
+import { BottleneckRateLimiterService } from '../../../rate-limiting/bottleneck-rate-limiter.service';
 
 const HTTP_STATUS_TOO_MANY_REQUESTS = 429;
 
@@ -33,7 +38,10 @@ export class CoinGeckoPricingAdapter implements ITokenPricingPort {
     ICoinGeckoPriceCacheEntry
   >();
 
-  public constructor(private readonly appConfigService: AppConfigService) {}
+  public constructor(
+    private readonly appConfigService: AppConfigService,
+    private readonly rateLimiterService: BottleneckRateLimiterService,
+  ) {}
 
   public async getUsdQuote(request: IPriceRequestDto): Promise<IPriceQuoteDto | null> {
     if (request.chainKey !== KnownChainKey.ETHEREUM_MAINNET) {
@@ -87,10 +95,15 @@ export class CoinGeckoPricingAdapter implements ITokenPricingPort {
   private async fetchUsdQuote(request: IPriceRequestDto): Promise<ICoinGeckoQuoteResult> {
     try {
       if (this.isEthereumNative(request.tokenAddress, request.tokenSymbol)) {
-        const nativeResponse: Response = await fetch(this.buildNativePriceUrl(), {
-          method: 'GET',
-          signal: AbortSignal.timeout(this.appConfigService.coingeckoTimeoutMs),
-        });
+        const nativeResponse: Response = await this.rateLimiterService.schedule(
+          LimiterKey.COINGECKO,
+          async (): Promise<Response> =>
+            fetch(this.buildNativePriceUrl(), {
+              method: 'GET',
+              signal: AbortSignal.timeout(this.appConfigService.coingeckoTimeoutMs),
+            }),
+          RequestPriority.NORMAL,
+        );
         return await this.mapFetchResponse(nativeResponse, 'ethereum');
       }
 
@@ -104,10 +117,15 @@ export class CoinGeckoPricingAdapter implements ITokenPricingPort {
         };
       }
 
-      const tokenResponse: Response = await fetch(this.buildTokenPriceUrl(normalizedTokenAddress), {
-        method: 'GET',
-        signal: AbortSignal.timeout(this.appConfigService.coingeckoTimeoutMs),
-      });
+      const tokenResponse: Response = await this.rateLimiterService.schedule(
+        LimiterKey.COINGECKO,
+        async (): Promise<Response> =>
+          fetch(this.buildTokenPriceUrl(normalizedTokenAddress), {
+            method: 'GET',
+            signal: AbortSignal.timeout(this.appConfigService.coingeckoTimeoutMs),
+          }),
+        RequestPriority.NORMAL,
+      );
 
       return await this.mapFetchResponse(tokenResponse, normalizedTokenAddress);
     } catch (error: unknown) {

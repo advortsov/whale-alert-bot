@@ -9,6 +9,7 @@ import {
   HistoryKind,
   type IHistoryRequestDto,
 } from '../../../features/tracking/dto/history-request.dto';
+import type { BottleneckRateLimiterService } from '../../../rate-limiting/bottleneck-rate-limiter.service';
 import { TronAddressCodec } from '../../address/tron/tron-address.codec';
 
 type AppConfigStub = {
@@ -104,6 +105,9 @@ describe('TronGridHistoryAdapter', (): void => {
     const adapter: TronGridHistoryAdapter = new TronGridHistoryAdapter(
       appConfigStub as unknown as AppConfigService,
       new TronAddressCodec(),
+      {
+        schedule: async (_k: unknown, op: () => Promise<unknown>): Promise<unknown> => op(),
+      } as unknown as BottleneckRateLimiterService,
     );
 
     const result = await adapter.loadRecentTransactions(createRequest({ kind: HistoryKind.ETH }));
@@ -172,6 +176,9 @@ describe('TronGridHistoryAdapter', (): void => {
     const adapter: TronGridHistoryAdapter = new TronGridHistoryAdapter(
       appConfigStub as unknown as AppConfigService,
       new TronAddressCodec(),
+      {
+        schedule: async (_k: unknown, op: () => Promise<unknown>): Promise<unknown> => op(),
+      } as unknown as BottleneckRateLimiterService,
     );
 
     const result = await adapter.loadRecentTransactions(
@@ -247,6 +254,9 @@ describe('TronGridHistoryAdapter', (): void => {
         tronscanTxBaseUrl: 'https://tronscan.org/#/transaction/',
       } as unknown as AppConfigService,
       new TronAddressCodec(),
+      {
+        schedule: async (_k: unknown, op: () => Promise<unknown>): Promise<unknown> => op(),
+      } as unknown as BottleneckRateLimiterService,
     );
 
     const result = await adapter.loadRecentTransactions(createRequest({ kind: HistoryKind.ETH }));
@@ -272,6 +282,9 @@ describe('TronGridHistoryAdapter', (): void => {
         tronscanTxBaseUrl: 'https://tronscan.org/#/transaction/',
       } as unknown as AppConfigService,
       new TronAddressCodec(),
+      {
+        schedule: async (_k: unknown, op: () => Promise<unknown>): Promise<unknown> => op(),
+      } as unknown as BottleneckRateLimiterService,
     );
 
     await expect(

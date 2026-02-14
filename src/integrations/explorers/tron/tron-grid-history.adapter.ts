@@ -17,6 +17,11 @@ import {
   HistoryKind,
   type IHistoryRequestDto,
 } from '../../../features/tracking/dto/history-request.dto';
+import {
+  LimiterKey,
+  RequestPriority,
+} from '../../../rate-limiting/bottleneck-rate-limiter.interfaces';
+import { BottleneckRateLimiterService } from '../../../rate-limiting/bottleneck-rate-limiter.service';
 import { TronAddressCodec } from '../../address/tron/tron-address.codec';
 
 interface ITronGridPageRequestOptions {
@@ -64,6 +69,7 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
   public constructor(
     private readonly appConfigService: AppConfigService,
     private readonly tronAddressCodec: TronAddressCodec,
+    private readonly rateLimiterService: BottleneckRateLimiterService,
   ) {
     this.mapper = new TronGridHistoryMapper(
       this.tronAddressCodec,
@@ -256,11 +262,16 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
       const requestUrl: URL = this.buildRequestUrl(options, queryPolicy);
       this.logger.debug(`tron history request url=${requestUrl.toString()}`);
 
-      const response: Response = await fetch(requestUrl, {
-        method: 'GET',
-        headers,
-        signal: AbortSignal.timeout(TRON_HISTORY_REQUEST_TIMEOUT_MS),
-      });
+      const response: Response = await this.rateLimiterService.schedule(
+        LimiterKey.TRON_GRID,
+        async (): Promise<Response> =>
+          fetch(requestUrl, {
+            method: 'GET',
+            headers,
+            signal: AbortSignal.timeout(TRON_HISTORY_REQUEST_TIMEOUT_MS),
+          }),
+        RequestPriority.NORMAL,
+      );
 
       if (response.ok) {
         const payload: unknown = await response.json();

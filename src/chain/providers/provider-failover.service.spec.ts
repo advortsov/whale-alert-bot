@@ -2,7 +2,6 @@ import { vi } from 'vitest';
 
 import { ProviderFailoverService } from './provider-failover.service';
 import type { ProviderFactory } from './provider.factory';
-import { RpcThrottlerService } from './rpc-throttler.service';
 import type { AppConfigService } from '../../config/app-config.service';
 import { ChainKey } from '../../core/chains/chain-key.interfaces';
 import type {
@@ -15,19 +14,29 @@ import type {
   ISubscriptionHandle,
   IProviderHealth,
 } from '../../core/ports/rpc/rpc-adapter.interfaces';
+import { BottleneckRateLimiterService } from '../../rate-limiting/bottleneck-rate-limiter.service';
 
 class RpcConfigStub {
   public readonly chainRpcMinIntervalMs: number = 0;
   public readonly chainBackoffBaseMs: number = 1;
   public readonly chainSolanaBackoffBaseMs: number = 1;
   public readonly chainBackoffMaxMs: number = 10;
+  public readonly rateLimitEthRpcMinTimeMs: number = 0;
+  public readonly rateLimitEthRpcMaxConcurrent: number = 10;
+  public readonly rateLimitEtherscanMinTimeMs: number = 0;
+  public readonly rateLimitEtherscanMaxConcurrent: number = 1;
+  public readonly rateLimitSolanaHeliusMinTimeMs: number = 0;
+  public readonly rateLimitSolanaHeliusMaxConcurrent: number = 10;
+  public readonly rateLimitTronGridMinTimeMs: number = 0;
+  public readonly rateLimitTronGridMaxConcurrent: number = 10;
+  public readonly rateLimitCoingeckoMinTimeMs: number = 0;
+  public readonly rateLimitCoingeckoMaxConcurrent: number = 1;
 }
 
-class RpcConfigSlowBackoffStub {
-  public readonly chainRpcMinIntervalMs: number = 0;
-  public readonly chainBackoffBaseMs: number = 1000;
-  public readonly chainSolanaBackoffBaseMs: number = 5000;
-  public readonly chainBackoffMaxMs: number = 60_000;
+class RpcConfigSlowBackoffStub extends RpcConfigStub {
+  public override readonly chainBackoffBaseMs: number = 1000;
+  public override readonly chainSolanaBackoffBaseMs: number = 5000;
+  public override readonly chainBackoffMaxMs: number = 60_000;
 }
 
 class PrimaryProviderStub implements IPrimaryRpcAdapter {
@@ -98,6 +107,20 @@ class FallbackProviderStub implements IFallbackRpcAdapter {
   }
 }
 
+const createService = (
+  factory: ProviderFactory,
+  configStub: RpcConfigStub = new RpcConfigStub(),
+): ProviderFailoverService => {
+  const rateLimiter: BottleneckRateLimiterService = new BottleneckRateLimiterService(
+    configStub as unknown as AppConfigService,
+  );
+  return new ProviderFailoverService(
+    factory,
+    rateLimiter,
+    configStub as unknown as AppConfigService,
+  );
+};
+
 describe('ProviderFailoverService', (): void => {
   it('uses fallback when primary operation throws', async (): Promise<void> => {
     const primary: IPrimaryRpcAdapter = new PrimaryProviderStub();
@@ -107,10 +130,7 @@ describe('ProviderFailoverService', (): void => {
       createPrimary: (): IPrimaryRpcAdapter => primary,
       createFallback: (): IFallbackRpcAdapter => fallback,
     } as unknown as ProviderFactory;
-    const throttler: RpcThrottlerService = new RpcThrottlerService(
-      new RpcConfigStub() as unknown as AppConfigService,
-    );
-    const service: ProviderFailoverService = new ProviderFailoverService(factory, throttler);
+    const service: ProviderFailoverService = createService(factory);
 
     const result: string = await service.execute(async (provider): Promise<string> => {
       if (provider.getName() === 'primary') {
@@ -131,10 +151,7 @@ describe('ProviderFailoverService', (): void => {
       createPrimary: (): IPrimaryRpcAdapter => primary,
       createFallback: (): IFallbackRpcAdapter => fallback,
     } as unknown as ProviderFactory;
-    const throttler: RpcThrottlerService = new RpcThrottlerService(
-      new RpcConfigStub() as unknown as AppConfigService,
-    );
-    const service: ProviderFailoverService = new ProviderFailoverService(factory, throttler);
+    const service: ProviderFailoverService = createService(factory);
 
     const operation = async (
       provider: IPrimaryRpcAdapter | IFallbackRpcAdapter,
@@ -169,10 +186,7 @@ describe('ProviderFailoverService', (): void => {
       createPrimary: (): IPrimaryRpcAdapter => primary,
       createFallback: (): IFallbackRpcAdapter => fallback,
     } as unknown as ProviderFactory;
-    const throttler: RpcThrottlerService = new RpcThrottlerService(
-      new RpcConfigSlowBackoffStub() as unknown as AppConfigService,
-    );
-    const service: ProviderFailoverService = new ProviderFailoverService(factory, throttler);
+    const service: ProviderFailoverService = createService(factory, new RpcConfigSlowBackoffStub());
 
     const operation = async (
       provider: IPrimaryRpcAdapter | IFallbackRpcAdapter,
@@ -202,10 +216,7 @@ describe('ProviderFailoverService', (): void => {
       createPrimary: (): IPrimaryRpcAdapter => primary,
       createFallback: (): IFallbackRpcAdapter => fallback,
     } as unknown as ProviderFactory;
-    const throttler: RpcThrottlerService = new RpcThrottlerService(
-      new RpcConfigStub() as unknown as AppConfigService,
-    );
-    const service: ProviderFailoverService = new ProviderFailoverService(factory, throttler);
+    const service: ProviderFailoverService = createService(factory);
 
     const operation = async (
       provider: IPrimaryRpcAdapter | IFallbackRpcAdapter,
@@ -245,10 +256,7 @@ describe('ProviderFailoverService', (): void => {
       createPrimary: (): IPrimaryRpcAdapter => primary,
       createFallback: (): IFallbackRpcAdapter => fallback,
     } as unknown as ProviderFactory;
-    const throttler: RpcThrottlerService = new RpcThrottlerService(
-      new RpcConfigStub() as unknown as AppConfigService,
-    );
-    const service: ProviderFailoverService = new ProviderFailoverService(factory, throttler);
+    const service: ProviderFailoverService = createService(factory);
 
     const operation = async (
       provider: IPrimaryRpcAdapter | IFallbackRpcAdapter,
@@ -296,10 +304,7 @@ describe('ProviderFailoverService', (): void => {
       createPrimary: createPrimaryMock,
       createFallback: (): IFallbackRpcAdapter => fallback,
     } as unknown as ProviderFactory;
-    const throttler: RpcThrottlerService = new RpcThrottlerService(
-      new RpcConfigStub() as unknown as AppConfigService,
-    );
-    const service: ProviderFailoverService = new ProviderFailoverService(factory, throttler);
+    const service: ProviderFailoverService = createService(factory);
 
     const result: string = await service.executeForChain(
       ChainKey.SOLANA_MAINNET,
@@ -330,10 +335,7 @@ describe('ProviderFailoverService', (): void => {
       createPrimary: createPrimaryMock,
       createFallback: (): IFallbackRpcAdapter => fallback,
     } as unknown as ProviderFactory;
-    const throttler: RpcThrottlerService = new RpcThrottlerService(
-      new RpcConfigStub() as unknown as AppConfigService,
-    );
-    const service: ProviderFailoverService = new ProviderFailoverService(factory, throttler);
+    const service: ProviderFailoverService = createService(factory);
 
     const result: string = await service.executeForChain(
       ChainKey.TRON_MAINNET,

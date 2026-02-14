@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 
 import type {
   ChainRuntimeEntry,
@@ -8,6 +8,7 @@ import type {
 import type { IChainRuntimeSnapshot } from '../chain/base-chain-stream.service';
 import { AppConfigService } from '../config/app-config.service';
 import type { ChainKey } from '../core/chains/chain-key.interfaces';
+import { MetricsService } from '../observability/metrics.service';
 
 interface ISloThresholds {
   readonly maxLagWarn: number;
@@ -37,7 +38,10 @@ export class RuntimeStatusService {
 
   private readonly lastWarnTimestamps: Map<string, number> = new Map<string, number>();
 
-  public constructor(private readonly appConfigService: AppConfigService) {}
+  public constructor(
+    private readonly appConfigService: AppConfigService,
+    @Optional() private readonly metricsService: MetricsService | null = null,
+  ) {}
 
   public setSnapshot(snapshot: WatcherRuntimeSnapshot): void {
     this.snapshot = snapshot;
@@ -60,6 +64,7 @@ export class RuntimeStatusService {
     };
 
     this.chainEntries.set(chainSnapshot.chainKey, entry);
+    this.pushChainMetrics(entry);
     this.evaluateSloThresholds(entry);
   }
 
@@ -75,6 +80,21 @@ export class RuntimeStatusService {
     }
 
     return { byChain };
+  }
+
+  private pushChainMetrics(entry: ChainRuntimeEntry): void {
+    if (this.metricsService === null) {
+      return;
+    }
+
+    const chain: string = entry.chainKey;
+
+    if (entry.lag !== null) {
+      this.metricsService.chainLagBlocks.set({ chain }, entry.lag);
+    }
+
+    this.metricsService.chainQueueSize.set({ chain }, entry.queueSize);
+    this.metricsService.chainBackoffMs.set({ chain }, entry.backoffMs);
   }
 
   private evaluateSloThresholds(entry: ChainRuntimeEntry): void {

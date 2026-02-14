@@ -57,4 +57,15 @@ export type AppConfig = {
   readonly historyRateLimitPerMinute: number;
   readonly historyButtonCooldownSec: number;
   readonly historyStaleOnErrorSec: number;
+  readonly metricsEnabled: boolean;
+  readonly rateLimitEtherscanMinTimeMs: number;
+  readonly rateLimitEtherscanMaxConcurrent: number;
+  readonly rateLimitSolanaHeliusMinTimeMs: number;
+  readonly rateLimitSolanaHeliusMaxConcurrent: number;
+  readonly rateLimitTronGridMinTimeMs: number;
+  readonly rateLimitTronGridMaxConcurrent: number;
+  readonly rateLimitCoingeckoMinTimeMs: number;
+  readonly rateLimitCoingeckoMaxConcurrent: number;
+  readonly rateLimitEthRpcMinTimeMs: number;
+  readonly rateLimitEthRpcMaxConcurrent: number;
 };

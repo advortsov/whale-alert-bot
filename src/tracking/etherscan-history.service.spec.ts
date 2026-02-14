@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { EtherscanHistoryService } from './etherscan-history.service';
 import type { AppConfigService } from '../config/app-config.service';
 import { EtherscanHistoryAdapter } from '../integrations/explorers/etherscan/etherscan-history.adapter';
+import type { BottleneckRateLimiterService } from '../rate-limiting/bottleneck-rate-limiter.service';
 
 class HistoryConfigStub {
   public readonly etherscanApiBaseUrl: string = 'https://api.etherscan.io/v2/api';
@@ -35,6 +36,9 @@ describe('EtherscanHistoryService', (): void => {
 
     const adapter: EtherscanHistoryAdapter = new EtherscanHistoryAdapter(
       new HistoryConfigStub() as unknown as AppConfigService,
+      {
+        schedule: async (_k: unknown, op: () => Promise<unknown>): Promise<unknown> => op(),
+      } as unknown as BottleneckRateLimiterService,
     );
     const service: EtherscanHistoryService = new EtherscanHistoryService(adapter);
     const result = await service.loadRecentTransactions(
@@ -89,6 +93,9 @@ describe('EtherscanHistoryService', (): void => {
 
     const adapter: EtherscanHistoryAdapter = new EtherscanHistoryAdapter(
       new HistoryConfigStub() as unknown as AppConfigService,
+      {
+        schedule: async (_k: unknown, op: () => Promise<unknown>): Promise<unknown> => op(),
+      } as unknown as BottleneckRateLimiterService,
     );
     const service: EtherscanHistoryService = new EtherscanHistoryService(adapter);
     const result = await service.loadRecentTransactions(
@@ -123,6 +130,9 @@ describe('EtherscanHistoryService', (): void => {
 
     const adapter: EtherscanHistoryAdapter = new EtherscanHistoryAdapter(
       new HistoryConfigStub() as unknown as AppConfigService,
+      {
+        schedule: async (_k: unknown, op: () => Promise<unknown>): Promise<unknown> => op(),
+      } as unknown as BottleneckRateLimiterService,
     );
     const service: EtherscanHistoryService = new EtherscanHistoryService(adapter);
 

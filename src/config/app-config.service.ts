@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import { type ParsedEnv, envSchema } from './app-config.schema';
 import type { AppConfig } from './app-config.types';
+import { assertWatcherConfig } from './app-config.validators';
 
 @Injectable()
 export class AppConfigService {
@@ -9,7 +10,7 @@ export class AppConfigService {
 
   public constructor() {
     const parsedEnv: ParsedEnv = envSchema.parse(process.env);
-    this.assertWatcherConfig(parsedEnv);
+    assertWatcherConfig(parsedEnv);
     this.config = this.mapConfig(parsedEnv);
   }
 
@@ -229,12 +230,57 @@ export class AppConfigService {
     return this.config.historyStaleOnErrorSec;
   }
 
+  public get metricsEnabled(): boolean {
+    return this.config.metricsEnabled;
+  }
+
+  public get rateLimitEtherscanMinTimeMs(): number {
+    return this.config.rateLimitEtherscanMinTimeMs;
+  }
+
+  public get rateLimitEtherscanMaxConcurrent(): number {
+    return this.config.rateLimitEtherscanMaxConcurrent;
+  }
+
+  public get rateLimitSolanaHeliusMinTimeMs(): number {
+    return this.config.rateLimitSolanaHeliusMinTimeMs;
+  }
+
+  public get rateLimitSolanaHeliusMaxConcurrent(): number {
+    return this.config.rateLimitSolanaHeliusMaxConcurrent;
+  }
+
+  public get rateLimitTronGridMinTimeMs(): number {
+    return this.config.rateLimitTronGridMinTimeMs;
+  }
+
+  public get rateLimitTronGridMaxConcurrent(): number {
+    return this.config.rateLimitTronGridMaxConcurrent;
+  }
+
+  public get rateLimitCoingeckoMinTimeMs(): number {
+    return this.config.rateLimitCoingeckoMinTimeMs;
+  }
+
+  public get rateLimitCoingeckoMaxConcurrent(): number {
+    return this.config.rateLimitCoingeckoMaxConcurrent;
+  }
+
+  public get rateLimitEthRpcMinTimeMs(): number {
+    return this.config.rateLimitEthRpcMinTimeMs;
+  }
+
+  public get rateLimitEthRpcMaxConcurrent(): number {
+    return this.config.rateLimitEthRpcMaxConcurrent;
+  }
+
   private mapConfig(parsedEnv: ParsedEnv): AppConfig {
     return {
       ...this.mapCoreConfig(parsedEnv),
       ...this.mapWatcherConfig(parsedEnv),
       ...this.mapApiConfig(parsedEnv),
       ...this.mapHistoryConfig(parsedEnv),
+      ...this.mapRateLimitConfig(parsedEnv),
     };
   }
 
@@ -376,83 +422,35 @@ export class AppConfigService {
     };
   }
 
-  private assertWatcherConfig(parsedEnv: ParsedEnv): void {
-    this.assertBackoffConfig(parsedEnv);
-    this.assertCatchupConfig(parsedEnv);
-    this.assertCacheConfig(parsedEnv);
-    this.assertEthereumWatcherConfig(parsedEnv);
-    this.assertSolanaWatcherConfig(parsedEnv);
-    this.assertTronWatcherConfig(parsedEnv);
-  }
-
-  private assertBackoffConfig(parsedEnv: ParsedEnv): void {
-    if (parsedEnv.CHAIN_BACKOFF_MAX_MS < parsedEnv.CHAIN_BACKOFF_BASE_MS) {
-      throw new Error('CHAIN_BACKOFF_MAX_MS must be >= CHAIN_BACKOFF_BASE_MS');
-    }
-
-    if (parsedEnv.CHAIN_BACKOFF_MAX_MS < parsedEnv.CHAIN_SOLANA_BACKOFF_BASE_MS) {
-      throw new Error('CHAIN_BACKOFF_MAX_MS must be >= CHAIN_SOLANA_BACKOFF_BASE_MS');
-    }
-  }
-
-  private assertCatchupConfig(parsedEnv: ParsedEnv): void {
-    if (parsedEnv.CHAIN_SOLANA_CATCHUP_BATCH > parsedEnv.CHAIN_SOLANA_QUEUE_MAX) {
-      throw new Error('CHAIN_SOLANA_CATCHUP_BATCH must be <= CHAIN_SOLANA_QUEUE_MAX');
-    }
-
-    if (parsedEnv.CHAIN_TRON_CATCHUP_BATCH > parsedEnv.CHAIN_TRON_QUEUE_MAX) {
-      throw new Error('CHAIN_TRON_CATCHUP_BATCH must be <= CHAIN_TRON_QUEUE_MAX');
-    }
-  }
-
-  private assertCacheConfig(parsedEnv: ParsedEnv): void {
-    if (parsedEnv.PRICE_CACHE_STALE_TTL_SEC < parsedEnv.PRICE_CACHE_FRESH_TTL_SEC) {
-      throw new Error('PRICE_CACHE_STALE_TTL_SEC must be >= PRICE_CACHE_FRESH_TTL_SEC');
-    }
-  }
-
-  private assertEthereumWatcherConfig(parsedEnv: ParsedEnv): void {
-    if (parsedEnv.CHAIN_WATCHER_ENABLED) {
-      if (!parsedEnv.ETH_ALCHEMY_WSS_URL) {
-        throw new Error('ETH_ALCHEMY_WSS_URL is required when CHAIN_WATCHER_ENABLED=true');
-      }
-
-      if (!parsedEnv.ETH_INFURA_WSS_URL) {
-        throw new Error('ETH_INFURA_WSS_URL is required when CHAIN_WATCHER_ENABLED=true');
-      }
-    }
-  }
-
-  private assertSolanaWatcherConfig(parsedEnv: ParsedEnv): void {
-    if (parsedEnv.SOLANA_WATCHER_ENABLED) {
-      if (!parsedEnv.SOLANA_HELIUS_HTTP_URL) {
-        throw new Error('SOLANA_HELIUS_HTTP_URL is required when SOLANA_WATCHER_ENABLED=true');
-      }
-
-      if (!parsedEnv.SOLANA_HELIUS_WSS_URL) {
-        throw new Error('SOLANA_HELIUS_WSS_URL is required when SOLANA_WATCHER_ENABLED=true');
-      }
-
-      if (!parsedEnv.SOLANA_PUBLIC_HTTP_URL) {
-        throw new Error('SOLANA_PUBLIC_HTTP_URL is required when SOLANA_WATCHER_ENABLED=true');
-      }
-
-      if (!parsedEnv.SOLANA_PUBLIC_WSS_URL) {
-        throw new Error('SOLANA_PUBLIC_WSS_URL is required when SOLANA_WATCHER_ENABLED=true');
-      }
-    }
-  }
-
-  private assertTronWatcherConfig(parsedEnv: ParsedEnv): void {
-    if (parsedEnv.TRON_WATCHER_ENABLED) {
-      if (!parsedEnv.TRON_PRIMARY_HTTP_URL) {
-        throw new Error('TRON_PRIMARY_HTTP_URL is required when TRON_WATCHER_ENABLED=true');
-      }
-
-      if (!parsedEnv.TRON_FALLBACK_HTTP_URL) {
-        throw new Error('TRON_FALLBACK_HTTP_URL is required when TRON_WATCHER_ENABLED=true');
-      }
-    }
+  private mapRateLimitConfig(
+    parsedEnv: ParsedEnv,
+  ): Pick<
+    AppConfig,
+    | 'metricsEnabled'
+    | 'rateLimitEtherscanMinTimeMs'
+    | 'rateLimitEtherscanMaxConcurrent'
+    | 'rateLimitSolanaHeliusMinTimeMs'
+    | 'rateLimitSolanaHeliusMaxConcurrent'
+    | 'rateLimitTronGridMinTimeMs'
+    | 'rateLimitTronGridMaxConcurrent'
+    | 'rateLimitCoingeckoMinTimeMs'
+    | 'rateLimitCoingeckoMaxConcurrent'
+    | 'rateLimitEthRpcMinTimeMs'
+    | 'rateLimitEthRpcMaxConcurrent'
+  > {
+    return {
+      metricsEnabled: parsedEnv.METRICS_ENABLED,
+      rateLimitEtherscanMinTimeMs: parsedEnv.RATE_LIMIT_ETHERSCAN_MIN_TIME_MS,
+      rateLimitEtherscanMaxConcurrent: parsedEnv.RATE_LIMIT_ETHERSCAN_MAX_CONCURRENT,
+      rateLimitSolanaHeliusMinTimeMs: parsedEnv.RATE_LIMIT_SOLANA_HELIUS_MIN_TIME_MS,
+      rateLimitSolanaHeliusMaxConcurrent: parsedEnv.RATE_LIMIT_SOLANA_HELIUS_MAX_CONCURRENT,
+      rateLimitTronGridMinTimeMs: parsedEnv.RATE_LIMIT_TRON_GRID_MIN_TIME_MS,
+      rateLimitTronGridMaxConcurrent: parsedEnv.RATE_LIMIT_TRON_GRID_MAX_CONCURRENT,
+      rateLimitCoingeckoMinTimeMs: parsedEnv.RATE_LIMIT_COINGECKO_MIN_TIME_MS,
+      rateLimitCoingeckoMaxConcurrent: parsedEnv.RATE_LIMIT_COINGECKO_MAX_CONCURRENT,
+      rateLimitEthRpcMinTimeMs: parsedEnv.RATE_LIMIT_ETH_RPC_MIN_TIME_MS,
+      rateLimitEthRpcMaxConcurrent: parsedEnv.RATE_LIMIT_ETH_RPC_MAX_CONCURRENT,
+    };
   }
 
   private parseAllowlist(rawValue: string | undefined): readonly string[] {

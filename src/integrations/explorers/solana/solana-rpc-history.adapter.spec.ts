@@ -8,6 +8,7 @@ import {
   HistoryDirectionFilter,
   HistoryKind,
 } from '../../../features/tracking/dto/history-request.dto';
+import type { BottleneckRateLimiterService } from '../../../rate-limiting/bottleneck-rate-limiter.service';
 
 type SolanaConfigStub = {
   readonly solanaHeliusHttpUrl: string | null;
@@ -69,6 +70,9 @@ describe('SolanaRpcHistoryAdapter', (): void => {
     };
     const adapter: SolanaRpcHistoryAdapter = new SolanaRpcHistoryAdapter(
       configStub as unknown as AppConfigService,
+      {
+        schedule: async (_k: unknown, op: () => Promise<unknown>): Promise<unknown> => op(),
+      } as unknown as BottleneckRateLimiterService,
     );
 
     const result = await adapter.loadRecentTransactions({
@@ -117,6 +121,9 @@ describe('SolanaRpcHistoryAdapter', (): void => {
     };
     const adapter: SolanaRpcHistoryAdapter = new SolanaRpcHistoryAdapter(
       configStub as unknown as AppConfigService,
+      {
+        schedule: async (_k: unknown, op: () => Promise<unknown>): Promise<unknown> => op(),
+      } as unknown as BottleneckRateLimiterService,
     );
 
     const result = await adapter.loadRecentTransactions({
@@ -182,6 +189,9 @@ describe('SolanaRpcHistoryAdapter', (): void => {
     };
     const adapter: SolanaRpcHistoryAdapter = new SolanaRpcHistoryAdapter(
       configStub as unknown as AppConfigService,
+      {
+        schedule: async (_k: unknown, op: () => Promise<unknown>): Promise<unknown> => op(),
+      } as unknown as BottleneckRateLimiterService,
     );
 
     const result = await adapter.loadRecentTransactions({

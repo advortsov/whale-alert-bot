@@ -18,6 +18,11 @@ import {
   HistoryKind,
   type IHistoryRequestDto,
 } from '../../../features/tracking/dto/history-request.dto';
+import {
+  LimiterKey,
+  RequestPriority,
+} from '../../../rate-limiting/bottleneck-rate-limiter.interfaces';
+import { BottleneckRateLimiterService } from '../../../rate-limiting/bottleneck-rate-limiter.service';
 
 const SPL_TOKEN_PROGRAM_SUBSTRING = 'tokenkeg';
 const SOLSCAN_TX_BASE_URL = 'https://solscan.io/tx/';
@@ -29,7 +34,10 @@ const SOL_NATIVE_DECIMALS = 9;
 export class SolanaRpcHistoryAdapter implements IHistoryExplorerAdapter {
   private readonly logger: Logger = new Logger(SolanaRpcHistoryAdapter.name);
 
-  public constructor(private readonly appConfigService: AppConfigService) {}
+  public constructor(
+    private readonly appConfigService: AppConfigService,
+    private readonly rateLimiterService: BottleneckRateLimiterService,
+  ) {}
 
   public async loadRecentTransactions(request: IHistoryRequestDto): Promise<IHistoryPageDto> {
     if (request.chainKey !== ChainKey.SOLANA_MAINNET) {
@@ -342,19 +350,24 @@ export class SolanaRpcHistoryAdapter implements IHistoryExplorerAdapter {
     method: string,
     params: readonly unknown[],
   ): Promise<unknown> {
-    const response: Response = await fetch(endpointUrl, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: Date.now(),
-        method,
-        params,
-      }),
-      signal: AbortSignal.timeout(SOLANA_HISTORY_REQUEST_TIMEOUT_MS),
-    });
+    const response: Response = await this.rateLimiterService.schedule(
+      LimiterKey.SOLANA_HELIUS,
+      async (): Promise<Response> =>
+        fetch(endpointUrl, {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: Date.now(),
+            method,
+            params,
+          }),
+          signal: AbortSignal.timeout(SOLANA_HISTORY_REQUEST_TIMEOUT_MS),
+        }),
+      RequestPriority.NORMAL,
+    );
 
     if (!response.ok) {
       throw new Error(`Solana RPC HTTP ${response.status}`);
