@@ -6,20 +6,195 @@
   "links": [],
   "panels": [
     {
-      "title": "Chain Block Lag",
-      "description": "Current block lag per chain watcher",
+      "title": "Node.js CPU Usage",
+      "description": "Process CPU usage (user + system)",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
-          "custom": {
-            "lineWidth": 2,
-            "fillOpacity": 10,
-            "pointSize": 5,
-            "showPoints": "auto"
-          },
+          "custom": { "lineWidth": 2, "fillOpacity": 15 },
+          "unit": "percentunit",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rate(process_cpu_user_seconds_total[1m])",
+          "legendFormat": "user",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(process_cpu_system_seconds_total[1m])",
+          "legendFormat": "system",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "title": "Node.js Memory (RSS & Heap)",
+      "description": "Process memory usage",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 15 },
+          "unit": "bytes",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "process_resident_memory_bytes",
+          "legendFormat": "RSS",
+          "refId": "A"
+        },
+        {
+          "expr": "nodejs_heap_size_used_bytes",
+          "legendFormat": "Heap Used",
+          "refId": "B"
+        },
+        {
+          "expr": "nodejs_heap_size_total_bytes",
+          "legendFormat": "Heap Total",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "title": "Node.js Event Loop Lag",
+      "description": "Event loop lag percentiles",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 10 },
+          "unit": "s",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "nodejs_eventloop_lag_p50_seconds",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "expr": "nodejs_eventloop_lag_p99_seconds",
+          "legendFormat": "p99",
+          "refId": "B"
+        },
+        {
+          "expr": "nodejs_eventloop_lag_seconds",
+          "legendFormat": "mean",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "title": "PostgreSQL Pool Connections",
+      "description": "PG connection pool stats",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 15 },
+          "unit": "short",
+          "min": 0,
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "pg_pool_connections_total",
+          "legendFormat": "total",
+          "refId": "A"
+        },
+        {
+          "expr": "pg_pool_connections_idle",
+          "legendFormat": "idle",
+          "refId": "B"
+        },
+        {
+          "expr": "pg_pool_connections_waiting",
+          "legendFormat": "waiting",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "title": "Node.js Active Handles & Requests",
+      "description": "Active handles and requests in the Node.js process",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 10 },
+          "unit": "short",
+          "min": 0,
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "nodejs_active_handles_total",
+          "legendFormat": "handles",
+          "refId": "A"
+        },
+        {
+          "expr": "nodejs_active_requests_total",
+          "legendFormat": "requests",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "title": "Node.js GC Duration",
+      "description": "Garbage collection duration by type",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 10 },
+          "unit": "s",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rate(nodejs_gc_duration_seconds_sum[5m])",
+          "legendFormat": "{{kind}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Chain Block Lag",
+      "description": "Current block lag per chain watcher",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 10 },
           "unit": "short"
         },
         "overrides": []
@@ -36,17 +211,12 @@
       "title": "Chain Queue Size",
       "description": "Block queue size per chain watcher",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
-          "custom": {
-            "lineWidth": 2,
-            "fillOpacity": 10,
-            "pointSize": 5,
-            "showPoints": "auto"
-          },
+          "custom": { "lineWidth": 2, "fillOpacity": 10 },
           "unit": "short"
         },
         "overrides": []
@@ -63,17 +233,12 @@
       "title": "RPC Requests Rate",
       "description": "RPC requests per second by chain and provider",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
-      "datasource": { "type": "prometheus", "uid": "" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
-          "custom": {
-            "lineWidth": 2,
-            "fillOpacity": 10,
-            "pointSize": 5,
-            "showPoints": "auto"
-          },
+          "custom": { "lineWidth": 2, "fillOpacity": 10 },
           "unit": "reqps"
         },
         "overrides": []
@@ -90,17 +255,12 @@
       "title": "RPC Request Duration (p95)",
       "description": "95th percentile RPC latency",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
-      "datasource": { "type": "prometheus", "uid": "" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
-          "custom": {
-            "lineWidth": 2,
-            "fillOpacity": 10,
-            "pointSize": 5,
-            "showPoints": "auto"
-          },
+          "custom": { "lineWidth": 2, "fillOpacity": 10 },
           "unit": "s"
         },
         "overrides": []
@@ -117,17 +277,12 @@
       "title": "Chain Backoff",
       "description": "Current backoff in ms per chain watcher",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
-      "datasource": { "type": "prometheus", "uid": "" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
-          "custom": {
-            "lineWidth": 2,
-            "fillOpacity": 10,
-            "pointSize": 5,
-            "showPoints": "auto"
-          },
+          "custom": { "lineWidth": 2, "fillOpacity": 10 },
           "unit": "ms"
         },
         "overrides": []
@@ -144,17 +299,12 @@
       "title": "Rate Limiter Queue",
       "description": "Queue size per rate limiter",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
-      "datasource": { "type": "prometheus", "uid": "" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
-          "custom": {
-            "lineWidth": 2,
-            "fillOpacity": 10,
-            "pointSize": 5,
-            "showPoints": "auto"
-          },
+          "custom": { "lineWidth": 2, "fillOpacity": 10 },
           "unit": "short"
         },
         "overrides": []
@@ -171,17 +321,12 @@
       "title": "Rate Limiter Rejections",
       "description": "Rate limiter rejected requests per second",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
-      "datasource": { "type": "prometheus", "uid": "" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 40 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
-          "custom": {
-            "lineWidth": 2,
-            "fillOpacity": 10,
-            "pointSize": 5,
-            "showPoints": "auto"
-          },
+          "custom": { "lineWidth": 2, "fillOpacity": 10 },
           "unit": "reqps"
         },
         "overrides": []

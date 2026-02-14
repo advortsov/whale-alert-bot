@@ -7,6 +7,7 @@ import type {
   LimiterKey,
 } from '../rate-limiting/bottleneck-rate-limiter.interfaces';
 import { BottleneckRateLimiterService } from '../rate-limiting/bottleneck-rate-limiter.service';
+import { DatabaseService } from '../storage/database.service';
 
 const COLLECT_INTERVAL_MS = 10_000;
 
@@ -19,6 +20,7 @@ export class MetricsCollectorService implements OnModuleInit, OnModuleDestroy {
     private readonly metricsService: MetricsService,
     private readonly rateLimiterService: BottleneckRateLimiterService,
     private readonly appConfigService: AppConfigService,
+    private readonly databaseService: DatabaseService,
   ) {}
 
   public onModuleInit(): void {
@@ -29,6 +31,7 @@ export class MetricsCollectorService implements OnModuleInit, OnModuleDestroy {
 
     this.intervalHandle = setInterval((): void => {
       this.collectRateLimiterMetrics();
+      this.collectPgPoolMetrics();
     }, COLLECT_INTERVAL_MS);
 
     this.logger.log(`Metrics collector started, interval=${String(COLLECT_INTERVAL_MS)}ms`);
@@ -48,5 +51,12 @@ export class MetricsCollectorService implements OnModuleInit, OnModuleDestroy {
       const metrics: ILimiterMetrics = this.rateLimiterService.getMetrics(key);
       this.metricsService.rateLimitQueueSize.set({ limiter: key }, metrics.queueSize);
     }
+  }
+
+  private collectPgPoolMetrics(): void {
+    const pool = this.databaseService.getPool();
+    this.metricsService.pgPoolTotal.set(pool.totalCount);
+    this.metricsService.pgPoolIdle.set(pool.idleCount);
+    this.metricsService.pgPoolWaiting.set(pool.waitingCount);
   }
 }

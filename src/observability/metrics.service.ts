@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Counter, Gauge, Histogram, Registry } from 'prom-client';
+import { collectDefaultMetrics, Counter, Gauge, Histogram, Registry } from 'prom-client';
 
 // Histogram bucket boundaries in seconds for RPC latency distribution
 /* eslint-disable no-magic-numbers */
@@ -17,9 +17,14 @@ export class MetricsService {
   public readonly chainLagBlocks: Gauge;
   public readonly chainQueueSize: Gauge;
   public readonly chainBackoffMs: Gauge;
+  public readonly pgPoolTotal: Gauge;
+  public readonly pgPoolIdle: Gauge;
+  public readonly pgPoolWaiting: Gauge;
 
   public constructor() {
     this.registry = new Registry();
+
+    collectDefaultMetrics({ register: this.registry });
 
     this.rpcRequestsTotal = new Counter({
       name: 'rpc_requests_total',
@@ -68,6 +73,24 @@ export class MetricsService {
       name: 'chain_backoff_ms',
       help: 'Current backoff in milliseconds for chain watcher',
       labelNames: ['chain'] as const,
+      registers: [this.registry],
+    });
+
+    this.pgPoolTotal = new Gauge({
+      name: 'pg_pool_connections_total',
+      help: 'Total number of connections in the pg pool',
+      registers: [this.registry],
+    });
+
+    this.pgPoolIdle = new Gauge({
+      name: 'pg_pool_connections_idle',
+      help: 'Number of idle connections in the pg pool',
+      registers: [this.registry],
+    });
+
+    this.pgPoolWaiting = new Gauge({
+      name: 'pg_pool_connections_waiting',
+      help: 'Number of queued requests waiting for a pg connection',
       registers: [this.registry],
     });
   }

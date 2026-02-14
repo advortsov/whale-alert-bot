@@ -8,19 +8,24 @@ import { AppConfigService } from '../config/app-config.service';
 @Injectable()
 export class DatabaseService implements OnModuleDestroy {
   private readonly db: Kysely<IDatabase>;
+  private readonly pool: Pool;
 
   public constructor(private readonly appConfigService: AppConfigService) {
-    const pool: Pool = new Pool({
+    this.pool = new Pool({
       connectionString: this.appConfigService.databaseUrl,
     });
 
     this.db = new Kysely<IDatabase>({
-      dialect: new PostgresDialect({ pool }),
+      dialect: new PostgresDialect({ pool: this.pool }),
     });
   }
 
   public getDb(): Kysely<IDatabase> {
     return this.db;
+  }
+
+  public getPool(): Pool {
+    return this.pool;
   }
 
   public async healthCheck(): Promise<boolean> {
