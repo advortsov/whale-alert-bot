@@ -1,0 +1,47 @@
+services:
+  postgres:
+    image: postgres:16.4-alpine
+    container_name: whale-alert-postgres
+    environment:
+      POSTGRES_DB: whale_alert_bot
+      POSTGRES_USER: ${POSTGRES_USER:-whale}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-whale}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: whale-alert-app
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-whale}:${POSTGRES_PASSWORD}@postgres:5432/whale_alert_bot
+    ports:
+      - '3000:3000'
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  prometheus:
+    image: prom/prometheus:v2.55.0
+    container_name: whale-alert-prometheus
+    ports:
+      - '127.0.0.1:9090:9090'
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    restart: unless-stopped
+    depends_on:
+      - app
+
+volumes:
+  postgres_data:
+  prometheus_data:

@@ -1,0 +1,14 @@
+node_modules
+dist
+coverage
+.git
+.idea
+.env
+.env.*
+!.env.prod.example
+*.md
+docker-compose*.yml
+prometheus.yml
+.github
+.husky
+.vscode

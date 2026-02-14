@@ -45,7 +45,8 @@
     "lint:depcruise": "depcruise src --output-type err-long",
     "depcruise:svg": "depcruise src --output-type dot | dot -T svg > deps.svg",
     "audit:fast": "npm run lint && npm run lint:circular",
-    "audit:full": "npm run lint && npm run lint:boundaries && npm run lint:circular && npm run depcruise:json"
+    "audit:full": "npm run lint && npm run lint:boundaries && npm run lint:circular && npm run depcruise:json",
+    "deploy": "bash scripts/deploy.sh"
   },
   "lint-staged": {
     "{src,test,scripts}/**/*.ts": [
