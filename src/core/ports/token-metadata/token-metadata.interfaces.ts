@@ -5,5 +5,5 @@ export interface ITokenMetadataDto {
 }
 
 export interface ITokenMetadataAdapter {
-  getMetadata(contractAddress: string | null, nowEpochMs?: number): ITokenMetadataDto;
+  getMetadata(contractAddress: string | null): ITokenMetadataDto;
 }

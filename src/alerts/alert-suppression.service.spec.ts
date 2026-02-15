@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AlertSuppressionService } from './alert-suppression.service';
 import { AlertSuppressionReason } from './alert.interfaces';
@@ -38,10 +38,18 @@ describe('AlertSuppressionService', (): void => {
     applyTestEnv();
   });
 
+  beforeEach((): void => {
+    vi.useFakeTimers();
+  });
+
+  afterEach((): void => {
+    vi.useRealTimers();
+  });
+
   it('suppresses zero-value transfer alerts', (): void => {
     const service: AlertSuppressionService = new AlertSuppressionService(new AppConfigService());
 
-    const decision = service.shouldSuppress(buildTransferEvent('0'), 1000);
+    const decision = service.shouldSuppress(buildTransferEvent('0'));
 
     expect(decision.suppressed).toBe(true);
     expect(decision.reason).toBe(AlertSuppressionReason.ZERO_AMOUNT);
@@ -50,13 +58,16 @@ describe('AlertSuppressionService', (): void => {
   it('suppresses repeated events within min interval and allows after interval', (): void => {
     const service: AlertSuppressionService = new AlertSuppressionService(new AppConfigService());
 
-    const firstDecision = service.shouldSuppress(buildTransferEvent('10'), 1000);
-    const secondDecision = service.shouldSuppress(buildTransferEvent('10'), 1001);
-    const thirdDecision = service.shouldSuppress(buildTransferEvent('10'), 12000);
-
+    const firstDecision = service.shouldSuppress(buildTransferEvent('10'));
     expect(firstDecision.suppressed).toBe(false);
+
+    vi.advanceTimersByTime(1_000);
+    const secondDecision = service.shouldSuppress(buildTransferEvent('10'));
     expect(secondDecision.suppressed).toBe(true);
     expect(secondDecision.reason).toBe(AlertSuppressionReason.MIN_INTERVAL);
+
+    vi.advanceTimersByTime(11_000);
+    const thirdDecision = service.shouldSuppress(buildTransferEvent('10'));
     expect(thirdDecision.suppressed).toBe(false);
   });
 });

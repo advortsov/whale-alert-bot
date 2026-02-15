@@ -3,17 +3,19 @@ import { Injectable } from '@nestjs/common';
 import { AlertSuppressionReason, type AlertSuppressionDecision } from './alert.interfaces';
 import { ClassifiedEventType, type ClassifiedEvent } from '../chain/chain.types';
 import { AppConfigService } from '../config/app-config.service';
+import { SimpleCacheImpl } from '../infra/cache';
 
 @Injectable()
 export class AlertSuppressionService {
-  private readonly lastEventByKey: Map<string, number> = new Map<string, number>();
+  private readonly suppressionCache: SimpleCacheImpl<true>;
 
-  public constructor(private readonly appConfigService: AppConfigService) {}
+  public constructor(private readonly appConfigService: AppConfigService) {
+    this.suppressionCache = new SimpleCacheImpl<true>({
+      ttlSec: this.appConfigService.alertMinSendIntervalSec,
+    });
+  }
 
-  public shouldSuppress(
-    event: ClassifiedEvent,
-    nowEpochMs: number = Date.now(),
-  ): AlertSuppressionDecision {
+  public shouldSuppress(event: ClassifiedEvent): AlertSuppressionDecision {
     if (event.eventType === ClassifiedEventType.TRANSFER && event.tokenAmountRaw === '0') {
       return {
         suppressed: true,
@@ -21,9 +23,9 @@ export class AlertSuppressionService {
       };
     }
 
-    const minIntervalMs: number = this.appConfigService.alertMinSendIntervalSec * 1000;
+    const minIntervalSec: number = this.appConfigService.alertMinSendIntervalSec;
 
-    if (minIntervalMs <= 0) {
+    if (minIntervalSec <= 0) {
       return {
         suppressed: false,
         reason: null,
@@ -31,16 +33,15 @@ export class AlertSuppressionService {
     }
 
     const suppressionKey: string = this.buildSuppressionKey(event);
-    const lastSentEpochMs: number | undefined = this.lastEventByKey.get(suppressionKey);
 
-    if (lastSentEpochMs !== undefined && nowEpochMs - lastSentEpochMs < minIntervalMs) {
+    if (this.suppressionCache.has(suppressionKey)) {
       return {
         suppressed: true,
         reason: AlertSuppressionReason.MIN_INTERVAL,
       };
     }
 
-    this.lastEventByKey.set(suppressionKey, nowEpochMs);
+    this.suppressionCache.set(suppressionKey, true);
 
     return {
       suppressed: false,

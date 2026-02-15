@@ -13,6 +13,7 @@ import {
   type IPriceQuoteDto,
   type IPriceRequestDto,
 } from '../../../core/ports/token-pricing/token-pricing.interfaces';
+import { SimpleCacheImpl } from '../../../infra/cache';
 import {
   LimiterKey,
   RequestPriority,
@@ -33,15 +34,19 @@ type CoinGeckoCacheEntryInput = {
 @Injectable()
 export class CoinGeckoPricingAdapter implements ITokenPricingPort {
   private readonly logger: Logger = new Logger(CoinGeckoPricingAdapter.name);
-  private readonly cache: Map<string, ICoinGeckoPriceCacheEntry> = new Map<
-    string,
-    ICoinGeckoPriceCacheEntry
-  >();
+  private readonly cache: SimpleCacheImpl<ICoinGeckoPriceCacheEntry>;
+  private readonly freshTtlMs: number;
 
   public constructor(
     private readonly appConfigService: AppConfigService,
     private readonly rateLimiterService: BottleneckRateLimiterService,
-  ) {}
+  ) {
+    this.freshTtlMs = this.appConfigService.priceCacheFreshTtlSec * 1000;
+    this.cache = new SimpleCacheImpl<ICoinGeckoPriceCacheEntry>({
+      ttlSec: this.appConfigService.priceCacheStaleTtlSec,
+      maxKeys: this.appConfigService.priceCacheMaxEntries,
+    });
+  }
 
   public async getUsdQuote(request: IPriceRequestDto): Promise<IPriceQuoteDto | null> {
     if (request.chainKey !== KnownChainKey.ETHEREUM_MAINNET) {
@@ -77,10 +82,7 @@ export class CoinGeckoPricingAdapter implements ITokenPricingPort {
       return this.mapCacheEntryToQuote(cacheEntry, false);
     }
 
-    const staleCacheEntry: ICoinGeckoPriceCacheEntry | null = this.getStaleCacheEntry(
-      key,
-      nowEpochMs,
-    );
+    const staleCacheEntry: ICoinGeckoPriceCacheEntry | null = this.getStaleCacheEntry(key);
 
     if (staleCacheEntry !== null) {
       this.logger.warn(
@@ -216,8 +218,6 @@ export class CoinGeckoPricingAdapter implements ITokenPricingPort {
   }
 
   private setCacheEntry(input: CoinGeckoCacheEntryInput): ICoinGeckoPriceCacheEntry {
-    const freshTtlMs: number = this.appConfigService.priceCacheFreshTtlSec * 1000;
-    const staleTtlMs: number = this.appConfigService.priceCacheStaleTtlSec * 1000;
     const cacheEntry: ICoinGeckoPriceCacheEntry = {
       key: input.key,
       chainKey: input.chainKey,
@@ -225,29 +225,12 @@ export class CoinGeckoPricingAdapter implements ITokenPricingPort {
       tokenSymbol: input.tokenSymbol,
       usdPrice: input.usdPrice,
       fetchedAtEpochMs: input.nowEpochMs,
-      freshUntilEpochMs: input.nowEpochMs + freshTtlMs,
-      staleUntilEpochMs: input.nowEpochMs + staleTtlMs,
+      freshUntilEpochMs: input.nowEpochMs + this.freshTtlMs,
+      staleUntilEpochMs: input.nowEpochMs + this.appConfigService.priceCacheStaleTtlSec * 1000,
     };
 
-    if (this.cache.has(input.key)) {
-      this.cache.delete(input.key);
-    }
-
     this.cache.set(input.key, cacheEntry);
-    this.evictIfNeeded();
     return cacheEntry;
-  }
-
-  private evictIfNeeded(): void {
-    while (this.cache.size > this.appConfigService.priceCacheMaxEntries) {
-      const oldestKey: string | undefined = this.cache.keys().next().value;
-
-      if (oldestKey === undefined) {
-        return;
-      }
-
-      this.cache.delete(oldestKey);
-    }
   }
 
   private getFreshCacheEntry(key: string, nowEpochMs: number): ICoinGeckoPriceCacheEntry | null {
@@ -261,25 +244,16 @@ export class CoinGeckoPricingAdapter implements ITokenPricingPort {
       return null;
     }
 
-    this.cache.delete(key);
-    this.cache.set(key, cacheEntry);
     return cacheEntry;
   }
 
-  private getStaleCacheEntry(key: string, nowEpochMs: number): ICoinGeckoPriceCacheEntry | null {
+  private getStaleCacheEntry(key: string): ICoinGeckoPriceCacheEntry | null {
     const cacheEntry: ICoinGeckoPriceCacheEntry | undefined = this.cache.get(key);
 
     if (!cacheEntry) {
       return null;
     }
 
-    if (nowEpochMs > cacheEntry.staleUntilEpochMs) {
-      this.cache.delete(key);
-      return null;
-    }
-
-    this.cache.delete(key);
-    this.cache.set(key, cacheEntry);
     return cacheEntry;
   }
 

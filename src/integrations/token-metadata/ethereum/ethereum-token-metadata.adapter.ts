@@ -9,25 +9,19 @@ import type {
   ITokenMetadataAdapter,
   ITokenMetadataDto,
 } from '../../../core/ports/token-metadata/token-metadata.interfaces';
-
-interface ITokenMetadataCacheEntry {
-  readonly tokenMetadata: ITokenMetadataDto;
-  readonly expiresAtEpochMs: number;
-}
+import { SimpleCacheImpl } from '../../../infra/cache';
 
 @Injectable()
 export class EthereumTokenMetadataAdapter implements ITokenMetadataAdapter {
-  private readonly metadataCache: Map<string, ITokenMetadataCacheEntry> = new Map<
-    string,
-    ITokenMetadataCacheEntry
-  >();
+  private readonly metadataCache: SimpleCacheImpl<ITokenMetadataDto>;
 
-  public constructor(private readonly appConfigService: AppConfigService) {}
+  public constructor(private readonly appConfigService: AppConfigService) {
+    this.metadataCache = new SimpleCacheImpl<ITokenMetadataDto>({
+      ttlSec: this.appConfigService.tokenMetaCacheTtlSec,
+    });
+  }
 
-  public getMetadata(
-    contractAddress: string | null,
-    nowEpochMs: number = Date.now(),
-  ): ITokenMetadataDto {
+  public getMetadata(contractAddress: string | null): ITokenMetadataDto {
     if (!contractAddress) {
       return {
         address: 'native_eth',
@@ -37,11 +31,10 @@ export class EthereumTokenMetadataAdapter implements ITokenMetadataAdapter {
     }
 
     const normalizedAddress: string = contractAddress.toLowerCase();
-    const cachedEntry: ITokenMetadataCacheEntry | undefined =
-      this.metadataCache.get(normalizedAddress);
+    const cached: ITokenMetadataDto | undefined = this.metadataCache.get(normalizedAddress);
 
-    if (cachedEntry && cachedEntry.expiresAtEpochMs >= nowEpochMs) {
-      return cachedEntry.tokenMetadata;
+    if (cached) {
+      return cached;
     }
 
     const knownMetadata: ITokenMetadataDto | undefined =
@@ -51,12 +44,7 @@ export class EthereumTokenMetadataAdapter implements ITokenMetadataAdapter {
       address: normalizedAddress,
     };
 
-    const cacheEntry: ITokenMetadataCacheEntry = {
-      tokenMetadata: resolvedMetadata,
-      expiresAtEpochMs: nowEpochMs + this.appConfigService.tokenMetaCacheTtlSec * 1000,
-    };
-
-    this.metadataCache.set(normalizedAddress, cacheEntry);
+    this.metadataCache.set(normalizedAddress, resolvedMetadata);
     return resolvedMetadata;
   }
 }

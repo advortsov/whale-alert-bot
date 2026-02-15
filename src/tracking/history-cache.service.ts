@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 import type { HistoryCacheEntry, HistoryCacheKey } from './history-cache.interfaces';
 import { AppConfigService } from '../config/app-config.service';
 import { HistoryDirectionFilter, HistoryKind } from '../features/tracking/dto/history-request.dto';
+import { SimpleCacheImpl } from '../infra/cache';
 
 type HistoryCacheLookupOptions = {
   readonly kind?: HistoryKind;
@@ -12,9 +13,21 @@ type HistoryCacheLookupOptions = {
 
 @Injectable()
 export class HistoryCacheService {
-  private readonly cache: Map<string, HistoryCacheEntry> = new Map<string, HistoryCacheEntry>();
+  private readonly cache: SimpleCacheImpl<HistoryCacheEntry>;
+  private readonly freshTtlMs: number;
+  private readonly staleTtlMs: number;
 
-  public constructor(private readonly appConfigService: AppConfigService) {}
+  public constructor(private readonly appConfigService: AppConfigService) {
+    const staleTtlSec: number = Math.max(
+      this.appConfigService.historyStaleOnErrorSec,
+      this.appConfigService.historyCacheTtlSec,
+    );
+    this.freshTtlMs = this.appConfigService.historyCacheTtlSec * 1000;
+    this.staleTtlMs = staleTtlSec * 1000;
+    this.cache = new SimpleCacheImpl<HistoryCacheEntry>({
+      ttlSec: staleTtlSec,
+    });
+  }
 
   public getFresh(
     address: string,
@@ -54,7 +67,7 @@ export class HistoryCacheService {
     }
 
     if (entry.staleUntilEpochMs < nowEpochMs) {
-      this.cache.delete(key);
+      this.cache.del(key);
       return null;
     }
 
@@ -76,14 +89,8 @@ export class HistoryCacheService {
       kind,
       direction,
     };
-    const freshUntilEpochMs: number = nowEpochMs + this.appConfigService.historyCacheTtlSec * 1000;
-    const staleUntilEpochMs: number =
-      nowEpochMs +
-      Math.max(
-        this.appConfigService.historyStaleOnErrorSec,
-        this.appConfigService.historyCacheTtlSec,
-      ) *
-        1000;
+    const freshUntilEpochMs: number = nowEpochMs + this.freshTtlMs;
+    const staleUntilEpochMs: number = nowEpochMs + this.staleTtlMs;
 
     const entry: HistoryCacheEntry = {
       key,
