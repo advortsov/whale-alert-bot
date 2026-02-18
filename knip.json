@@ -1,15 +1,17 @@
 {
   "entry": [
     "src/main.ts",
-    "src/modules/**/*.module.ts"
+    "test/**/*.ts"
   ],
   "project": [
-    "src/**/*.ts"
+    "src/**/*.ts",
+    "test/**/*.ts"
   ],
   "ignore": [
     "src/**/*.spec.ts",
     "src/**/*.test.ts"
   ],
+  "ignoreBinaries": ["dot"],
   "ignoreExportsUsedInFile": true,
   "rules": {
     "files": "error",
