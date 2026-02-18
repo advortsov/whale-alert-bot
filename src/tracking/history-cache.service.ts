@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 
 import type { HistoryCacheEntry, HistoryCacheKey } from './history-cache.interfaces';
+import { SimpleCacheImpl } from '../common/utils/cache';
 import { AppConfigService } from '../config/app-config.service';
 import { HistoryDirectionFilter, HistoryKind } from '../features/tracking/dto/history-request.dto';
-import { SimpleCacheImpl } from '../infra/cache';
 
 type HistoryCacheLookupOptions = {
   readonly kind?: HistoryKind;

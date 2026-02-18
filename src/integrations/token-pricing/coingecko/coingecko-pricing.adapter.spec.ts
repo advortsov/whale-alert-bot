@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { CoinGeckoPricingAdapter } from './coingecko-pricing.adapter';
+import { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
 import type { AppConfigService } from '../../../config/app-config.service';
-import { ChainKey } from '../../../core/chains/chain-key.interfaces';
 import type { BottleneckRateLimiterService } from '../../../rate-limiting/bottleneck-rate-limiter.service';
 
 type AppConfigServiceStub = {

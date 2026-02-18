@@ -6,7 +6,7 @@ import {
   ChainId,
   ClassifiedEventType,
   EventDirection,
-} from '../../chain/chain.types';
+} from '../../common/interfaces/chain.types';
 import type { IClassificationContextDto } from '../../core/ports/classification/chain-classifier.interfaces';
 
 describe('SolanaEventClassifierService', (): void => {

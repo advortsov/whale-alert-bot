@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 
-import type { ChainKey } from '../../core/chains/chain-key.interfaces';
+import type { IUpsertAlertMuteInput } from './alert-mutes.repository.interfaces';
+import type { ChainKey } from '../../common/interfaces/chain-key.interfaces';
 import { DatabaseService } from '../kysely/database.service';
 import type { AlertMuteRow, NewAlertMuteRow } from '../types/database.types';
-import type { IUpsertAlertMuteInput } from './alert-mutes.repository.interfaces';
 
 @Injectable()
 export class AlertMutesRepository {

@@ -1,5 +1,5 @@
 import { ProviderFactory } from './provider.factory';
-import { ChainKey } from '../../core/chains/chain-key.interfaces';
+import { ChainKey } from '../../common/interfaces/chain-key.interfaces';
 import type {
   IBlockEnvelope,
   IReceiptEnvelope,

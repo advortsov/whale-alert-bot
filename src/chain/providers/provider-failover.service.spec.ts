@@ -2,8 +2,8 @@ import { vi } from 'vitest';
 
 import { ProviderFailoverService } from './provider-failover.service';
 import type { ProviderFactory } from './provider.factory';
+import { ChainKey } from '../../common/interfaces/chain-key.interfaces';
 import type { AppConfigService } from '../../config/app-config.service';
-import { ChainKey } from '../../core/chains/chain-key.interfaces';
 import type {
   IBlockEnvelope,
   IReceiptEnvelope,

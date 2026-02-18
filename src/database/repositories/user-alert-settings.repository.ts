@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
 
-import type { ChainKey } from '../../core/chains/chain-key.interfaces';
+import type { IUserAlertSettingsUpdatePatch } from './user-alert-settings.repository.interfaces';
+import type { ChainKey } from '../../common/interfaces/chain-key.interfaces';
 import { AlertCexFlowMode } from '../../features/alerts/cex-flow.interfaces';
 import { AlertSmartFilterType } from '../../features/alerts/smart-filter.interfaces';
 import { DatabaseService } from '../kysely/database.service';
 import type { NewUserAlertSettingsRow, UserAlertSettingsRow } from '../types/database.types';
-import type { IUserAlertSettingsUpdatePatch } from './user-alert-settings.repository.interfaces';
 
 @Injectable()
 export class UserAlertSettingsRepository {

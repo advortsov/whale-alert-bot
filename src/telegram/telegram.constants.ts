@@ -1,5 +1,5 @@
 import { SupportedTelegramCommand, WalletCallbackFilterTarget } from './telegram.interfaces';
-import { ChainKey } from '../core/chains/chain-key.interfaces';
+import { ChainKey } from '../common/interfaces/chain-key.interfaces';
 import { AlertFilterToggleTarget } from '../tracking/tracking.interfaces';
 
 export const USER_NOT_IDENTIFIED_MESSAGE = 'Не удалось определить пользователя.';

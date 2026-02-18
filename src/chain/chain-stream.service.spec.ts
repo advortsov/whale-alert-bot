@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { ChainStreamService } from './chain-stream.service';
+import type { EventClassifierService } from './event-classifier.service';
+import type { ProviderFailoverService } from './providers/provider-failover.service';
+import type { ProviderFactory } from './providers/provider.factory';
+import type { AlertDispatcherService } from '../alerts/alert-dispatcher.service';
 import {
   AssetStandard,
   ChainId,
@@ -8,11 +12,7 @@ import {
   EventDirection,
   type ClassifiedEvent,
   type ObservedTransaction,
-} from './chain.types';
-import type { EventClassifierService } from './event-classifier.service';
-import type { ProviderFailoverService } from './providers/provider-failover.service';
-import type { ProviderFactory } from './providers/provider.factory';
-import type { AlertDispatcherService } from '../alerts/alert-dispatcher.service';
+} from '../common/interfaces/chain.types';
 import type { AppConfigService } from '../config/app-config.service';
 import type {
   IBlockEnvelope,
@@ -24,11 +24,11 @@ import type {
   ProviderOperation,
   IProviderHealth,
 } from '../core/ports/rpc/rpc-adapter.interfaces';
-import type { RuntimeStatusService } from '../runtime/runtime-status.service';
 import type { ChainCheckpointsRepository } from '../database/repositories/chain-checkpoints.repository';
 import type { ProcessedEventsRepository } from '../database/repositories/processed-events.repository';
 import type { SubscriptionsRepository } from '../database/repositories/subscriptions.repository';
 import type { WalletEventsRepository } from '../database/repositories/wallet-events.repository';
+import type { RuntimeStatusService } from '../runtime/runtime-status.service';
 
 class ProviderStub {
   public blockHandler: ((blockNumber: number) => Promise<void>) | null = null;

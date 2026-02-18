@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { formatUnits } from 'ethers';
 
+import { ChainKey } from '../common/interfaces/chain-key.interfaces';
 import { AppConfigService } from '../config/app-config.service';
-import { ChainKey } from '../core/chains/chain-key.interfaces';
+import type { WalletEventHistoryView } from '../database/repositories/wallet-events.repository.interfaces';
 import type { IHistoryItemDto } from '../features/tracking/dto/history-item.dto';
 import { HistoryDirectionFilter, HistoryKind } from '../features/tracking/dto/history-request.dto';
-import type { WalletEventHistoryView } from '../database/repositories/wallet-events.repository.interfaces';
 
 const ASSET_VALUE_PRECISION = 6;
 const SHORT_HASH_PREFIX_LENGTH = 10;

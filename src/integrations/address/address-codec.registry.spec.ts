@@ -4,7 +4,7 @@ import { AddressCodecRegistry } from './address-codec.registry';
 import { EthereumAddressCodec } from './ethereum/ethereum-address.codec';
 import { SolanaAddressCodec } from './solana/solana-address.codec';
 import { TronAddressCodec } from './tron/tron-address.codec';
-import { ChainKey } from '../../core/chains/chain-key.interfaces';
+import { ChainKey } from '../../common/interfaces/chain-key.interfaces';
 
 describe('AddressCodecRegistry', (): void => {
   it('returns ethereum codec for ethereum chain', (): void => {

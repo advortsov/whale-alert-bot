@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import type { ChainKey } from '../../core/chains/chain-key.interfaces';
+import type { ChainKey } from '../../common/interfaces/chain-key.interfaces';
 import { DatabaseService } from '../kysely/database.service';
 import type { ChainCheckpointRow, NewChainCheckpointRow } from '../types/database.types';
 

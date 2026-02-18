@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { AlertFilterPolicyService } from './alert-filter-policy.service';
-import { ClassifiedEventType, EventDirection } from '../chain/chain.types';
+import { ClassifiedEventType, EventDirection } from '../common/interfaces/chain.types';
 import { AlertCexFlowMode } from '../features/alerts/cex-flow.interfaces';
 import { AlertSmartFilterType } from '../features/alerts/smart-filter.interfaces';
 

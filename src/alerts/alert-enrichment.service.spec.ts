@@ -9,7 +9,7 @@ import {
   ClassifiedEventType,
   EventDirection,
   type ClassifiedEvent,
-} from '../chain/chain.types';
+} from '../common/interfaces/chain.types';
 import { AppConfigService } from '../config/app-config.service';
 
 describe('AlertEnrichmentService', (): void => {

@@ -1,5 +1,5 @@
-import type { ChainKey } from '../../../core/chains/chain-key.interfaces';
-import type { PriceFailureReason } from '../../../core/ports/token-pricing/token-pricing.interfaces';
+import type { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
+import type { PriceFailureReason } from '../../../common/interfaces/token-pricing/token-pricing.interfaces';
 
 export interface ICoinGeckoPriceCacheEntry {
   readonly key: string;

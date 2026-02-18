@@ -10,14 +10,9 @@ import {
   type UserAlertSettingsSnapshot,
   type WalletAlertFilterState,
 } from './tracking.interfaces';
-import { ChainKey } from '../core/chains/chain-key.interfaces';
-import type { IAddressCodecRegistry } from '../core/ports/address/address-codec-registry.interfaces';
-import { ADDRESS_CODEC_REGISTRY } from '../core/ports/address/address-port.tokens';
-import type {
-  AlertMuteRow,
-  UserAlertPreferenceRow,
-  UserWalletAlertPreferenceRow,
-} from '../database/types/database.types';
+import type { IAddressCodecRegistry } from '../common/interfaces/address/address-codec-registry.interfaces';
+import { ADDRESS_CODEC_REGISTRY } from '../common/interfaces/address/address-port.tokens';
+import { ChainKey } from '../common/interfaces/chain-key.interfaces';
 import { AlertMutesRepository } from '../database/repositories/alert-mutes.repository';
 import { SubscriptionsRepository } from '../database/repositories/subscriptions.repository';
 import { TrackedWalletsRepository } from '../database/repositories/tracked-wallets.repository';
@@ -27,6 +22,11 @@ import { UserAlertSettingsRepository } from '../database/repositories/user-alert
 import { UserWalletAlertPreferencesRepository } from '../database/repositories/user-wallet-alert-preferences.repository';
 import { UsersRepository } from '../database/repositories/users.repository';
 import { WalletEventsRepository } from '../database/repositories/wallet-events.repository';
+import type {
+  AlertMuteRow,
+  UserAlertPreferenceRow,
+  UserWalletAlertPreferenceRow,
+} from '../database/types/database.types';
 
 const DEFAULT_HISTORY_LIMIT = 5;
 const WALLET_CARD_RECENT_EVENTS_LIMIT = 3;

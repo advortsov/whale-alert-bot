@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { buildReleaseNotesMessage } from '../../src/release/release-notes-message.builder';
+import { buildReleaseNotesMessage } from '../../src/common/utils/release/release-notes-message.builder';
 
 type ReleaseNotesCliOptions = {
   readonly chatId: string | null;

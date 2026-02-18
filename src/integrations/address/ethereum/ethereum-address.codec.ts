@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { getAddress } from 'ethers';
 
-import type { IAddressCodec } from '../../../core/ports/address/address-codec.interfaces';
+import type { IAddressCodec } from '../../../common/interfaces/address/address-codec.interfaces';
 
 const ETHEREUM_ADDRESS_PATTERN: RegExp = /^0x[a-fA-F0-9]{40}$/;
 const SHORT_FORMAT_MIN_LENGTH = 14;

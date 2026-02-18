@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { TronGridHistoryAdapter } from './tron-grid-history.adapter';
+import { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
 import type { AppConfigService } from '../../../config/app-config.service';
-import { ChainKey } from '../../../core/chains/chain-key.interfaces';
 import { HistoryDirection, HistoryItemType } from '../../../features/tracking/dto/history-item.dto';
 import {
   HistoryDirectionFilter,

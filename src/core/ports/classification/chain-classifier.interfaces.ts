@@ -1,4 +1,4 @@
-import type { ChainId, ClassifiedEvent } from '../../../chain/chain.types';
+import type { ChainId, ClassifiedEvent } from '../../../common/interfaces/chain.types';
 import type { IReceiptEnvelope } from '../rpc/block-stream.interfaces';
 
 export interface IClassificationContextDto {

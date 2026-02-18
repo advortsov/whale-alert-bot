@@ -8,7 +8,7 @@ import {
   TRACK_CHAIN_ALIAS_MAP,
 } from './telegram.constants';
 import { SupportedTelegramCommand, type ParsedMessageCommand } from './telegram.interfaces';
-import { ChainKey } from '../core/chains/chain-key.interfaces';
+import { ChainKey } from '../common/interfaces/chain-key.interfaces';
 import { AlertFilterToggleTarget } from '../tracking/tracking.interfaces';
 
 const TRACK_ARGS_WITH_LABEL_COUNT = 3;

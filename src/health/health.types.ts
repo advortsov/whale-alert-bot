@@ -1,4 +1,4 @@
-import type { ChainRuntimeEntry, RuntimeTelemetry } from '../runtime/runtime-status.interfaces';
+import type { ChainRuntimeEntry } from '../runtime/runtime-status.interfaces';
 
 export type ComponentHealth = {
   readonly ok: boolean;
@@ -19,5 +19,3 @@ export type AppHealthStatus = {
   readonly tron: ChainStreamHealth;
   readonly telegram: ComponentHealth;
 };
-
-export type AppRuntimeStatus = RuntimeTelemetry;

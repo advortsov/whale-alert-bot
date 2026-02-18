@@ -9,8 +9,3 @@ export interface IThresholdDecision {
   readonly usdAmount: number | null;
   readonly usdUnavailable: boolean;
 }
-
-export interface IQuietHoursDecision {
-  readonly suppressed: boolean;
-  readonly reason: string | null;
-}

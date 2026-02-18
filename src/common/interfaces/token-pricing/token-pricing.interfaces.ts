@@ -1,4 +1,4 @@
-import type { ChainKey } from '../../chains/chain-key.interfaces';
+import type { ChainKey } from '../chain-key.interfaces';
 
 export enum PriceFailureReason {
   RATE_LIMIT = 'rate_limit',

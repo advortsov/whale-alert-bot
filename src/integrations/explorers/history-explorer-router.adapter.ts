@@ -3,8 +3,8 @@ import { Injectable } from '@nestjs/common';
 import { EtherscanHistoryAdapter } from './etherscan/etherscan-history.adapter';
 import { SolanaRpcHistoryAdapter } from './solana/solana-rpc-history.adapter';
 import { TronGridHistoryAdapter } from './tron/tron-grid-history.adapter';
-import { ChainKey } from '../../core/chains/chain-key.interfaces';
-import type { IHistoryExplorerAdapter } from '../../core/ports/explorers/history-explorer.interfaces';
+import { ChainKey } from '../../common/interfaces/chain-key.interfaces';
+import type { IHistoryExplorerAdapter } from '../../common/interfaces/explorers/history-explorer.interfaces';
 import type { IHistoryPageDto } from '../../features/tracking/dto/history-item.dto';
 import type { IHistoryRequestDto } from '../../features/tracking/dto/history-request.dto';
 

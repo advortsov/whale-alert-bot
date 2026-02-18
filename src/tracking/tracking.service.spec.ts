@@ -25,13 +25,11 @@ import {
 } from './tracking-wallets.service';
 import { AlertFilterToggleTarget, type TelegramUserRef } from './tracking.interfaces';
 import { TrackingService } from './tracking.service';
+import type { IAddressCodecRegistry } from '../common/interfaces/address/address-codec-registry.interfaces';
+import type { IAddressCodec } from '../common/interfaces/address/address-codec.interfaces';
+import { ChainKey } from '../common/interfaces/chain-key.interfaces';
+import type { IHistoryExplorerAdapter } from '../common/interfaces/explorers/history-explorer.interfaces';
 import type { AppConfigService } from '../config/app-config.service';
-import { ChainKey } from '../core/chains/chain-key.interfaces';
-import type { IAddressCodecRegistry } from '../core/ports/address/address-codec-registry.interfaces';
-import type { IAddressCodec } from '../core/ports/address/address-codec.interfaces';
-import type { IHistoryExplorerAdapter } from '../core/ports/explorers/history-explorer.interfaces';
-import { HistoryDirection, HistoryItemType } from '../features/tracking/dto/history-item.dto';
-import { HistoryDirectionFilter, HistoryKind } from '../features/tracking/dto/history-request.dto';
 import type { AlertMutesRepository } from '../database/repositories/alert-mutes.repository';
 import type { SubscriptionsRepository } from '../database/repositories/subscriptions.repository';
 import type { TrackedWalletsRepository } from '../database/repositories/tracked-wallets.repository';
@@ -40,6 +38,8 @@ import type { UserAlertSettingsRepository } from '../database/repositories/user-
 import type { UserWalletAlertPreferencesRepository } from '../database/repositories/user-wallet-alert-preferences.repository';
 import type { UsersRepository } from '../database/repositories/users.repository';
 import type { WalletEventsRepository } from '../database/repositories/wallet-events.repository';
+import { HistoryDirection, HistoryItemType } from '../features/tracking/dto/history-item.dto';
+import { HistoryDirectionFilter, HistoryKind } from '../features/tracking/dto/history-request.dto';
 
 type SubscriptionsRepositoryStub = {
   readonly addSubscription: ReturnType<typeof vi.fn>;

@@ -24,8 +24,3 @@ export type TieredCacheOptions = {
   readonly staleTtlSec: number;
   readonly maxKeys?: number;
 };
-
-export type TieredCacheResult<T> = {
-  readonly value: T;
-  readonly fresh: boolean;
-};

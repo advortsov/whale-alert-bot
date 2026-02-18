@@ -3,7 +3,7 @@ import type {
   ITrackingHistoryPageRequestDto,
 } from './dto/tracking-history-request.dto';
 import type { HistoryRequestSource } from './history-rate-limiter.interfaces';
-import type { ChainKey } from '../core/chains/chain-key.interfaces';
+import type { ChainKey } from '../common/interfaces/chain-key.interfaces';
 
 export interface IHistoryUserRef {
   readonly telegramId: string;
@@ -21,12 +21,6 @@ export interface IFirstHistoryPageContext {
   readonly request: ITrackingHistoryPageRequestDto;
   readonly target: IHistoryTargetSnapshot;
   readonly historyParams: IParsedHistoryQueryParams;
-}
-
-export interface IOffsetHistoryPageContext {
-  readonly target: IHistoryTargetSnapshot;
-  readonly historyParams: IParsedHistoryQueryParams;
-  readonly localEventsWithProbeCount: number;
 }
 
 export interface IRateLimitedHistoryContext {

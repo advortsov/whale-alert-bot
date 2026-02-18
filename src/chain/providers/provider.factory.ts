@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 
-import { ChainKey } from '../../core/chains/chain-key.interfaces';
+import { ChainKey } from '../../common/interfaces/chain-key.interfaces';
 import type {
   IFallbackRpcAdapter,
   IPrimaryRpcAdapter,

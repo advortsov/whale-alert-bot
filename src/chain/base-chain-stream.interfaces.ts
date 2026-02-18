@@ -1,6 +1,6 @@
 import type { AlertDispatcherService } from '../alerts/alert-dispatcher.service';
 import type { ProviderFailoverService } from './providers/provider-failover.service';
-import type { ChainKey } from '../core/chains/chain-key.interfaces';
+import type { ChainKey } from '../common/interfaces/chain-key.interfaces';
 import type { ChainCheckpointsRepository } from '../database/repositories/chain-checkpoints.repository';
 import type { ProcessedEventsRepository } from '../database/repositories/processed-events.repository';
 import type { SubscriptionsRepository } from '../database/repositories/subscriptions.repository';

@@ -5,9 +5,9 @@ import type {
   IResolvedHistoryTarget,
   IResolvedTrackedWalletSubscription,
 } from './tracking-address.interfaces';
-import { ChainKey } from '../core/chains/chain-key.interfaces';
-import type { IAddressCodecRegistry } from '../core/ports/address/address-codec-registry.interfaces';
-import { ADDRESS_CODEC_REGISTRY } from '../core/ports/address/address-port.tokens';
+import type { IAddressCodecRegistry } from '../common/interfaces/address/address-codec-registry.interfaces';
+import { ADDRESS_CODEC_REGISTRY } from '../common/interfaces/address/address-port.tokens';
+import { ChainKey } from '../common/interfaces/chain-key.interfaces';
 import { SubscriptionsRepository } from '../database/repositories/subscriptions.repository';
 
 @Injectable()

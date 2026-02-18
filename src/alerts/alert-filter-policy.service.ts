@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import { ClassifiedEventType, EventDirection } from '../chain/chain.types';
+import { ClassifiedEventType, EventDirection } from '../common/interfaces/chain.types';
 import type {
   IAlertFilterPolicy,
   IThresholdDecision,

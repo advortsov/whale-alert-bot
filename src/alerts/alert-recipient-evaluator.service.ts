@@ -4,19 +4,19 @@ import type { IDispatchDecision, IEventUsdContext } from './alert-dispatcher.int
 import { AlertFilterPolicyService } from './alert-filter-policy.service';
 import { CexAddressBookService } from './cex-address-book.service';
 import { QuietHoursService } from './quiet-hours.service';
-import { ClassifiedEventType, type ClassifiedEvent } from '../chain/chain.types';
-import type { ChainKey } from '../core/chains/chain-key.interfaces';
+import type { ChainKey } from '../common/interfaces/chain-key.interfaces';
+import { ClassifiedEventType, type ClassifiedEvent } from '../common/interfaces/chain.types';
+import { AlertMutesRepository } from '../database/repositories/alert-mutes.repository';
+import type { SubscriberWalletRecipient } from '../database/repositories/subscriptions.repository.interfaces';
+import { UserAlertPreferencesRepository } from '../database/repositories/user-alert-preferences.repository';
+import { UserAlertSettingsRepository } from '../database/repositories/user-alert-settings.repository';
+import { UserWalletAlertPreferencesRepository } from '../database/repositories/user-wallet-alert-preferences.repository';
 import type { IAlertFilterPolicy } from '../features/alerts/alert-filter.interfaces';
 import { AlertCexFlowMode, type IAlertCexFlowPolicy } from '../features/alerts/cex-flow.interfaces';
 import {
   AlertSmartFilterType,
   type IAlertSemanticFilterPolicy,
 } from '../features/alerts/smart-filter.interfaces';
-import { AlertMutesRepository } from '../database/repositories/alert-mutes.repository';
-import type { SubscriberWalletRecipient } from '../database/repositories/subscriptions.repository.interfaces';
-import { UserAlertPreferencesRepository } from '../database/repositories/user-alert-preferences.repository';
-import { UserAlertSettingsRepository } from '../database/repositories/user-alert-settings.repository';
-import { UserWalletAlertPreferencesRepository } from '../database/repositories/user-wallet-alert-preferences.repository';
 
 interface IRecipientState {
   readonly preferences: Awaited<ReturnType<UserAlertPreferencesRepository['findOrCreateByUserId']>>;

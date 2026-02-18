@@ -7,7 +7,7 @@ import {
   EventDirection,
   type ClassifiedEvent,
   type ObservedTransaction,
-} from './chain.types';
+} from '../common/interfaces/chain.types';
 import { AppConfigService } from '../config/app-config.service';
 import {
   ERC20_TRANSFER_TOPIC,

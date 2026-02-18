@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { LocalBotHarness } from './local-bot-harness';
 import type { HarnessRunResult, HarnessUser } from './local-bot-harness.interfaces';
+import { ChainKey } from '../../common/interfaces/chain-key.interfaces';
 import type { AppConfigService } from '../../config/app-config.service';
-import { ChainKey } from '../../core/chains/chain-key.interfaces';
 import {
   HistoryDirectionFilter,
   HistoryKind,

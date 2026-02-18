@@ -24,14 +24,14 @@ import type {
   ILoadHistoryWithFallbackContext,
   IRateLimitedHistoryContext,
 } from './tracking-history.interfaces';
-import { ChainKey } from '../core/chains/chain-key.interfaces';
-import { HISTORY_EXPLORER_ADAPTER } from '../core/ports/explorers/explorer-port.tokens';
-import type { IHistoryExplorerAdapter } from '../core/ports/explorers/history-explorer.interfaces';
-import type { IHistoryPageDto } from '../features/tracking/dto/history-item.dto';
-import { HistoryDirectionFilter, HistoryKind } from '../features/tracking/dto/history-request.dto';
+import { ChainKey } from '../common/interfaces/chain-key.interfaces';
+import { HISTORY_EXPLORER_ADAPTER } from '../common/interfaces/explorers/explorer-port.tokens';
+import type { IHistoryExplorerAdapter } from '../common/interfaces/explorers/history-explorer.interfaces';
 import { UsersRepository } from '../database/repositories/users.repository';
 import { WalletEventsRepository } from '../database/repositories/wallet-events.repository';
 import type { WalletEventHistoryView } from '../database/repositories/wallet-events.repository.interfaces';
+import type { IHistoryPageDto } from '../features/tracking/dto/history-item.dto';
+import { HistoryDirectionFilter, HistoryKind } from '../features/tracking/dto/history-request.dto';
 
 const LOCAL_EVENTS_BUFFER = 50;
 const LOCAL_EVENTS_MAX_FETCH = 200;

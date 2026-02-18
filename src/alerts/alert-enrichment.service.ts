@@ -1,9 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { formatUnits } from 'ethers';
 
-import { EventDirection, type ClassifiedEvent } from '../chain/chain.types';
-import { TOKEN_METADATA_ADAPTER } from '../core/ports/token-metadata/token-metadata-port.tokens';
-import type { ITokenMetadataAdapter } from '../core/ports/token-metadata/token-metadata.interfaces';
+import { EventDirection, type ClassifiedEvent } from '../common/interfaces/chain.types';
+import { TOKEN_METADATA_ADAPTER } from '../common/interfaces/token-metadata/token-metadata-port.tokens';
+import type { ITokenMetadataAdapter } from '../common/interfaces/token-metadata/token-metadata.interfaces';
 
 const VALUE_DISPLAY_PRECISION = 6;
 

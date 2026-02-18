@@ -1,16 +1,16 @@
 import { Injectable } from '@nestjs/common';
 
-import { ChainKey } from '../../core/chains/chain-key.interfaces';
+import type {
+  SubscriberWalletRecipient,
+  UserWalletSubscriptionView,
+} from './subscriptions.repository.interfaces';
+import { ChainKey } from '../../common/interfaces/chain-key.interfaces';
 import { DatabaseService } from '../kysely/database.service';
 import type {
   NewUserWalletSubscriptionRow,
   TrackedWalletRow,
   UserWalletSubscriptionRow,
 } from '../types/database.types';
-import type {
-  SubscriberWalletRecipient,
-  UserWalletSubscriptionView,
-} from './subscriptions.repository.interfaces';
 
 const USER_WALLET_SUBSCRIPTIONS_TABLE = 'user_wallet_subscriptions';
 const TRACKED_WALLETS_CHAIN_KEY_COLUMN = 'tracked_wallets.chain_key';

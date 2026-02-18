@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import type { IAddressCodec } from '../../../core/ports/address/address-codec.interfaces';
+import type { IAddressCodec } from '../../../common/interfaces/address/address-codec.interfaces';
 
 const BASE58_ALPHABET: string = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 const SOL_ADDR_MIN_LENGTH = 32;

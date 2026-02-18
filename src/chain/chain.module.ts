@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { ChainStreamService, ChainStreamServiceDependencies } from './chain-stream.service';
 import { EventClassifierService } from './event-classifier.service';
 import { AlertsModule } from '../alerts/alerts.module';
+import { ProviderFailoverService } from './providers/provider-failover.service';
 import {
   SolanaChainStreamService,
   SolanaChainStreamServiceDependencies,
@@ -21,6 +22,7 @@ import {
   TRON_FALLBACK_RPC_ADAPTER,
   TRON_PRIMARY_RPC_ADAPTER,
 } from '../core/ports/rpc/rpc-port.tokens';
+import { DatabaseModule } from '../database/database.module';
 import { TronAddressCodec } from '../integrations/address/tron/tron-address.codec';
 import { AlchemyPrimaryAdapter } from '../integrations/rpc/ethereum/alchemy-primary.adapter';
 import { InfuraFallbackAdapter } from '../integrations/rpc/ethereum/infura-fallback.adapter';
@@ -30,8 +32,6 @@ import { TronGridPrimaryAdapter } from '../integrations/rpc/tron/tron-grid-prima
 import { TronPublicFallbackAdapter } from '../integrations/rpc/tron/tron-public-fallback.adapter';
 import { RateLimitingModule } from '../rate-limiting/rate-limiting.module';
 import { RuntimeModule } from '../runtime/runtime.module';
-import { DatabaseModule } from '../database/database.module';
-import { ProviderFailoverService } from './providers/provider-failover.service';
 import { ProviderFactory } from './providers/provider.factory';
 
 @Module({

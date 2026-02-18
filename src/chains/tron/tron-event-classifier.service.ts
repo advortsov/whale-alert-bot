@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
 
+import { ERC20_TRANSFER_TOPIC } from '../../chain/constants/event-signatures';
 import {
   AssetStandard,
   ClassifiedEventType,
   EventDirection,
   type ClassifiedEvent,
-} from '../../chain/chain.types';
-import { ERC20_TRANSFER_TOPIC } from '../../chain/constants/event-signatures';
+} from '../../common/interfaces/chain.types';
 import type {
   IClassificationContextDto,
   IClassificationResultDto,

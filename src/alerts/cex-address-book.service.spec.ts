@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { CexAddressBookService } from './cex-address-book.service';
+import { ChainKey } from '../common/interfaces/chain-key.interfaces';
 import type { AppConfigService } from '../config/app-config.service';
-import { ChainKey } from '../core/chains/chain-key.interfaces';
 
 describe('CexAddressBookService', (): void => {
   it('resolves known exchange address from built-in map', (): void => {

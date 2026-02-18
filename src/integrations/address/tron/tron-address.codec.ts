@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 
-import type { IAddressCodec } from '../../../core/ports/address/address-codec.interfaces';
+import type { IAddressCodec } from '../../../common/interfaces/address/address-codec.interfaces';
 
 const BASE58_ALPHABET: string = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 const BASE58_MAP: ReadonlyMap<string, number> = new Map(

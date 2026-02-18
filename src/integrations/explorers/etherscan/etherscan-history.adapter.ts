@@ -6,9 +6,9 @@ import {
   type IEtherscanNormalTransaction,
   type IEtherscanTokenTransaction,
 } from './etherscan-history.interfaces';
+import { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
+import type { IHistoryExplorerAdapter } from '../../../common/interfaces/explorers/history-explorer.interfaces';
 import { AppConfigService } from '../../../config/app-config.service';
-import { ChainKey } from '../../../core/chains/chain-key.interfaces';
-import type { IHistoryExplorerAdapter } from '../../../core/ports/explorers/history-explorer.interfaces';
 import {
   HistoryDirection,
   HistoryItemType,

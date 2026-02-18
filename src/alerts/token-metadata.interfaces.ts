@@ -1,1 +1,1 @@
-export type { ITokenMetadataDto as TokenMetadata } from '../core/ports/token-metadata/token-metadata.interfaces';
+export type { ITokenMetadataDto as TokenMetadata } from '../common/interfaces/token-metadata/token-metadata.interfaces';

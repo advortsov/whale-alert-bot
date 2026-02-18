@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { HistoryExplorerRouterAdapter } from './history-explorer-router.adapter';
-import { ChainKey } from '../../core/chains/chain-key.interfaces';
+import { ChainKey } from '../../common/interfaces/chain-key.interfaces';
 import {
   HistoryDirectionFilter,
   HistoryKind,

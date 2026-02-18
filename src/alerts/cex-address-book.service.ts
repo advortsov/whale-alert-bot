@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 
 import { KNOWN_CEX_ADDRESS_BOOK } from './constants/known-cex-addresses';
+import { ChainKey } from '../common/interfaces/chain-key.interfaces';
 import { AppConfigService } from '../config/app-config.service';
-import { ChainKey } from '../core/chains/chain-key.interfaces';
 
 @Injectable()
 export class CexAddressBookService {

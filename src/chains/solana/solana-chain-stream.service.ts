@@ -8,10 +8,10 @@ import {
   type IMatchedTransaction,
 } from '../../chain/base-chain-stream.interfaces';
 import { BaseChainStreamService } from '../../chain/base-chain-stream.service';
-import { ChainId, type ClassifiedEvent } from '../../chain/chain.types';
 import { ProviderFailoverService } from '../../chain/providers/provider-failover.service';
+import { ChainKey } from '../../common/interfaces/chain-key.interfaces';
+import { ChainId, type ClassifiedEvent } from '../../common/interfaces/chain.types';
 import { AppConfigService } from '../../config/app-config.service';
-import { ChainKey } from '../../core/chains/chain-key.interfaces';
 import type { IClassificationContextDto } from '../../core/ports/classification/chain-classifier.interfaces';
 import type {
   IBlockEnvelope,

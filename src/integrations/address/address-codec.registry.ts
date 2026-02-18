@@ -3,9 +3,9 @@ import { Injectable } from '@nestjs/common';
 import { EthereumAddressCodec } from './ethereum/ethereum-address.codec';
 import { SolanaAddressCodec } from './solana/solana-address.codec';
 import { TronAddressCodec } from './tron/tron-address.codec';
-import { ChainKey } from '../../core/chains/chain-key.interfaces';
-import type { IAddressCodecRegistry } from '../../core/ports/address/address-codec-registry.interfaces';
-import type { IAddressCodec } from '../../core/ports/address/address-codec.interfaces';
+import type { IAddressCodecRegistry } from '../../common/interfaces/address/address-codec-registry.interfaces';
+import type { IAddressCodec } from '../../common/interfaces/address/address-codec.interfaces';
+import { ChainKey } from '../../common/interfaces/chain-key.interfaces';
 
 @Injectable()
 export class AddressCodecRegistry implements IAddressCodecRegistry {

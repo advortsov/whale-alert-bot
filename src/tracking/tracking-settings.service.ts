@@ -8,14 +8,17 @@ import {
   type UserAlertPreferences,
   type UserAlertSettingsSnapshot,
 } from './tracking.interfaces';
-import { ChainKey } from '../core/chains/chain-key.interfaces';
-import { AlertCexFlowMode } from '../features/alerts/cex-flow.interfaces';
-import { AlertSmartFilterType } from '../features/alerts/smart-filter.interfaces';
-import type { UserAlertPreferenceRow, UserAlertSettingsRow } from '../database/types/database.types';
+import { ChainKey } from '../common/interfaces/chain-key.interfaces';
 import { AlertEventFilterType } from '../database/repositories/user-alert-preferences.interfaces';
 import { UserAlertPreferencesRepository } from '../database/repositories/user-alert-preferences.repository';
 import { UserAlertSettingsRepository } from '../database/repositories/user-alert-settings.repository';
 import { UsersRepository } from '../database/repositories/users.repository';
+import type {
+  UserAlertPreferenceRow,
+  UserAlertSettingsRow,
+} from '../database/types/database.types';
+import { AlertCexFlowMode } from '../features/alerts/cex-flow.interfaces';
+import { AlertSmartFilterType } from '../features/alerts/smart-filter.interfaces';
 
 @Injectable()
 export class TrackingSettingsServiceDependencies {

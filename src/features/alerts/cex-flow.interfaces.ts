@@ -1,4 +1,4 @@
-import type { ClassifiedEventType, EventDirection } from '../../chain/chain.types';
+import type { ClassifiedEventType, EventDirection } from '../../common/interfaces/chain.types';
 
 export enum AlertCexFlowMode {
   OFF = 'off',

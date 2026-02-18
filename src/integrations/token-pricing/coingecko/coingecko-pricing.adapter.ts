@@ -4,16 +4,16 @@ import type {
   ICoinGeckoPriceCacheEntry,
   ICoinGeckoQuoteResult,
 } from './coingecko-pricing.interfaces';
-import { AppConfigService } from '../../../config/app-config.service';
-import { ChainKey as KnownChainKey } from '../../../core/chains/chain-key.interfaces';
-import type { ChainKey } from '../../../core/chains/chain-key.interfaces';
+import { ChainKey as KnownChainKey } from '../../../common/interfaces/chain-key.interfaces';
+import type { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
 import {
   type ITokenPricingPort,
   PriceFailureReason,
   type IPriceQuoteDto,
   type IPriceRequestDto,
-} from '../../../core/ports/token-pricing/token-pricing.interfaces';
-import { SimpleCacheImpl } from '../../../infra/cache';
+} from '../../../common/interfaces/token-pricing/token-pricing.interfaces';
+import { SimpleCacheImpl } from '../../../common/utils/cache';
+import { AppConfigService } from '../../../config/app-config.service';
 import {
   LimiterKey,
   RequestPriority,

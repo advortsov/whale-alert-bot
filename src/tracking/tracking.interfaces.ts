@@ -1,4 +1,4 @@
-import type { ChainKey } from '../core/chains/chain-key.interfaces';
+import type { ChainKey } from '../common/interfaces/chain-key.interfaces';
 import type { AlertCexFlowMode } from '../features/alerts/cex-flow.interfaces';
 import type { AlertSmartFilterType } from '../features/alerts/smart-filter.interfaces';
 

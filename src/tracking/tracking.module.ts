@@ -20,8 +20,9 @@ import {
   TrackingWalletsServiceDependencies,
 } from './tracking-wallets.service';
 import { TrackingService } from './tracking.service';
-import { ADDRESS_CODEC_REGISTRY } from '../core/ports/address/address-port.tokens';
-import { HISTORY_EXPLORER_ADAPTER } from '../core/ports/explorers/explorer-port.tokens';
+import { ADDRESS_CODEC_REGISTRY } from '../common/interfaces/address/address-port.tokens';
+import { HISTORY_EXPLORER_ADAPTER } from '../common/interfaces/explorers/explorer-port.tokens';
+import { DatabaseModule } from '../database/database.module';
 import { AddressCodecRegistry } from '../integrations/address/address-codec.registry';
 import { EthereumAddressCodec } from '../integrations/address/ethereum/ethereum-address.codec';
 import { SolanaAddressCodec } from '../integrations/address/solana/solana-address.codec';
@@ -31,7 +32,6 @@ import { HistoryExplorerRouterAdapter } from '../integrations/explorers/history-
 import { SolanaRpcHistoryAdapter } from '../integrations/explorers/solana/solana-rpc-history.adapter';
 import { TronGridHistoryAdapter } from '../integrations/explorers/tron/tron-grid-history.adapter';
 import { RateLimitingModule } from '../rate-limiting/rate-limiting.module';
-import { DatabaseModule } from '../database/database.module';
 
 @Module({
   imports: [DatabaseModule, RateLimitingModule],

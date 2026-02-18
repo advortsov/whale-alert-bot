@@ -6,9 +6,9 @@ import type {
   ITronGridTrc20TransactionItem,
 } from './tron-grid-history.interfaces';
 import { TronGridHistoryMapper } from './tron-grid-history.mapper';
+import { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
+import type { IHistoryExplorerAdapter } from '../../../common/interfaces/explorers/history-explorer.interfaces';
 import { AppConfigService } from '../../../config/app-config.service';
-import { ChainKey } from '../../../core/chains/chain-key.interfaces';
-import type { IHistoryExplorerAdapter } from '../../../core/ports/explorers/history-explorer.interfaces';
 import {
   type IHistoryItemDto,
   type IHistoryPageDto,

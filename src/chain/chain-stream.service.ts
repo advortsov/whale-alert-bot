@@ -7,25 +7,25 @@ import {
   type IMatchedTransaction,
 } from './base-chain-stream.interfaces';
 import { BaseChainStreamService } from './base-chain-stream.service';
+import { EventClassifierService } from './event-classifier.service';
+import { ProviderFailoverService } from './providers/provider-failover.service';
+import { ProviderFactory } from './providers/provider.factory';
+import { AlertDispatcherService } from '../alerts/alert-dispatcher.service';
+import { ChainKey } from '../common/interfaces/chain-key.interfaces';
 import {
   ChainId,
   ClassifiedEventType,
   type ClassifiedEvent,
   type ObservedTransaction,
-} from './chain.types';
-import { EventClassifierService } from './event-classifier.service';
-import { ProviderFailoverService } from './providers/provider-failover.service';
-import { ProviderFactory } from './providers/provider.factory';
-import { AlertDispatcherService } from '../alerts/alert-dispatcher.service';
+} from '../common/interfaces/chain.types';
 import { AppConfigService } from '../config/app-config.service';
-import { ChainKey } from '../core/chains/chain-key.interfaces';
 import type { IBlockEnvelope, IReceiptEnvelope } from '../core/ports/rpc/block-stream.interfaces';
 import type { ISubscriptionHandle } from '../core/ports/rpc/rpc-adapter.interfaces';
-import { RuntimeStatusService } from '../runtime/runtime-status.service';
 import { ChainCheckpointsRepository } from '../database/repositories/chain-checkpoints.repository';
 import { ProcessedEventsRepository } from '../database/repositories/processed-events.repository';
 import { SubscriptionsRepository } from '../database/repositories/subscriptions.repository';
 import { WalletEventsRepository } from '../database/repositories/wallet-events.repository';
+import { RuntimeStatusService } from '../runtime/runtime-status.service';
 
 @Injectable()
 export class ChainStreamServiceDependencies implements IBaseChainStreamDependencies {

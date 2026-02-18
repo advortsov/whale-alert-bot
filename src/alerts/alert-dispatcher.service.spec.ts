@@ -11,16 +11,16 @@ import {
 import type { AlertSuppressionService } from './alert-suppression.service';
 import type { CexAddressBookService } from './cex-address-book.service';
 import type { QuietHoursService } from './quiet-hours.service';
+import { ChainKey } from '../common/interfaces/chain-key.interfaces';
 import {
   AssetStandard,
   ChainId,
   ClassifiedEventType,
   EventDirection,
   type ClassifiedEvent,
-} from '../chain/chain.types';
+} from '../common/interfaces/chain.types';
+import type { ITokenPricingPort } from '../common/interfaces/token-pricing/token-pricing.interfaces';
 import type { AppConfigService } from '../config/app-config.service';
-import { ChainKey } from '../core/chains/chain-key.interfaces';
-import type { ITokenPricingPort } from '../core/ports/token-pricing/token-pricing.interfaces';
 import type { AlertMutesRepository } from '../database/repositories/alert-mutes.repository';
 import type { SubscriptionsRepository } from '../database/repositories/subscriptions.repository';
 import type { UserAlertPreferencesRepository } from '../database/repositories/user-alert-preferences.repository';

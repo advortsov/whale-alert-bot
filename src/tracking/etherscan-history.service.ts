@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import type { IHistoryTransactionItem } from './etherscan-history.interfaces';
-import { ChainKey } from '../core/chains/chain-key.interfaces';
+import { ChainKey } from '../common/interfaces/chain-key.interfaces';
 import { HistoryDirectionFilter, HistoryKind } from '../features/tracking/dto/history-request.dto';
 import { EtherscanHistoryAdapter } from '../integrations/explorers/etherscan/etherscan-history.adapter';
 

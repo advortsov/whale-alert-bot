@@ -7,11 +7,16 @@ import {
   type IBaseChainStreamDependencies,
   type IMatchedTransaction,
 } from './base-chain-stream.service';
-import { ChainId, ClassifiedEventType, EventDirection, AssetStandard } from './chain.types';
-import type { ClassifiedEvent } from './chain.types';
 import type { ProviderFailoverService } from './providers/provider-failover.service';
 import type { AlertDispatcherService } from '../alerts/alert-dispatcher.service';
-import type { ChainKey } from '../core/chains/chain-key.interfaces';
+import type { ChainKey } from '../common/interfaces/chain-key.interfaces';
+import type { ClassifiedEvent } from '../common/interfaces/chain.types';
+import {
+  ChainId,
+  ClassifiedEventType,
+  EventDirection,
+  AssetStandard,
+} from '../common/interfaces/chain.types';
 import type { IBlockEnvelope, IReceiptEnvelope } from '../core/ports/rpc/block-stream.interfaces';
 import type {
   ISubscriptionHandle,

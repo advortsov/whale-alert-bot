@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
 
-import { ChainId } from '../../chain/chain.types';
-import { ChainKey } from '../../core/chains/chain-key.interfaces';
-import { DatabaseService } from '../kysely/database.service';
-import type { NewWalletEventRow } from '../types/database.types';
 import type {
   SaveWalletEventInput,
   WalletEventHistoryView,
 } from './wallet-events.repository.interfaces';
+import { ChainKey } from '../../common/interfaces/chain-key.interfaces';
+import { ChainId } from '../../common/interfaces/chain.types';
+import { DatabaseService } from '../kysely/database.service';
+import type { NewWalletEventRow } from '../types/database.types';
 
 @Injectable()
 export class WalletEventsRepository {

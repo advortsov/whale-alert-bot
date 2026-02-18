@@ -1,12 +1,12 @@
+import { ERC20_TRANSFER_TOPIC, UNISWAP_V2_SWAP_TOPIC } from './constants/event-signatures';
+import { EventClassifierService } from './event-classifier.service';
+import { applyTestEnv } from '../../test/helpers/test-env';
 import {
   ChainId,
   ClassifiedEventType,
   EventDirection,
   type ObservedTransaction,
-} from './chain.types';
-import { ERC20_TRANSFER_TOPIC, UNISWAP_V2_SWAP_TOPIC } from './constants/event-signatures';
-import { EventClassifierService } from './event-classifier.service';
-import { applyTestEnv } from '../../test/helpers/test-env';
+} from '../common/interfaces/chain.types';
 import { AppConfigService } from '../config/app-config.service';
 
 const buildTransferEvent = (): ObservedTransaction => {

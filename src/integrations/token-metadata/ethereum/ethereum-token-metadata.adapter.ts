@@ -4,12 +4,12 @@ import {
   FALLBACK_TOKEN_METADATA,
   KNOWN_TOKEN_METADATA,
 } from '../../../alerts/constants/known-token-metadata';
-import { AppConfigService } from '../../../config/app-config.service';
 import type {
   ITokenMetadataAdapter,
   ITokenMetadataDto,
-} from '../../../core/ports/token-metadata/token-metadata.interfaces';
-import { SimpleCacheImpl } from '../../../infra/cache';
+} from '../../../common/interfaces/token-metadata/token-metadata.interfaces';
+import { SimpleCacheImpl } from '../../../common/utils/cache';
+import { AppConfigService } from '../../../config/app-config.service';
 
 @Injectable()
 export class EthereumTokenMetadataAdapter implements ITokenMetadataAdapter {

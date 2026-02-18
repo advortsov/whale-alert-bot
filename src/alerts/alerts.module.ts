@@ -12,12 +12,12 @@ import { AlertSuppressionService } from './alert-suppression.service';
 import { CexAddressBookService } from './cex-address-book.service';
 import { QuietHoursService } from './quiet-hours.service';
 import { TokenMetadataService } from './token-metadata.service';
-import { TOKEN_METADATA_ADAPTER } from '../core/ports/token-metadata/token-metadata-port.tokens';
-import { TOKEN_PRICING_PORT } from '../core/ports/token-pricing/token-pricing-port.tokens';
+import { TOKEN_METADATA_ADAPTER } from '../common/interfaces/token-metadata/token-metadata-port.tokens';
+import { TOKEN_PRICING_PORT } from '../common/interfaces/token-pricing/token-pricing-port.tokens';
+import { DatabaseModule } from '../database/database.module';
 import { EthereumTokenMetadataAdapter } from '../integrations/token-metadata/ethereum/ethereum-token-metadata.adapter';
 import { CoinGeckoPricingAdapter } from '../integrations/token-pricing/coingecko/coingecko-pricing.adapter';
 import { RateLimitingModule } from '../rate-limiting/rate-limiting.module';
-import { DatabaseModule } from '../database/database.module';
 import { TelegramModule } from '../telegram/telegram.module';
 
 @Module({

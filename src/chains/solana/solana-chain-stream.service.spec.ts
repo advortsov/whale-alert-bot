@@ -3,15 +3,15 @@ import { describe, expect, it, vi } from 'vitest';
 import { SolanaChainStreamService } from './solana-chain-stream.service';
 import { SolanaEventClassifierService } from './solana-event-classifier.service';
 import type { AlertDispatcherService } from '../../alerts/alert-dispatcher.service';
+import type { ProviderFailoverService } from '../../chain/providers/provider-failover.service';
+import { ChainKey } from '../../common/interfaces/chain-key.interfaces';
 import {
   ChainId,
   ClassifiedEventType,
   EventDirection,
   type ClassifiedEvent,
-} from '../../chain/chain.types';
-import type { ProviderFailoverService } from '../../chain/providers/provider-failover.service';
+} from '../../common/interfaces/chain.types';
 import type { AppConfigService } from '../../config/app-config.service';
-import { ChainKey } from '../../core/chains/chain-key.interfaces';
 import type {
   IBlockEnvelope,
   IReceiptEnvelope,

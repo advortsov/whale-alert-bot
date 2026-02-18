@@ -1,10 +1,13 @@
 import { Injectable } from '@nestjs/common';
 
 import type { UserAlertPreferences, UserAlertSettingsSnapshot } from './tracking.interfaces';
+import type {
+  UserAlertPreferenceRow,
+  UserAlertSettingsRow,
+} from '../database/types/database.types';
 import { AlertCexFlowMode } from '../features/alerts/cex-flow.interfaces';
 import { normalizeDexKey } from '../features/alerts/dex-normalizer.util';
 import { AlertSmartFilterType } from '../features/alerts/smart-filter.interfaces';
-import type { UserAlertPreferenceRow, UserAlertSettingsRow } from '../database/types/database.types';
 
 const MAX_HOUR = 23;
 const MAX_MINUTE = 59;

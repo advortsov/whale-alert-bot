@@ -1,4 +1,4 @@
-import type { ClassifiedEvent } from '../../chain/chain.types';
+import type { ClassifiedEvent } from '../../common/interfaces/chain.types';
 
 export type WalletEventHistoryView = {
   readonly chainId: number;

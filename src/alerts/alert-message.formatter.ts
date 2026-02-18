@@ -1,7 +1,11 @@
 import { Injectable } from '@nestjs/common';
 
 import type { IAlertMessageContext } from './alert.interfaces';
-import { ClassifiedEventType, EventDirection, type ClassifiedEvent } from '../chain/chain.types';
+import {
+  ClassifiedEventType,
+  EventDirection,
+  type ClassifiedEvent,
+} from '../common/interfaces/chain.types';
 import { AppConfigService } from '../config/app-config.service';
 
 const SHORT_HASH_PREFIX_LENGTH = 10;

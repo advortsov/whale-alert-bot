@@ -1,7 +1,5 @@
 export enum HistoryItemType {
   TRANSFER = 'TRANSFER',
-  SWAP = 'SWAP',
-  UNKNOWN = 'UNKNOWN',
 }
 
 export enum HistoryDirection {

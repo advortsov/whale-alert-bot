@@ -1,4 +1,4 @@
-import type { EventDirection, ClassifiedEventType } from '../../chain/chain.types';
+import type { EventDirection, ClassifiedEventType } from '../../common/interfaces/chain.types';
 
 export enum AlertSmartFilterType {
   ALL = 'all',

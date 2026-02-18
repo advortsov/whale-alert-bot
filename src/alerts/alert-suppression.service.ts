@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 
 import { AlertSuppressionReason, type AlertSuppressionDecision } from './alert.interfaces';
-import { ClassifiedEventType, type ClassifiedEvent } from '../chain/chain.types';
+import { ClassifiedEventType, type ClassifiedEvent } from '../common/interfaces/chain.types';
+import { SimpleCacheImpl } from '../common/utils/cache';
 import { AppConfigService } from '../config/app-config.service';
-import { SimpleCacheImpl } from '../infra/cache';
 
 @Injectable()
 export class AlertSuppressionService {

@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 import { ProviderFactory } from './provider.factory';
+import { ChainKey } from '../../common/interfaces/chain-key.interfaces';
 import { AppConfigService } from '../../config/app-config.service';
-import { ChainKey } from '../../core/chains/chain-key.interfaces';
 import type {
   IFallbackRpcAdapter,
   IPrimaryRpcAdapter,

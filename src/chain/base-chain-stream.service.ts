@@ -6,7 +6,7 @@ import type {
   IChainStreamConfig,
   IMatchedTransaction,
 } from './base-chain-stream.interfaces';
-import { ClassifiedEventType, type ClassifiedEvent } from './chain.types';
+import { ClassifiedEventType, type ClassifiedEvent } from '../common/interfaces/chain.types';
 import type {
   IBlockEnvelope,
   ITransactionEnvelope,

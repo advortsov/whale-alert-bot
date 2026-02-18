@@ -6,8 +6,8 @@ import type {
   WatcherRuntimeSnapshot,
 } from './runtime-status.interfaces';
 import type { IChainRuntimeSnapshot } from '../chain/base-chain-stream.service';
+import type { ChainKey } from '../common/interfaces/chain-key.interfaces';
 import { AppConfigService } from '../config/app-config.service';
-import type { ChainKey } from '../core/chains/chain-key.interfaces';
 import { MetricsService } from '../observability/metrics.service';
 
 interface ISloThresholds {
