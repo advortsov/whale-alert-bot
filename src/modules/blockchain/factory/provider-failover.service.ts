@@ -1,19 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 import { ProviderFactory } from './provider.factory';
-import { ChainKey } from '../../common/interfaces/chain-key.interfaces';
-import { AppConfigService } from '../../config/app-config.service';
+import { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
+import { AppConfigService } from '../../../config/app-config.service';
 import type {
   IFallbackRpcAdapter,
   IPrimaryRpcAdapter,
   IProviderFailoverService,
   ProviderOperation,
-} from '../../core/ports/rpc/rpc-adapter.interfaces';
-import {
-  LimiterKey,
-  RequestPriority,
-} from '../../rate-limiting/bottleneck-rate-limiter.interfaces';
-import { BottleneckRateLimiterService } from '../../rate-limiting/bottleneck-rate-limiter.service';
+} from '../base/rpc-adapter.interfaces';
+import { LimiterKey, RequestPriority } from '../rate-limiting/bottleneck-rate-limiter.interfaces';
+import { BottleneckRateLimiterService } from '../rate-limiting/bottleneck-rate-limiter.service';
 
 const PRIMARY_BACKOFF_RESET_SUCCESS_STREAK = 3;
 

@@ -17,8 +17,8 @@ import { AppConfigService } from '../../../config/app-config.service';
 import {
   LimiterKey,
   RequestPriority,
-} from '../../../rate-limiting/bottleneck-rate-limiter.interfaces';
-import { BottleneckRateLimiterService } from '../../../rate-limiting/bottleneck-rate-limiter.service';
+} from '../../../modules/blockchain/rate-limiting/bottleneck-rate-limiter.interfaces';
+import { BottleneckRateLimiterService } from '../../../modules/blockchain/rate-limiting/bottleneck-rate-limiter.service';
 
 const HTTP_STATUS_TOO_MANY_REQUESTS = 429;
 

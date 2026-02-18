@@ -10,7 +10,7 @@ import type {
   IClassificationContextDto,
   IClassificationResultDto,
   IChainEventClassifier,
-} from '../../core/ports/classification/chain-classifier.interfaces';
+} from '../../modules/blockchain/base/chain-classifier.interfaces';
 
 const SOL_NATIVE_DECIMALS = 9;
 

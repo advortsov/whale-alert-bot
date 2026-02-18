@@ -1,18 +1,15 @@
 import { Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 
-import { ClassifiedEventType, type ClassifiedEvent } from '../common/interfaces/chain.types';
 import type {
   IBaseChainStreamDependencies,
   IChainRuntimeSnapshot,
   IChainStreamConfig,
   IMatchedTransaction,
-} from '../modules/blockchain/base/base-chain-stream.interfaces';
-import {
-  type IBlockEnvelope,
-  type ITransactionEnvelope,
-} from '../modules/blockchain/base/block-stream.interfaces';
-import type { ISubscriptionHandle } from '../modules/blockchain/base/rpc-adapter.interfaces';
-import { QueueOverflowPolicy } from '../modules/blockchain/base/stream-policy.interfaces';
+} from './base-chain-stream.interfaces';
+import type { IBlockEnvelope, ITransactionEnvelope } from './block-stream.interfaces';
+import type { ISubscriptionHandle } from './rpc-adapter.interfaces';
+import { QueueOverflowPolicy } from './stream-policy.interfaces';
+import { ClassifiedEventType, type ClassifiedEvent } from '../../../common/interfaces/chain.types';
 
 const QUEUE_RETAIN_RATIO = 0.3;
 const QUEUE_RETAIN_MIN = 10;
@@ -488,4 +485,4 @@ export type {
   IChainRuntimeSnapshot,
   IChainStreamConfig,
   IMatchedTransaction,
-} from '../modules/blockchain/base/base-chain-stream.interfaces';
+} from './base-chain-stream.interfaces';

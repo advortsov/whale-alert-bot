@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CoinGeckoPricingAdapter } from './coingecko-pricing.adapter';
 import { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
 import type { AppConfigService } from '../../../config/app-config.service';
-import type { BottleneckRateLimiterService } from '../../../rate-limiting/bottleneck-rate-limiter.service';
+import type { BottleneckRateLimiterService } from '../../../modules/blockchain/rate-limiting/bottleneck-rate-limiter.service';
 
 type AppConfigServiceStub = {
   readonly coingeckoApiBaseUrl: string;

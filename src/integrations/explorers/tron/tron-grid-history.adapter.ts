@@ -20,8 +20,8 @@ import {
 import {
   LimiterKey,
   RequestPriority,
-} from '../../../rate-limiting/bottleneck-rate-limiter.interfaces';
-import { BottleneckRateLimiterService } from '../../../rate-limiting/bottleneck-rate-limiter.service';
+} from '../../../modules/blockchain/rate-limiting/bottleneck-rate-limiter.interfaces';
+import { BottleneckRateLimiterService } from '../../../modules/blockchain/rate-limiting/bottleneck-rate-limiter.service';
 import { TronAddressCodec } from '../../address/tron/tron-address.codec';
 
 interface ITronGridPageRequestOptions {

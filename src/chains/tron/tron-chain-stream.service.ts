@@ -2,26 +2,26 @@ import { Inject, Injectable } from '@nestjs/common';
 
 import { TronEventClassifierService } from './tron-event-classifier.service';
 import { AlertDispatcherService } from '../../alerts/alert-dispatcher.service';
-import {
-  type IBaseChainStreamDependencies,
-  type IChainStreamConfig,
-  type IMatchedTransaction,
-} from '../../chain/base-chain-stream.interfaces';
-import { BaseChainStreamService } from '../../chain/base-chain-stream.service';
-import { ProviderFailoverService } from '../../chain/providers/provider-failover.service';
 import { ChainKey } from '../../common/interfaces/chain-key.interfaces';
 import { ChainId, type ClassifiedEvent } from '../../common/interfaces/chain.types';
 import { AppConfigService } from '../../config/app-config.service';
-import type { IClassificationContextDto } from '../../core/ports/classification/chain-classifier.interfaces';
-import type {
-  IBlockEnvelope,
-  IReceiptEnvelope,
-} from '../../core/ports/rpc/block-stream.interfaces';
-import type { ISubscriptionHandle } from '../../core/ports/rpc/rpc-adapter.interfaces';
 import { ChainCheckpointsRepository } from '../../database/repositories/chain-checkpoints.repository';
 import { ProcessedEventsRepository } from '../../database/repositories/processed-events.repository';
 import { SubscriptionsRepository } from '../../database/repositories/subscriptions.repository';
 import { WalletEventsRepository } from '../../database/repositories/wallet-events.repository';
+import {
+  type IBaseChainStreamDependencies,
+  type IChainStreamConfig,
+  type IMatchedTransaction,
+} from '../../modules/blockchain/base/base-chain-stream.interfaces';
+import { BaseChainStreamService } from '../../modules/blockchain/base/base-chain-stream.service';
+import type {
+  IBlockEnvelope,
+  IReceiptEnvelope,
+} from '../../modules/blockchain/base/block-stream.interfaces';
+import type { IClassificationContextDto } from '../../modules/blockchain/base/chain-classifier.interfaces';
+import type { ISubscriptionHandle } from '../../modules/blockchain/base/rpc-adapter.interfaces';
+import { ProviderFailoverService } from '../../modules/blockchain/factory/provider-failover.service';
 
 @Injectable()
 export class TronChainStreamServiceDependencies implements IBaseChainStreamDependencies {

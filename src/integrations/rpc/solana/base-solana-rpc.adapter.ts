@@ -4,13 +4,13 @@ import type {
   IBlockEnvelope,
   IReceiptEnvelope,
   ITransactionEnvelope,
-} from '../../../core/ports/rpc/block-stream.interfaces';
+} from '../../../modules/blockchain/base/block-stream.interfaces';
 import type {
   BlockHandler,
   IRpcAdapter,
   ISubscriptionHandle,
   IProviderHealth,
-} from '../../../core/ports/rpc/rpc-adapter.interfaces';
+} from '../../../modules/blockchain/base/rpc-adapter.interfaces';
 
 type JsonRpcId = number;
 

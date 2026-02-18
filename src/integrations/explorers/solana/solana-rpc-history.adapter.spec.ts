@@ -8,7 +8,7 @@ import {
   HistoryDirectionFilter,
   HistoryKind,
 } from '../../../features/tracking/dto/history-request.dto';
-import type { BottleneckRateLimiterService } from '../../../rate-limiting/bottleneck-rate-limiter.service';
+import type { BottleneckRateLimiterService } from '../../../modules/blockchain/rate-limiting/bottleneck-rate-limiter.service';
 
 type SolanaConfigStub = {
   readonly solanaHeliusHttpUrl: string | null;

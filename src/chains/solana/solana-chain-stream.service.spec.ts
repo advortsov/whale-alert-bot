@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { SolanaChainStreamService } from './solana-chain-stream.service';
 import { SolanaEventClassifierService } from './solana-event-classifier.service';
 import type { AlertDispatcherService } from '../../alerts/alert-dispatcher.service';
-import type { ProviderFailoverService } from '../../chain/providers/provider-failover.service';
 import { ChainKey } from '../../common/interfaces/chain-key.interfaces';
 import {
   ChainId,
@@ -12,20 +11,21 @@ import {
   type ClassifiedEvent,
 } from '../../common/interfaces/chain.types';
 import type { AppConfigService } from '../../config/app-config.service';
-import type {
-  IBlockEnvelope,
-  IReceiptEnvelope,
-  ITransactionEnvelope,
-} from '../../core/ports/rpc/block-stream.interfaces';
-import type {
-  ISubscriptionHandle,
-  IProviderHealth,
-  ProviderOperation,
-} from '../../core/ports/rpc/rpc-adapter.interfaces';
 import type { ChainCheckpointsRepository } from '../../database/repositories/chain-checkpoints.repository';
 import type { ProcessedEventsRepository } from '../../database/repositories/processed-events.repository';
 import type { SubscriptionsRepository } from '../../database/repositories/subscriptions.repository';
 import type { WalletEventsRepository } from '../../database/repositories/wallet-events.repository';
+import type {
+  IBlockEnvelope,
+  IReceiptEnvelope,
+  ITransactionEnvelope,
+} from '../../modules/blockchain/base/block-stream.interfaces';
+import type {
+  ISubscriptionHandle,
+  IProviderHealth,
+  ProviderOperation,
+} from '../../modules/blockchain/base/rpc-adapter.interfaces';
+import type { ProviderFailoverService } from '../../modules/blockchain/factory/provider-failover.service';
 
 class SolanaProviderStub {
   public blockHandler: ((blockNumber: number) => Promise<void>) | null = null;

@@ -7,28 +7,22 @@ import {
   type IBaseChainStreamDependencies,
   type IMatchedTransaction,
 } from './base-chain-stream.service';
-import type { AlertDispatcherService } from '../alerts/alert-dispatcher.service';
-import type { ChainKey } from '../common/interfaces/chain-key.interfaces';
-import type { ClassifiedEvent } from '../common/interfaces/chain.types';
+import type { IBlockEnvelope, IReceiptEnvelope } from './block-stream.interfaces';
+import type { ISubscriptionHandle, ProviderOperation } from './rpc-adapter.interfaces';
+import type { AlertDispatcherService } from '../../../alerts/alert-dispatcher.service';
+import type { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
+import type { ClassifiedEvent } from '../../../common/interfaces/chain.types';
 import {
   ChainId,
   ClassifiedEventType,
   EventDirection,
   AssetStandard,
-} from '../common/interfaces/chain.types';
-import type { ChainCheckpointsRepository } from '../database/repositories/chain-checkpoints.repository';
-import type { ProcessedEventsRepository } from '../database/repositories/processed-events.repository';
-import type { SubscriptionsRepository } from '../database/repositories/subscriptions.repository';
-import type { WalletEventsRepository } from '../database/repositories/wallet-events.repository';
-import type {
-  IBlockEnvelope,
-  IReceiptEnvelope,
-} from '../modules/blockchain/base/block-stream.interfaces';
-import type {
-  ISubscriptionHandle,
-  ProviderOperation,
-} from '../modules/blockchain/base/rpc-adapter.interfaces';
-import type { ProviderFailoverService } from '../modules/blockchain/factory/provider-failover.service';
+} from '../../../common/interfaces/chain.types';
+import type { ChainCheckpointsRepository } from '../../../database/repositories/chain-checkpoints.repository';
+import type { ProcessedEventsRepository } from '../../../database/repositories/processed-events.repository';
+import type { SubscriptionsRepository } from '../../../database/repositories/subscriptions.repository';
+import type { WalletEventsRepository } from '../../../database/repositories/wallet-events.repository';
+import type { ProviderFailoverService } from '../factory/provider-failover.service';
 
 const TRACKED_ADDRESS: string = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const CHAIN_KEY: string = 'ethereum_mainnet';

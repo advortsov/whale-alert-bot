@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
 
 import type { AppHealthStatus, ChainStreamHealth, ComponentHealth } from './health.types';
-import { ProviderFactory } from '../chain/providers/provider.factory';
-import { ChainKey } from '../common/interfaces/chain-key.interfaces';
-import { AppConfigService } from '../config/app-config.service';
-import { DatabaseService } from '../database/kysely/database.service';
-import { RuntimeStatusService } from '../runtime/runtime-status.service';
+import { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
+import { AppConfigService } from '../../../config/app-config.service';
+import { DatabaseService } from '../../../database/kysely/database.service';
+import { RuntimeStatusService } from '../../../runtime/runtime-status.service';
+import { ProviderFactory } from '../factory/provider.factory';
 
 interface IProviderHealthResult {
   readonly provider: string;

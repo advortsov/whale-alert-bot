@@ -1,11 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
 
-import { ChainKey } from '../../common/interfaces/chain-key.interfaces';
+import { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
 import type {
   IFallbackRpcAdapter,
   IPrimaryRpcAdapter,
   IProviderFactory,
-} from '../../core/ports/rpc/rpc-adapter.interfaces';
+} from '../base/rpc-adapter.interfaces';
 import {
   ETHEREUM_FALLBACK_RPC_ADAPTER,
   ETHEREUM_PRIMARY_RPC_ADAPTER,
@@ -13,7 +13,7 @@ import {
   SOLANA_PRIMARY_RPC_ADAPTER,
   TRON_FALLBACK_RPC_ADAPTER,
   TRON_PRIMARY_RPC_ADAPTER,
-} from '../../core/ports/rpc/rpc-port.tokens';
+} from '../base/rpc-port.tokens';
 
 @Injectable()
 export class ProviderFactory implements IProviderFactory {

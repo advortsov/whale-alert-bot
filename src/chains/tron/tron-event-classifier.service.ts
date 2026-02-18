@@ -1,18 +1,18 @@
 import { Injectable } from '@nestjs/common';
 
-import { ERC20_TRANSFER_TOPIC } from '../../chain/constants/event-signatures';
+import { ERC20_TRANSFER_TOPIC } from '../../common/constants/event-signatures';
 import {
   AssetStandard,
   ClassifiedEventType,
   EventDirection,
   type ClassifiedEvent,
 } from '../../common/interfaces/chain.types';
+import { TronAddressCodec } from '../../integrations/address/tron/tron-address.codec';
 import type {
   IClassificationContextDto,
   IClassificationResultDto,
   IChainEventClassifier,
-} from '../../core/ports/classification/chain-classifier.interfaces';
-import { TronAddressCodec } from '../../integrations/address/tron/tron-address.codec';
+} from '../../modules/blockchain/base/chain-classifier.interfaces';
 
 const TRON_ADDRESS_HEX_MIN_LENGTH = 40;
 const TRON_ADDRESS_HEX_TAIL = -40;
@@ -104,10 +104,12 @@ export class TronEventClassifierService implements IChainEventClassifier {
       return null;
     }
 
-    const trc10Log = context.receiptEnvelope.logs.find((log): boolean => {
-      const topic0: string | undefined = log.topics[0];
-      return topic0 === TronEventClassifierService.TRC10_HINT_TOPIC;
-    });
+    const trc10Log = context.receiptEnvelope.logs.find(
+      (log: { readonly topics: readonly (string | undefined)[] }): boolean => {
+        const topic0: string | undefined = log.topics[0];
+        return topic0 === TronEventClassifierService.TRC10_HINT_TOPIC;
+      },
+    );
 
     if (typeof trc10Log === 'undefined') {
       return null;
@@ -147,10 +149,12 @@ export class TronEventClassifierService implements IChainEventClassifier {
   }
 
   private classifyNativeTransfer(context: IClassificationContextDto): ClassifiedEvent {
-    const nativeLog = context.receiptEnvelope?.logs.find((log): boolean => {
-      const topic0: string | undefined = log.topics[0];
-      return topic0 === TronEventClassifierService.NATIVE_HINT_TOPIC;
-    });
+    const nativeLog = context.receiptEnvelope?.logs.find(
+      (log: { readonly topics: readonly (string | undefined)[] }): boolean => {
+        const topic0: string | undefined = log.topics[0];
+        return topic0 === TronEventClassifierService.NATIVE_HINT_TOPIC;
+      },
+    );
     const direction: EventDirection = this.resolveDirectionByEnvelope(context);
     const tokenAmountRaw: string | null =
       typeof nativeLog !== 'undefined' ? this.decodeUint256(nativeLog.data) : null;

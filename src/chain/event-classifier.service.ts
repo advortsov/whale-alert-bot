@@ -1,6 +1,12 @@
 import { Injectable } from '@nestjs/common';
 
 import {
+  ERC20_TRANSFER_TOPIC,
+  SUPPORTED_SWAP_TOPICS,
+  UNISWAP_V2_SWAP_TOPIC,
+  UNISWAP_V3_SWAP_TOPIC,
+} from '../common/constants/event-signatures';
+import {
   AssetStandard,
   ChainId,
   ClassifiedEventType,
@@ -9,12 +15,6 @@ import {
   type ObservedTransaction,
 } from '../common/interfaces/chain.types';
 import { AppConfigService } from '../config/app-config.service';
-import {
-  ERC20_TRANSFER_TOPIC,
-  SUPPORTED_SWAP_TOPICS,
-  UNISWAP_V2_SWAP_TOPIC,
-  UNISWAP_V3_SWAP_TOPIC,
-} from './constants/event-signatures';
 
 const ETH_TOPIC_HEX_LENGTH = 66;
 const ETH_ADDRESS_OFFSET = 26;

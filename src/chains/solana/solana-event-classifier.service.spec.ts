@@ -7,7 +7,7 @@ import {
   ClassifiedEventType,
   EventDirection,
 } from '../../common/interfaces/chain.types';
-import type { IClassificationContextDto } from '../../core/ports/classification/chain-classifier.interfaces';
+import type { IClassificationContextDto } from '../../modules/blockchain/base/chain-classifier.interfaces';
 
 describe('SolanaEventClassifierService', (): void => {
   it('classifies SPL transfer when receipt contains token program log', (): void => {

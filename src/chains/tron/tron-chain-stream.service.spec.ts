@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { TronChainStreamService } from './tron-chain-stream.service';
 import { TronEventClassifierService } from './tron-event-classifier.service';
 import type { AlertDispatcherService } from '../../alerts/alert-dispatcher.service';
-import type { ProviderFailoverService } from '../../chain/providers/provider-failover.service';
 import { ChainKey } from '../../common/interfaces/chain-key.interfaces';
 import {
   ChainId,
@@ -12,20 +11,21 @@ import {
   type ClassifiedEvent,
 } from '../../common/interfaces/chain.types';
 import type { AppConfigService } from '../../config/app-config.service';
-import type {
-  IBlockEnvelope,
-  IReceiptEnvelope,
-} from '../../core/ports/rpc/block-stream.interfaces';
-import type {
-  ISubscriptionHandle,
-  IProviderHealth,
-  ProviderOperation,
-} from '../../core/ports/rpc/rpc-adapter.interfaces';
 import type { ChainCheckpointsRepository } from '../../database/repositories/chain-checkpoints.repository';
 import type { ProcessedEventsRepository } from '../../database/repositories/processed-events.repository';
 import type { SubscriptionsRepository } from '../../database/repositories/subscriptions.repository';
 import type { WalletEventsRepository } from '../../database/repositories/wallet-events.repository';
 import { TronAddressCodec } from '../../integrations/address/tron/tron-address.codec';
+import type {
+  IBlockEnvelope,
+  IReceiptEnvelope,
+} from '../../modules/blockchain/base/block-stream.interfaces';
+import type {
+  ISubscriptionHandle,
+  IProviderHealth,
+  ProviderOperation,
+} from '../../modules/blockchain/base/rpc-adapter.interfaces';
+import type { ProviderFailoverService } from '../../modules/blockchain/factory/provider-failover.service';
 
 class TronProviderStub {
   public blockHandler: ((blockNumber: number) => Promise<void>) | null = null;

@@ -17,7 +17,7 @@ import { TOKEN_PRICING_PORT } from '../common/interfaces/token-pricing/token-pri
 import { DatabaseModule } from '../database/database.module';
 import { EthereumTokenMetadataAdapter } from '../integrations/token-metadata/ethereum/ethereum-token-metadata.adapter';
 import { CoinGeckoPricingAdapter } from '../integrations/token-pricing/coingecko/coingecko-pricing.adapter';
-import { RateLimitingModule } from '../rate-limiting/rate-limiting.module';
+import { RateLimitingModule } from '../modules/blockchain/rate-limiting/rate-limiting.module';
 import { TelegramModule } from '../telegram/telegram.module';
 
 @Module({

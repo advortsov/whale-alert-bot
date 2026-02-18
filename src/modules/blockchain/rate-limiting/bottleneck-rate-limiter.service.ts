@@ -8,7 +8,7 @@ import {
   RequestPriority,
 } from './bottleneck-rate-limiter.interfaces';
 import { buildLimiterConfigs } from './rate-limiter-config.factory';
-import { AppConfigService } from '../config/app-config.service';
+import { AppConfigService } from '../../../config/app-config.service';
 
 @Injectable()
 export class BottleneckRateLimiterService implements OnModuleDestroy {

@@ -3,7 +3,6 @@ import { Module } from '@nestjs/common';
 import { ChainStreamService, ChainStreamServiceDependencies } from './chain-stream.service';
 import { EventClassifierService } from './event-classifier.service';
 import { AlertsModule } from '../alerts/alerts.module';
-import { ProviderFailoverService } from './providers/provider-failover.service';
 import {
   SolanaChainStreamService,
   SolanaChainStreamServiceDependencies,
@@ -14,14 +13,6 @@ import {
   TronChainStreamServiceDependencies,
 } from '../chains/tron/tron-chain-stream.service';
 import { TronEventClassifierService } from '../chains/tron/tron-event-classifier.service';
-import {
-  ETHEREUM_FALLBACK_RPC_ADAPTER,
-  ETHEREUM_PRIMARY_RPC_ADAPTER,
-  SOLANA_FALLBACK_RPC_ADAPTER,
-  SOLANA_PRIMARY_RPC_ADAPTER,
-  TRON_FALLBACK_RPC_ADAPTER,
-  TRON_PRIMARY_RPC_ADAPTER,
-} from '../core/ports/rpc/rpc-port.tokens';
 import { DatabaseModule } from '../database/database.module';
 import { TronAddressCodec } from '../integrations/address/tron/tron-address.codec';
 import { AlchemyPrimaryAdapter } from '../integrations/rpc/ethereum/alchemy-primary.adapter';
@@ -30,12 +21,21 @@ import { SolanaHeliusPrimaryAdapter } from '../integrations/rpc/solana/solana-he
 import { SolanaPublicFallbackAdapter } from '../integrations/rpc/solana/solana-public-fallback.adapter';
 import { TronGridPrimaryAdapter } from '../integrations/rpc/tron/tron-grid-primary.adapter';
 import { TronPublicFallbackAdapter } from '../integrations/rpc/tron/tron-public-fallback.adapter';
-import { RateLimitingModule } from '../rate-limiting/rate-limiting.module';
+import {
+  ETHEREUM_FALLBACK_RPC_ADAPTER,
+  ETHEREUM_PRIMARY_RPC_ADAPTER,
+  SOLANA_FALLBACK_RPC_ADAPTER,
+  SOLANA_PRIMARY_RPC_ADAPTER,
+  TRON_FALLBACK_RPC_ADAPTER,
+  TRON_PRIMARY_RPC_ADAPTER,
+} from '../modules/blockchain/base/rpc-port.tokens';
+import { ProviderFailoverService } from '../modules/blockchain/factory/provider-failover.service';
+import { ProviderFactory } from '../modules/blockchain/factory/provider.factory';
+import { BottleneckRateLimiterService } from '../modules/blockchain/rate-limiting/bottleneck-rate-limiter.service';
 import { RuntimeModule } from '../runtime/runtime.module';
-import { ProviderFactory } from './providers/provider.factory';
 
 @Module({
-  imports: [DatabaseModule, AlertsModule, RuntimeModule, RateLimitingModule],
+  imports: [DatabaseModule, AlertsModule, RuntimeModule],
   providers: [
     AlchemyPrimaryAdapter,
     InfuraFallbackAdapter,
@@ -44,6 +44,7 @@ import { ProviderFactory } from './providers/provider.factory';
     TronAddressCodec,
     TronGridPrimaryAdapter,
     TronPublicFallbackAdapter,
+    BottleneckRateLimiterService,
     {
       provide: ETHEREUM_PRIMARY_RPC_ADAPTER,
       useExisting: AlchemyPrimaryAdapter,

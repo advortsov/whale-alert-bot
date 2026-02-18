@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import { BaseSolanaRpcAdapter } from './base-solana-rpc.adapter';
 import { AppConfigService } from '../../../config/app-config.service';
-import type { IFallbackRpcAdapter } from '../../../core/ports/rpc/rpc-adapter.interfaces';
+import type { IFallbackRpcAdapter } from '../../../modules/blockchain/base/rpc-adapter.interfaces';
 
 @Injectable()
 export class SolanaPublicFallbackAdapter

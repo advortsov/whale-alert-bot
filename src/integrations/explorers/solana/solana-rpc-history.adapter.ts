@@ -21,8 +21,8 @@ import {
 import {
   LimiterKey,
   RequestPriority,
-} from '../../../rate-limiting/bottleneck-rate-limiter.interfaces';
-import { BottleneckRateLimiterService } from '../../../rate-limiting/bottleneck-rate-limiter.service';
+} from '../../../modules/blockchain/rate-limiting/bottleneck-rate-limiter.interfaces';
+import { BottleneckRateLimiterService } from '../../../modules/blockchain/rate-limiting/bottleneck-rate-limiter.service';
 
 const SPL_TOKEN_PROGRAM_SUBSTRING = 'tokenkeg';
 const SOLSCAN_TX_BASE_URL = 'https://solscan.io/tx/';

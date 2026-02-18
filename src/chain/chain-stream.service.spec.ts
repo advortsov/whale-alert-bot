@@ -2,8 +2,6 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { ChainStreamService } from './chain-stream.service';
 import type { EventClassifierService } from './event-classifier.service';
-import type { ProviderFailoverService } from './providers/provider-failover.service';
-import type { ProviderFactory } from './providers/provider.factory';
 import type { AlertDispatcherService } from '../alerts/alert-dispatcher.service';
 import {
   AssetStandard,
@@ -14,20 +12,22 @@ import {
   type ObservedTransaction,
 } from '../common/interfaces/chain.types';
 import type { AppConfigService } from '../config/app-config.service';
-import type {
-  IBlockEnvelope,
-  IReceiptEnvelope,
-  ITransactionEnvelope,
-} from '../core/ports/rpc/block-stream.interfaces';
-import type {
-  ISubscriptionHandle,
-  ProviderOperation,
-  IProviderHealth,
-} from '../core/ports/rpc/rpc-adapter.interfaces';
 import type { ChainCheckpointsRepository } from '../database/repositories/chain-checkpoints.repository';
 import type { ProcessedEventsRepository } from '../database/repositories/processed-events.repository';
 import type { SubscriptionsRepository } from '../database/repositories/subscriptions.repository';
 import type { WalletEventsRepository } from '../database/repositories/wallet-events.repository';
+import type {
+  IBlockEnvelope,
+  IReceiptEnvelope,
+  ITransactionEnvelope,
+} from '../modules/blockchain/base/block-stream.interfaces';
+import type {
+  ISubscriptionHandle,
+  ProviderOperation,
+  IProviderHealth,
+} from '../modules/blockchain/base/rpc-adapter.interfaces';
+import type { ProviderFailoverService } from '../modules/blockchain/factory/provider-failover.service';
+import type { ProviderFactory } from '../modules/blockchain/factory/provider.factory';
 import type { RuntimeStatusService } from '../runtime/runtime-status.service';
 
 class ProviderStub {

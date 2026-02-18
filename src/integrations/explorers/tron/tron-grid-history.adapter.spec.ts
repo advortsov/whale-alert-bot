@@ -9,7 +9,7 @@ import {
   HistoryKind,
   type IHistoryRequestDto,
 } from '../../../features/tracking/dto/history-request.dto';
-import type { BottleneckRateLimiterService } from '../../../rate-limiting/bottleneck-rate-limiter.service';
+import type { BottleneckRateLimiterService } from '../../../modules/blockchain/rate-limiting/bottleneck-rate-limiter.service';
 import { TronAddressCodec } from '../../address/tron/tron-address.codec';
 
 type AppConfigStub = {

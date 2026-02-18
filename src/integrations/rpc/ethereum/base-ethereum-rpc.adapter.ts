@@ -9,13 +9,13 @@ import {
 import type {
   IBlockEnvelope,
   IReceiptEnvelope,
-} from '../../../core/ports/rpc/block-stream.interfaces';
+} from '../../../modules/blockchain/base/block-stream.interfaces';
 import type {
   BlockHandler,
   IRpcAdapter,
   ISubscriptionHandle,
   IProviderHealth,
-} from '../../../core/ports/rpc/rpc-adapter.interfaces';
+} from '../../../modules/blockchain/base/rpc-adapter.interfaces';
 
 export abstract class BaseEthereumRpcAdapter implements IRpcAdapter {
   private provider: WebSocketProvider | null = null;

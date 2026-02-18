@@ -1,15 +1,12 @@
 import { ProviderFactory } from './provider.factory';
-import { ChainKey } from '../../common/interfaces/chain-key.interfaces';
-import type {
-  IBlockEnvelope,
-  IReceiptEnvelope,
-} from '../../core/ports/rpc/block-stream.interfaces';
+import { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
+import type { IBlockEnvelope, IReceiptEnvelope } from '../base/block-stream.interfaces';
 import type {
   IFallbackRpcAdapter,
   IPrimaryRpcAdapter,
   ISubscriptionHandle,
   IProviderHealth,
-} from '../../core/ports/rpc/rpc-adapter.interfaces';
+} from '../base/rpc-adapter.interfaces';
 
 class PrimaryAdapterStub implements IPrimaryRpcAdapter {
   public constructor(private readonly name: string) {}

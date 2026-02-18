@@ -31,7 +31,7 @@ import { EtherscanHistoryAdapter } from '../integrations/explorers/etherscan/eth
 import { HistoryExplorerRouterAdapter } from '../integrations/explorers/history-explorer-router.adapter';
 import { SolanaRpcHistoryAdapter } from '../integrations/explorers/solana/solana-rpc-history.adapter';
 import { TronGridHistoryAdapter } from '../integrations/explorers/tron/tron-grid-history.adapter';
-import { RateLimitingModule } from '../rate-limiting/rate-limiting.module';
+import { RateLimitingModule } from '../modules/blockchain/rate-limiting/rate-limiting.module';
 
 @Module({
   imports: [DatabaseModule, RateLimitingModule],

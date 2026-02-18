@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { LimiterKey, RequestPriority } from './bottleneck-rate-limiter.interfaces';
 import { BottleneckRateLimiterService } from './bottleneck-rate-limiter.service';
-import type { AppConfigService } from '../config/app-config.service';
+import type { AppConfigService } from '../../../config/app-config.service';
 
 const createConfigStub = (): AppConfigService =>
   ({

@@ -2,19 +2,16 @@ import { vi } from 'vitest';
 
 import { ProviderFailoverService } from './provider-failover.service';
 import type { ProviderFactory } from './provider.factory';
-import { ChainKey } from '../../common/interfaces/chain-key.interfaces';
-import type { AppConfigService } from '../../config/app-config.service';
-import type {
-  IBlockEnvelope,
-  IReceiptEnvelope,
-} from '../../core/ports/rpc/block-stream.interfaces';
+import { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
+import type { AppConfigService } from '../../../config/app-config.service';
+import type { IBlockEnvelope, IReceiptEnvelope } from '../base/block-stream.interfaces';
 import type {
   IFallbackRpcAdapter,
   IPrimaryRpcAdapter,
   ISubscriptionHandle,
   IProviderHealth,
-} from '../../core/ports/rpc/rpc-adapter.interfaces';
-import { BottleneckRateLimiterService } from '../../rate-limiting/bottleneck-rate-limiter.service';
+} from '../base/rpc-adapter.interfaces';
+import { BottleneckRateLimiterService } from '../rate-limiting/bottleneck-rate-limiter.service';
 
 class RpcConfigStub {
   public readonly chainRpcMinIntervalMs: number = 0;

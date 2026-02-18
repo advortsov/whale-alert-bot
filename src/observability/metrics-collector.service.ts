@@ -6,8 +6,8 @@ import { DatabaseService } from '../database/kysely/database.service';
 import type {
   ILimiterMetrics,
   LimiterKey,
-} from '../rate-limiting/bottleneck-rate-limiter.interfaces';
-import { BottleneckRateLimiterService } from '../rate-limiting/bottleneck-rate-limiter.service';
+} from '../modules/blockchain/rate-limiting/bottleneck-rate-limiter.interfaces';
+import { BottleneckRateLimiterService } from '../modules/blockchain/rate-limiting/bottleneck-rate-limiter.service';
 
 const COLLECT_INTERVAL_MS = 10_000;
 

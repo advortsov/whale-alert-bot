@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import { BaseTronRpcAdapter } from './base-tron-rpc.adapter';
 import { AppConfigService } from '../../../config/app-config.service';
-import type { IPrimaryRpcAdapter } from '../../../core/ports/rpc/rpc-adapter.interfaces';
+import type { IPrimaryRpcAdapter } from '../../../modules/blockchain/base/rpc-adapter.interfaces';
 import { TronAddressCodec } from '../../address/tron/tron-address.codec';
 
 @Injectable()

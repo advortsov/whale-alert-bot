@@ -1,5 +1,5 @@
 import { type IBottleneckConfig, LimiterKey } from './bottleneck-rate-limiter.interfaces';
-import type { AppConfigService } from '../config/app-config.service';
+import type { AppConfigService } from '../../../config/app-config.service';
 
 export function buildLimiterConfigs(
   config: AppConfigService,

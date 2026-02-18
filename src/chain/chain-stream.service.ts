@@ -1,15 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 
-import {
-  type IBaseChainStreamDependencies,
-  type IChainRuntimeSnapshot,
-  type IChainStreamConfig,
-  type IMatchedTransaction,
-} from './base-chain-stream.interfaces';
 import { BaseChainStreamService } from './base-chain-stream.service';
 import { EventClassifierService } from './event-classifier.service';
-import { ProviderFailoverService } from './providers/provider-failover.service';
-import { ProviderFactory } from './providers/provider.factory';
 import { AlertDispatcherService } from '../alerts/alert-dispatcher.service';
 import { ChainKey } from '../common/interfaces/chain-key.interfaces';
 import {
@@ -19,12 +11,23 @@ import {
   type ObservedTransaction,
 } from '../common/interfaces/chain.types';
 import { AppConfigService } from '../config/app-config.service';
-import type { IBlockEnvelope, IReceiptEnvelope } from '../core/ports/rpc/block-stream.interfaces';
-import type { ISubscriptionHandle } from '../core/ports/rpc/rpc-adapter.interfaces';
 import { ChainCheckpointsRepository } from '../database/repositories/chain-checkpoints.repository';
 import { ProcessedEventsRepository } from '../database/repositories/processed-events.repository';
 import { SubscriptionsRepository } from '../database/repositories/subscriptions.repository';
 import { WalletEventsRepository } from '../database/repositories/wallet-events.repository';
+import {
+  type IBaseChainStreamDependencies,
+  type IChainRuntimeSnapshot,
+  type IChainStreamConfig,
+  type IMatchedTransaction,
+} from '../modules/blockchain/base/base-chain-stream.interfaces';
+import type {
+  IBlockEnvelope,
+  IReceiptEnvelope,
+} from '../modules/blockchain/base/block-stream.interfaces';
+import type { ISubscriptionHandle } from '../modules/blockchain/base/rpc-adapter.interfaces';
+import { ProviderFailoverService } from '../modules/blockchain/factory/provider-failover.service';
+import { ProviderFactory } from '../modules/blockchain/factory/provider.factory';
 import { RuntimeStatusService } from '../runtime/runtime-status.service';
 
 @Injectable()
