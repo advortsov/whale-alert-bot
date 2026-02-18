@@ -23,15 +23,15 @@ import { TrackingService } from './tracking.service';
 import { ADDRESS_CODEC_REGISTRY } from '../common/interfaces/address/address-port.tokens';
 import { HISTORY_EXPLORER_ADAPTER } from '../common/interfaces/explorers/explorer-port.tokens';
 import { DatabaseModule } from '../database/database.module';
-import { EtherscanHistoryAdapter } from '../integrations/explorers/etherscan/etherscan-history.adapter';
-import { HistoryExplorerRouterAdapter } from '../integrations/explorers/history-explorer-router.adapter';
-import { TronGridHistoryAdapter } from '../integrations/explorers/tron/tron-grid-history.adapter';
 import { AddressCodecRegistry } from '../modules/blockchain/address-codec.registry';
 import { RateLimitingModule } from '../modules/blockchain/rate-limiting/rate-limiting.module';
 import { EthereumAddressCodec } from '../modules/chains/ethereum/ethereum-address.codec';
 import { SolanaAddressCodec } from '../modules/chains/solana/solana-address.codec';
 import { SolanaRpcHistoryAdapter } from '../modules/chains/solana/solana-rpc-history.adapter';
 import { TronAddressCodec } from '../modules/chains/tron/tron-address.codec';
+import { EtherscanHistoryAdapter } from '../modules/integrations/etherscan/etherscan-history.adapter';
+import { HistoryExplorerRouterAdapter } from '../modules/integrations/history-explorer-router.adapter';
+import { TronGridHistoryAdapter } from '../modules/integrations/trongrid/tron-grid-history.adapter';
 
 @Module({
   imports: [DatabaseModule, RateLimitingModule],

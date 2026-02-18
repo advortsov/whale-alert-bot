@@ -3,7 +3,7 @@ export {
   type IEtherscanHistoryResponse,
   type IEtherscanNormalTransaction,
   type IEtherscanTokenTransaction,
-} from '../integrations/explorers/etherscan/etherscan-history.interfaces';
+} from '../modules/integrations/etherscan/etherscan-history.interfaces';
 
 export interface IHistoryTransactionItem {
   readonly hash: string;

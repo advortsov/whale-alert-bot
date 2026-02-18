@@ -2,8 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { EtherscanHistoryService } from './etherscan-history.service';
 import type { AppConfigService } from '../config/app-config.service';
-import { EtherscanHistoryAdapter } from '../integrations/explorers/etherscan/etherscan-history.adapter';
 import type { BottleneckRateLimiterService } from '../modules/blockchain/rate-limiting/bottleneck-rate-limiter.service';
+import { EtherscanHistoryAdapter } from '../modules/integrations/etherscan/etherscan-history.adapter';
 
 class HistoryConfigStub {
   public readonly etherscanApiBaseUrl: string = 'https://api.etherscan.io/v2/api';
