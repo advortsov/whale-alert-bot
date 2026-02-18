@@ -22,7 +22,7 @@ import {
   RequestPriority,
 } from '../../../modules/blockchain/rate-limiting/bottleneck-rate-limiter.interfaces';
 import { BottleneckRateLimiterService } from '../../../modules/blockchain/rate-limiting/bottleneck-rate-limiter.service';
-import { TronAddressCodec } from '../../address/tron/tron-address.codec';
+import { TronAddressCodec } from '../../../modules/chains/tron/tron-address.codec';
 
 interface ITronGridPageRequestOptions {
   readonly path: string;

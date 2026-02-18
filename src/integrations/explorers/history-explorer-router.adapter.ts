@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
 
 import { EtherscanHistoryAdapter } from './etherscan/etherscan-history.adapter';
-import { SolanaRpcHistoryAdapter } from './solana/solana-rpc-history.adapter';
 import { TronGridHistoryAdapter } from './tron/tron-grid-history.adapter';
 import { ChainKey } from '../../common/interfaces/chain-key.interfaces';
 import type { IHistoryExplorerAdapter } from '../../common/interfaces/explorers/history-explorer.interfaces';
 import type { IHistoryPageDto } from '../../features/tracking/dto/history-item.dto';
 import type { IHistoryRequestDto } from '../../features/tracking/dto/history-request.dto';
+import { SolanaRpcHistoryAdapter } from '../../modules/chains/solana/solana-rpc-history.adapter';
 
 @Injectable()
 export class HistoryExplorerRouterAdapter implements IHistoryExplorerAdapter {

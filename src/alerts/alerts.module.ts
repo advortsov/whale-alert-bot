@@ -15,9 +15,9 @@ import { TokenMetadataService } from './token-metadata.service';
 import { TOKEN_METADATA_ADAPTER } from '../common/interfaces/token-metadata/token-metadata-port.tokens';
 import { TOKEN_PRICING_PORT } from '../common/interfaces/token-pricing/token-pricing-port.tokens';
 import { DatabaseModule } from '../database/database.module';
-import { EthereumTokenMetadataAdapter } from '../integrations/token-metadata/ethereum/ethereum-token-metadata.adapter';
 import { CoinGeckoPricingAdapter } from '../integrations/token-pricing/coingecko/coingecko-pricing.adapter';
 import { RateLimitingModule } from '../modules/blockchain/rate-limiting/rate-limiting.module';
+import { EthereumTokenMetadataAdapter } from '../modules/chains/ethereum/ethereum-token-metadata.adapter';
 import { TelegramModule } from '../telegram/telegram.module';
 
 @Module({

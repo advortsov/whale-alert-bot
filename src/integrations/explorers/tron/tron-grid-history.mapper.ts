@@ -11,7 +11,7 @@ import {
   type IHistoryItemDto,
 } from '../../../features/tracking/dto/history-item.dto';
 import { HistoryDirectionFilter } from '../../../features/tracking/dto/history-request.dto';
-import type { TronAddressCodec } from '../../address/tron/tron-address.codec';
+import type { TronAddressCodec } from '../../../modules/chains/tron/tron-address.codec';
 
 const TRX_NATIVE_DECIMALS = 6;
 

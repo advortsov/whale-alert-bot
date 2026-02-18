@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import { AddressCodecRegistry } from './address-codec.registry';
 import { ChainKey } from '../../common/interfaces/chain-key.interfaces';
-import { EthereumAddressCodec } from '../../integrations/address/ethereum/ethereum-address.codec';
-import { SolanaAddressCodec } from '../../integrations/address/solana/solana-address.codec';
-import { TronAddressCodec } from '../../integrations/address/tron/tron-address.codec';
+import { EthereumAddressCodec } from '../chains/ethereum/ethereum-address.codec';
+import { SolanaAddressCodec } from '../chains/solana/solana-address.codec';
+import { TronAddressCodec } from '../chains/tron/tron-address.codec';
 
 describe('AddressCodecRegistry', (): void => {
   it('returns ethereum codec for ethereum chain', (): void => {
