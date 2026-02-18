@@ -17,16 +17,16 @@ import type {
   AlertMuteRow,
   UserAlertPreferenceRow,
   UserWalletAlertPreferenceRow,
-} from '../storage/database.types';
-import { AlertMutesRepository } from '../storage/repositories/alert-mutes.repository';
-import { SubscriptionsRepository } from '../storage/repositories/subscriptions.repository';
-import { TrackedWalletsRepository } from '../storage/repositories/tracked-wallets.repository';
-import { AlertEventFilterType } from '../storage/repositories/user-alert-preferences.interfaces';
-import { UserAlertPreferencesRepository } from '../storage/repositories/user-alert-preferences.repository';
-import { UserAlertSettingsRepository } from '../storage/repositories/user-alert-settings.repository';
-import { UserWalletAlertPreferencesRepository } from '../storage/repositories/user-wallet-alert-preferences.repository';
-import { UsersRepository } from '../storage/repositories/users.repository';
-import { WalletEventsRepository } from '../storage/repositories/wallet-events.repository';
+} from '../database/types/database.types';
+import { AlertMutesRepository } from '../database/repositories/alert-mutes.repository';
+import { SubscriptionsRepository } from '../database/repositories/subscriptions.repository';
+import { TrackedWalletsRepository } from '../database/repositories/tracked-wallets.repository';
+import { AlertEventFilterType } from '../database/repositories/user-alert-preferences.interfaces';
+import { UserAlertPreferencesRepository } from '../database/repositories/user-alert-preferences.repository';
+import { UserAlertSettingsRepository } from '../database/repositories/user-alert-settings.repository';
+import { UserWalletAlertPreferencesRepository } from '../database/repositories/user-wallet-alert-preferences.repository';
+import { UsersRepository } from '../database/repositories/users.repository';
+import { WalletEventsRepository } from '../database/repositories/wallet-events.repository';
 
 const DEFAULT_HISTORY_LIMIT = 5;
 const WALLET_CARD_RECENT_EVENTS_LIMIT = 3;

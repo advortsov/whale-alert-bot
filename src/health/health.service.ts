@@ -5,7 +5,7 @@ import { ProviderFactory } from '../chain/providers/provider.factory';
 import { AppConfigService } from '../config/app-config.service';
 import { ChainKey } from '../core/chains/chain-key.interfaces';
 import { RuntimeStatusService } from '../runtime/runtime-status.service';
-import { DatabaseService } from '../storage/database.service';
+import { DatabaseService } from '../database/kysely/database.service';
 
 interface IProviderHealthResult {
   readonly provider: string;

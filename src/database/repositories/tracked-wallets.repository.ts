@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 
 import type { ChainKey } from '../../core/chains/chain-key.interfaces';
-import { DatabaseService } from '../database.service';
-import type { NewTrackedWalletRow, TrackedWalletRow } from '../database.types';
+import { DatabaseService } from '../kysely/database.service';
+import type { NewTrackedWalletRow, TrackedWalletRow } from '../types/database.types';
 
 @Injectable()
 export class TrackedWalletsRepository {

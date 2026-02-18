@@ -7,7 +7,7 @@ import type {
   LimiterKey,
 } from '../rate-limiting/bottleneck-rate-limiter.interfaces';
 import { BottleneckRateLimiterService } from '../rate-limiting/bottleneck-rate-limiter.service';
-import { DatabaseService } from '../storage/database.service';
+import { DatabaseService } from '../database/kysely/database.service';
 
 const COLLECT_INTERVAL_MS = 10_000;
 

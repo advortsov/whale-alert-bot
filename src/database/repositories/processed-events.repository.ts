@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
-import { DatabaseService } from '../database.service';
-import type { NewProcessedEventRow } from '../database.types';
+import { DatabaseService } from '../kysely/database.service';
+import type { NewProcessedEventRow } from '../types/database.types';
 
 export type ProcessedEventKey = {
   readonly txHash: string;

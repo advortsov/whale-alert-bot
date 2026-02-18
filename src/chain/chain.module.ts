@@ -30,12 +30,12 @@ import { TronGridPrimaryAdapter } from '../integrations/rpc/tron/tron-grid-prima
 import { TronPublicFallbackAdapter } from '../integrations/rpc/tron/tron-public-fallback.adapter';
 import { RateLimitingModule } from '../rate-limiting/rate-limiting.module';
 import { RuntimeModule } from '../runtime/runtime.module';
-import { StorageModule } from '../storage/storage.module';
+import { DatabaseModule } from '../database/database.module';
 import { ProviderFailoverService } from './providers/provider-failover.service';
 import { ProviderFactory } from './providers/provider.factory';
 
 @Module({
-  imports: [StorageModule, AlertsModule, RuntimeModule, RateLimitingModule],
+  imports: [DatabaseModule, AlertsModule, RuntimeModule, RateLimitingModule],
   providers: [
     AlchemyPrimaryAdapter,
     InfuraFallbackAdapter,

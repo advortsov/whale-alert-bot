@@ -29,9 +29,9 @@ import { HISTORY_EXPLORER_ADAPTER } from '../core/ports/explorers/explorer-port.
 import type { IHistoryExplorerAdapter } from '../core/ports/explorers/history-explorer.interfaces';
 import type { IHistoryPageDto } from '../features/tracking/dto/history-item.dto';
 import { HistoryDirectionFilter, HistoryKind } from '../features/tracking/dto/history-request.dto';
-import { UsersRepository } from '../storage/repositories/users.repository';
-import { WalletEventsRepository } from '../storage/repositories/wallet-events.repository';
-import type { WalletEventHistoryView } from '../storage/repositories/wallet-events.repository.interfaces';
+import { UsersRepository } from '../database/repositories/users.repository';
+import { WalletEventsRepository } from '../database/repositories/wallet-events.repository';
+import type { WalletEventHistoryView } from '../database/repositories/wallet-events.repository.interfaces';
 
 const LOCAL_EVENTS_BUFFER = 50;
 const LOCAL_EVENTS_MAX_FETCH = 200;

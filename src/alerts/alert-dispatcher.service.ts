@@ -10,8 +10,8 @@ import { AppConfigService } from '../config/app-config.service';
 import { ChainKey } from '../core/chains/chain-key.interfaces';
 import { TOKEN_PRICING_PORT } from '../core/ports/token-pricing/token-pricing-port.tokens';
 import type { ITokenPricingPort } from '../core/ports/token-pricing/token-pricing.interfaces';
-import { SubscriptionsRepository } from '../storage/repositories/subscriptions.repository';
-import type { SubscriberWalletRecipient } from '../storage/repositories/subscriptions.repository.interfaces';
+import { SubscriptionsRepository } from '../database/repositories/subscriptions.repository';
+import type { SubscriberWalletRecipient } from '../database/repositories/subscriptions.repository.interfaces';
 import type { TelegramSendTextOptions } from '../telegram/telegram-sender.service';
 import { TelegramSenderService } from '../telegram/telegram-sender.service';
 

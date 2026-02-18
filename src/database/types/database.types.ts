@@ -142,7 +142,6 @@ export type NewTrackedWalletRow = Insertable<ITrackedWalletsTable>;
 export type UserWalletSubscriptionRow = Selectable<IUserWalletSubscriptionsTable>;
 export type NewUserWalletSubscriptionRow = Insertable<IUserWalletSubscriptionsTable>;
 
-export type ProcessedEventRow = Selectable<IProcessedEventsTable>;
 export type NewProcessedEventRow = Insertable<IProcessedEventsTable>;
 
 export type UserAlertPreferenceRow = Selectable<IUserAlertPreferencesTable>;
@@ -160,5 +159,4 @@ export type NewAlertMuteRow = Insertable<IAlertMutesTable>;
 export type ChainCheckpointRow = Selectable<IChainCheckpointsTable>;
 export type NewChainCheckpointRow = Insertable<IChainCheckpointsTable>;
 
-export type WalletEventRow = Selectable<IWalletEventsTable>;
 export type NewWalletEventRow = Insertable<IWalletEventsTable>;

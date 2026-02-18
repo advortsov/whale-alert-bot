@@ -22,10 +22,10 @@ import { ChainKey } from '../core/chains/chain-key.interfaces';
 import type { IBlockEnvelope, IReceiptEnvelope } from '../core/ports/rpc/block-stream.interfaces';
 import type { ISubscriptionHandle } from '../core/ports/rpc/rpc-adapter.interfaces';
 import { RuntimeStatusService } from '../runtime/runtime-status.service';
-import { ChainCheckpointsRepository } from '../storage/repositories/chain-checkpoints.repository';
-import { ProcessedEventsRepository } from '../storage/repositories/processed-events.repository';
-import { SubscriptionsRepository } from '../storage/repositories/subscriptions.repository';
-import { WalletEventsRepository } from '../storage/repositories/wallet-events.repository';
+import { ChainCheckpointsRepository } from '../database/repositories/chain-checkpoints.repository';
+import { ProcessedEventsRepository } from '../database/repositories/processed-events.repository';
+import { SubscriptionsRepository } from '../database/repositories/subscriptions.repository';
+import { WalletEventsRepository } from '../database/repositories/wallet-events.repository';
 
 @Injectable()
 export class ChainStreamServiceDependencies implements IBaseChainStreamDependencies {

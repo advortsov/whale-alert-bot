@@ -1,4 +1,3 @@
-import type { ChainKey } from '../../core/chains/chain-key.interfaces';
 import type { AlertCexFlowMode } from '../../features/alerts/cex-flow.interfaces';
 import type { AlertSmartFilterType } from '../../features/alerts/smart-filter.interfaces';
 
@@ -12,9 +11,4 @@ export interface IUserAlertSettingsUpdatePatch {
   readonly quietFrom?: string | null;
   readonly quietTo?: string | null;
   readonly timezone?: string;
-}
-
-export interface IUserAlertSettingsLookupKey {
-  readonly userId: number;
-  readonly chainKey: ChainKey;
 }

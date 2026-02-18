@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { Pool, type QueryResultRow } from 'pg';
 import Postgrator from 'postgrator';
 
-import { AppConfigService } from '../config/app-config.service';
+import { AppConfigService } from '../../config/app-config.service';
 
 type ExecQueryResult = {
   rows: QueryResultRow[];

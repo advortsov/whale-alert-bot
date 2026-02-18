@@ -32,14 +32,14 @@ import type { IAddressCodec } from '../core/ports/address/address-codec.interfac
 import type { IHistoryExplorerAdapter } from '../core/ports/explorers/history-explorer.interfaces';
 import { HistoryDirection, HistoryItemType } from '../features/tracking/dto/history-item.dto';
 import { HistoryDirectionFilter, HistoryKind } from '../features/tracking/dto/history-request.dto';
-import type { AlertMutesRepository } from '../storage/repositories/alert-mutes.repository';
-import type { SubscriptionsRepository } from '../storage/repositories/subscriptions.repository';
-import type { TrackedWalletsRepository } from '../storage/repositories/tracked-wallets.repository';
-import type { UserAlertPreferencesRepository } from '../storage/repositories/user-alert-preferences.repository';
-import type { UserAlertSettingsRepository } from '../storage/repositories/user-alert-settings.repository';
-import type { UserWalletAlertPreferencesRepository } from '../storage/repositories/user-wallet-alert-preferences.repository';
-import type { UsersRepository } from '../storage/repositories/users.repository';
-import type { WalletEventsRepository } from '../storage/repositories/wallet-events.repository';
+import type { AlertMutesRepository } from '../database/repositories/alert-mutes.repository';
+import type { SubscriptionsRepository } from '../database/repositories/subscriptions.repository';
+import type { TrackedWalletsRepository } from '../database/repositories/tracked-wallets.repository';
+import type { UserAlertPreferencesRepository } from '../database/repositories/user-alert-preferences.repository';
+import type { UserAlertSettingsRepository } from '../database/repositories/user-alert-settings.repository';
+import type { UserWalletAlertPreferencesRepository } from '../database/repositories/user-wallet-alert-preferences.repository';
+import type { UsersRepository } from '../database/repositories/users.repository';
+import type { WalletEventsRepository } from '../database/repositories/wallet-events.repository';
 
 type SubscriptionsRepositoryStub = {
   readonly addSubscription: ReturnType<typeof vi.fn>;

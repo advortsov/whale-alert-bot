@@ -12,11 +12,11 @@ import {
   AlertSmartFilterType,
   type IAlertSemanticFilterPolicy,
 } from '../features/alerts/smart-filter.interfaces';
-import { AlertMutesRepository } from '../storage/repositories/alert-mutes.repository';
-import type { SubscriberWalletRecipient } from '../storage/repositories/subscriptions.repository.interfaces';
-import { UserAlertPreferencesRepository } from '../storage/repositories/user-alert-preferences.repository';
-import { UserAlertSettingsRepository } from '../storage/repositories/user-alert-settings.repository';
-import { UserWalletAlertPreferencesRepository } from '../storage/repositories/user-wallet-alert-preferences.repository';
+import { AlertMutesRepository } from '../database/repositories/alert-mutes.repository';
+import type { SubscriberWalletRecipient } from '../database/repositories/subscriptions.repository.interfaces';
+import { UserAlertPreferencesRepository } from '../database/repositories/user-alert-preferences.repository';
+import { UserAlertSettingsRepository } from '../database/repositories/user-alert-settings.repository';
+import { UserWalletAlertPreferencesRepository } from '../database/repositories/user-wallet-alert-preferences.repository';
 
 interface IRecipientState {
   readonly preferences: Awaited<ReturnType<UserAlertPreferencesRepository['findOrCreateByUserId']>>;

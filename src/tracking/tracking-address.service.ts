@@ -8,7 +8,7 @@ import type {
 import { ChainKey } from '../core/chains/chain-key.interfaces';
 import type { IAddressCodecRegistry } from '../core/ports/address/address-codec-registry.interfaces';
 import { ADDRESS_CODEC_REGISTRY } from '../core/ports/address/address-port.tokens';
-import { SubscriptionsRepository } from '../storage/repositories/subscriptions.repository';
+import { SubscriptionsRepository } from '../database/repositories/subscriptions.repository';
 
 @Injectable()
 export class TrackingAddressService {

@@ -17,11 +17,11 @@ import { TOKEN_PRICING_PORT } from '../core/ports/token-pricing/token-pricing-po
 import { EthereumTokenMetadataAdapter } from '../integrations/token-metadata/ethereum/ethereum-token-metadata.adapter';
 import { CoinGeckoPricingAdapter } from '../integrations/token-pricing/coingecko/coingecko-pricing.adapter';
 import { RateLimitingModule } from '../rate-limiting/rate-limiting.module';
-import { StorageModule } from '../storage/storage.module';
+import { DatabaseModule } from '../database/database.module';
 import { TelegramModule } from '../telegram/telegram.module';
 
 @Module({
-  imports: [StorageModule, TelegramModule, RateLimitingModule],
+  imports: [DatabaseModule, TelegramModule, RateLimitingModule],
   providers: [
     EthereumTokenMetadataAdapter,
     CoinGeckoPricingAdapter,

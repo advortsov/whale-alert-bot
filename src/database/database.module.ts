@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 
-import { DatabaseService } from './database.service';
-import { MigrationService } from './migration.service';
+import { DatabaseService } from './kysely/database.service';
+import { MigrationService } from './migrations/migration.service';
 import { AlertMutesRepository } from './repositories/alert-mutes.repository';
 import { ChainCheckpointsRepository } from './repositories/chain-checkpoints.repository';
 import { ProcessedEventsRepository } from './repositories/processed-events.repository';
@@ -42,4 +42,4 @@ import { WalletEventsRepository } from './repositories/wallet-events.repository'
     WalletEventsRepository,
   ],
 })
-export class StorageModule {}
+export class DatabaseModule {}

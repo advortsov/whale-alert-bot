@@ -21,11 +21,11 @@ import {
 import type { AppConfigService } from '../config/app-config.service';
 import { ChainKey } from '../core/chains/chain-key.interfaces';
 import type { ITokenPricingPort } from '../core/ports/token-pricing/token-pricing.interfaces';
-import type { AlertMutesRepository } from '../storage/repositories/alert-mutes.repository';
-import type { SubscriptionsRepository } from '../storage/repositories/subscriptions.repository';
-import type { UserAlertPreferencesRepository } from '../storage/repositories/user-alert-preferences.repository';
-import type { UserAlertSettingsRepository } from '../storage/repositories/user-alert-settings.repository';
-import type { UserWalletAlertPreferencesRepository } from '../storage/repositories/user-wallet-alert-preferences.repository';
+import type { AlertMutesRepository } from '../database/repositories/alert-mutes.repository';
+import type { SubscriptionsRepository } from '../database/repositories/subscriptions.repository';
+import type { UserAlertPreferencesRepository } from '../database/repositories/user-alert-preferences.repository';
+import type { UserAlertSettingsRepository } from '../database/repositories/user-alert-settings.repository';
+import type { UserWalletAlertPreferencesRepository } from '../database/repositories/user-wallet-alert-preferences.repository';
 import type { TelegramSenderService } from '../telegram/telegram-sender.service';
 
 type SubscriptionsRepositoryStub = {

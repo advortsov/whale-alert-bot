@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 
-import { DatabaseService } from '../database.service';
+import { DatabaseService } from '../kysely/database.service';
 import type {
   NewUserWalletAlertPreferenceRow,
   UserWalletAlertPreferenceRow,
-} from '../database.types';
+} from '../types/database.types';
 import { AlertEventFilterType } from './user-alert-preferences.interfaces';
 
 @Injectable()

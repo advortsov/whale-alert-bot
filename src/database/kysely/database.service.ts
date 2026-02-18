@@ -2,8 +2,8 @@ import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { Kysely, PostgresDialect, sql } from 'kysely';
 import { Pool } from 'pg';
 
-import type { IDatabase } from './database.types';
-import { AppConfigService } from '../config/app-config.service';
+import type { IDatabase } from '../types/database.types';
+import { AppConfigService } from '../../config/app-config.service';
 
 @Injectable()
 export class DatabaseService implements OnModuleDestroy {

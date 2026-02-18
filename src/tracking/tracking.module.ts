@@ -31,10 +31,10 @@ import { HistoryExplorerRouterAdapter } from '../integrations/explorers/history-
 import { SolanaRpcHistoryAdapter } from '../integrations/explorers/solana/solana-rpc-history.adapter';
 import { TronGridHistoryAdapter } from '../integrations/explorers/tron/tron-grid-history.adapter';
 import { RateLimitingModule } from '../rate-limiting/rate-limiting.module';
-import { StorageModule } from '../storage/storage.module';
+import { DatabaseModule } from '../database/database.module';
 
 @Module({
-  imports: [StorageModule, RateLimitingModule],
+  imports: [DatabaseModule, RateLimitingModule],
   providers: [
     EthereumAddressCodec,
     SolanaAddressCodec,

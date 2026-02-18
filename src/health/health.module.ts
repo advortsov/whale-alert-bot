@@ -4,10 +4,10 @@ import { HealthController } from './health.controller';
 import { HealthService } from './health.service';
 import { ChainModule } from '../chain/chain.module';
 import { RuntimeModule } from '../runtime/runtime.module';
-import { StorageModule } from '../storage/storage.module';
+import { DatabaseModule } from '../database/database.module';
 
 @Module({
-  imports: [StorageModule, ChainModule, RuntimeModule],
+  imports: [DatabaseModule, ChainModule, RuntimeModule],
   controllers: [HealthController],
   providers: [HealthService],
 })

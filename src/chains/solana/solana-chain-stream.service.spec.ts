@@ -22,10 +22,10 @@ import type {
   IProviderHealth,
   ProviderOperation,
 } from '../../core/ports/rpc/rpc-adapter.interfaces';
-import type { ChainCheckpointsRepository } from '../../storage/repositories/chain-checkpoints.repository';
-import type { ProcessedEventsRepository } from '../../storage/repositories/processed-events.repository';
-import type { SubscriptionsRepository } from '../../storage/repositories/subscriptions.repository';
-import type { WalletEventsRepository } from '../../storage/repositories/wallet-events.repository';
+import type { ChainCheckpointsRepository } from '../../database/repositories/chain-checkpoints.repository';
+import type { ProcessedEventsRepository } from '../../database/repositories/processed-events.repository';
+import type { SubscriptionsRepository } from '../../database/repositories/subscriptions.repository';
+import type { WalletEventsRepository } from '../../database/repositories/wallet-events.repository';
 
 class SolanaProviderStub {
   public blockHandler: ((blockNumber: number) => Promise<void>) | null = null;

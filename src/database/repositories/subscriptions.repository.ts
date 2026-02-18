@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
 
 import { ChainKey } from '../../core/chains/chain-key.interfaces';
-import { DatabaseService } from '../database.service';
+import { DatabaseService } from '../kysely/database.service';
 import type {
   NewUserWalletSubscriptionRow,
   TrackedWalletRow,
   UserWalletSubscriptionRow,
-} from '../database.types';
+} from '../types/database.types';
 import type {
   SubscriberWalletRecipient,
   UserWalletSubscriptionView,
