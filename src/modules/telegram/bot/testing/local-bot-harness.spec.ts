@@ -4,7 +4,7 @@ import { LocalBotHarness } from './local-bot-harness';
 import type { HarnessRunResult, HarnessUser } from './local-bot-harness.interfaces';
 import { ChainKey } from '../../../../common/interfaces/chain-key.interfaces';
 import type { AppConfigService } from '../../../../config/app-config.service';
-import type { RuntimeStatusService } from '../../../../runtime/runtime-status.service';
+import type { RuntimeStatusService } from '../../../runtime/runtime-status.service';
 import { HistoryRequestSource } from '../../../whales/entities/history-rate-limiter.interfaces';
 import { HistoryDirectionFilter, HistoryKind } from '../../../whales/entities/history-request.dto';
 import type { TrackingService } from '../../../whales/services/tracking.service';

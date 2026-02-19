@@ -13,7 +13,6 @@ import { ChainCheckpointsRepository } from '../../../database/repositories/chain
 import { ProcessedEventsRepository } from '../../../database/repositories/processed-events.repository';
 import { SubscriptionsRepository } from '../../../database/repositories/subscriptions.repository';
 import { WalletEventsRepository } from '../../../database/repositories/wallet-events.repository';
-import { RuntimeStatusService } from '../../../runtime/runtime-status.service';
 import {
   type IBaseChainStreamDependencies,
   type IChainRuntimeSnapshot,
@@ -28,6 +27,7 @@ import type {
 import type { ISubscriptionHandle } from '../../blockchain/base/rpc-adapter.interfaces';
 import { ProviderFailoverService } from '../../blockchain/factory/provider-failover.service';
 import { ProviderFactory } from '../../blockchain/factory/provider.factory';
+import { RuntimeStatusService } from '../../runtime/runtime-status.service';
 import { AlertDispatcherService } from '../../whales/services/alert-dispatcher.service';
 
 @Injectable()

@@ -21,7 +21,7 @@ import { TelegramSenderService } from './bot/telegram-sender.service';
 import { TelegramUiService } from './bot/telegram-ui.service';
 import { TelegramUpdate } from './bot/telegram.update';
 import { AppConfigService } from '../../config/app-config.service';
-import { RuntimeModule } from '../../runtime/runtime.module';
+import { RuntimeModule } from '../runtime/runtime.module';
 import { WhalesModule } from '../whales/whales.module';
 
 const createTelegrafOptions = (appConfigService: AppConfigService): TelegrafModuleOptions => {

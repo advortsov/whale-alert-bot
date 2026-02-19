@@ -5,6 +5,7 @@ import {
   ChainStreamServiceDependencies,
 } from './ethereum/ethereum-chain-stream.service';
 import { BlockchainModule } from '../blockchain/blockchain.module';
+import { RuntimeModule } from '../runtime/runtime.module';
 import { EventClassifierService } from './ethereum/processors/event-classifier.service';
 import { AlchemyPrimaryAdapter } from './ethereum/providers/alchemy-primary.adapter';
 import { InfuraFallbackAdapter } from './ethereum/providers/infura-fallback.adapter';
@@ -25,7 +26,6 @@ import {
 } from './tron/tron-chain-stream.service';
 import { DatabaseModule } from '../../database/database.module';
 import { TronPublicFallbackAdapter } from './tron/providers/tron-public-fallback.adapter';
-import { RuntimeModule } from '../../runtime/runtime.module';
 import {
   ETHEREUM_FALLBACK_RPC_ADAPTER,
   ETHEREUM_PRIMARY_RPC_ADAPTER,

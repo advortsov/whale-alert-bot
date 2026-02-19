@@ -1,7 +1,7 @@
 import type { Message } from 'telegraf/typings/core/types/typegram';
 
 import type { AppConfigService } from '../../../../config/app-config.service';
-import type { RuntimeStatusService } from '../../../../runtime/runtime-status.service';
+import type { RuntimeStatusService } from '../../../runtime/runtime-status.service';
 import type { TrackingService } from '../../../whales/services/tracking.service';
 import type { ReplyOptions } from '../telegram.interfaces';
 

@@ -28,7 +28,7 @@ import {
   type WalletCallbackTarget,
 } from './telegram.interfaces';
 import type { AppConfigService } from '../../../config/app-config.service';
-import type { RuntimeStatusService } from '../../../runtime/runtime-status.service';
+import type { RuntimeStatusService } from '../../runtime/runtime-status.service';
 import type { TelegramUserRef } from '../../whales/entities/tracking.interfaces';
 import type { TrackingService } from '../../whales/services/tracking.service';
 

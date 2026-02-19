@@ -1,4 +1,4 @@
-import type { ChainKey } from '../common/interfaces/chain-key.interfaces';
+import type { ChainKey } from '../../common/interfaces/chain-key.interfaces';
 
 export type WatcherRuntimeSnapshot = {
   readonly observedBlock: number | null;

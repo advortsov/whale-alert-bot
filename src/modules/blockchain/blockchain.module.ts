@@ -7,7 +7,7 @@ import { HealthController } from './health/health.controller';
 import { HealthService } from './health/health.service';
 import { BottleneckRateLimiterService } from './rate-limiting/bottleneck-rate-limiter.service';
 import { DatabaseModule } from '../../database/database.module';
-import { RuntimeModule } from '../../runtime/runtime.module';
+import { RuntimeModule } from '../runtime/runtime.module';
 
 @Module({
   imports: [DatabaseModule, RuntimeModule],

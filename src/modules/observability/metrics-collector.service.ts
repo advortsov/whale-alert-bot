@@ -1,13 +1,13 @@
 import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 
 import { MetricsService } from './metrics.service';
-import { AppConfigService } from '../config/app-config.service';
-import { DatabaseService } from '../database/kysely/database.service';
+import { AppConfigService } from '../../config/app-config.service';
+import { DatabaseService } from '../../database/kysely/database.service';
 import type {
   ILimiterMetrics,
   LimiterKey,
-} from '../modules/blockchain/rate-limiting/bottleneck-rate-limiter.interfaces';
-import { BottleneckRateLimiterService } from '../modules/blockchain/rate-limiting/bottleneck-rate-limiter.service';
+} from '../blockchain/rate-limiting/bottleneck-rate-limiter.interfaces';
+import { BottleneckRateLimiterService } from '../blockchain/rate-limiting/bottleneck-rate-limiter.service';
 
 const COLLECT_INTERVAL_MS = 10_000;
 

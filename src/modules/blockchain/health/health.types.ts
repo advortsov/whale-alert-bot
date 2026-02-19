@@ -1,4 +1,4 @@
-import type { ChainRuntimeEntry } from '../../../runtime/runtime-status.interfaces';
+import type { ChainRuntimeEntry } from '../../runtime/runtime-status.interfaces';
 
 export type ComponentHealth = {
   readonly ok: boolean;

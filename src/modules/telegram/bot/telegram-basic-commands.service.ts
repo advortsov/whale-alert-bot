@@ -9,7 +9,7 @@ import type {
   UpdateMeta,
 } from './telegram.interfaces';
 import { AppConfigService } from '../../../config/app-config.service';
-import { RuntimeStatusService } from '../../../runtime/runtime-status.service';
+import { RuntimeStatusService } from '../../runtime/runtime-status.service';
 import type { HistoryPageResult } from '../../whales/entities/history-page.interfaces';
 import { HistoryRequestSource } from '../../whales/entities/history-rate-limiter.interfaces';
 import type { TelegramUserRef } from '../../whales/entities/tracking.interfaces';

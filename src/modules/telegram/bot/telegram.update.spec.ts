@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { WalletCallbackAction, type WalletCallbackTarget } from './telegram.interfaces';
 import { TelegramUpdate } from './telegram.update';
 import type { AppConfigService } from '../../../config/app-config.service';
-import type { RuntimeStatusService } from '../../../runtime/runtime-status.service';
+import type { RuntimeStatusService } from '../../runtime/runtime-status.service';
 import { HistoryRequestSource } from '../../whales/entities/history-rate-limiter.interfaces';
 import { HistoryDirectionFilter, HistoryKind } from '../../whales/entities/history-request.dto';
 import { AlertFilterToggleTarget } from '../../whales/entities/tracking.interfaces';

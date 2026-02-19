@@ -15,7 +15,6 @@ import type { ChainCheckpointsRepository } from '../../../database/repositories/
 import type { ProcessedEventsRepository } from '../../../database/repositories/processed-events.repository';
 import type { SubscriptionsRepository } from '../../../database/repositories/subscriptions.repository';
 import type { WalletEventsRepository } from '../../../database/repositories/wallet-events.repository';
-import type { RuntimeStatusService } from '../../../runtime/runtime-status.service';
 import type {
   IBlockEnvelope,
   IReceiptEnvelope,
@@ -28,6 +27,7 @@ import type {
 } from '../../blockchain/base/rpc-adapter.interfaces';
 import type { ProviderFailoverService } from '../../blockchain/factory/provider-failover.service';
 import type { ProviderFactory } from '../../blockchain/factory/provider.factory';
+import type { RuntimeStatusService } from '../../runtime/runtime-status.service';
 import type { AlertDispatcherService } from '../../whales/services/alert-dispatcher.service';
 
 class ProviderStub {
