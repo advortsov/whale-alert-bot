@@ -5,13 +5,13 @@ import type {
   ITronGridTrc20TokenInfo,
   ITronGridTrc20TransactionItem,
 } from './tron-grid-history.interfaces';
+import type { TronAddressCodec } from '../../../modules/chains/tron/tron-address.codec';
 import {
   HistoryDirection,
   HistoryItemType,
   type IHistoryItemDto,
-} from '../../../features/tracking/dto/history-item.dto';
-import { HistoryDirectionFilter } from '../../../features/tracking/dto/history-request.dto';
-import type { TronAddressCodec } from '../../../modules/chains/tron/tron-address.codec';
+} from '../../whales/entities/history-item.dto';
+import { HistoryDirectionFilter } from '../../whales/entities/history-request.dto';
 
 const TRX_NATIVE_DECIMALS = 6;
 

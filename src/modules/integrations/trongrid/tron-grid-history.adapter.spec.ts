@@ -3,14 +3,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TronGridHistoryAdapter } from './tron-grid-history.adapter';
 import { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
 import type { AppConfigService } from '../../../config/app-config.service';
-import { HistoryDirection, HistoryItemType } from '../../../features/tracking/dto/history-item.dto';
+import type { BottleneckRateLimiterService } from '../../../modules/blockchain/rate-limiting/bottleneck-rate-limiter.service';
+import { TronAddressCodec } from '../../../modules/chains/tron/tron-address.codec';
+import { HistoryDirection, HistoryItemType } from '../../whales/entities/history-item.dto';
 import {
   HistoryDirectionFilter,
   HistoryKind,
   type IHistoryRequestDto,
-} from '../../../features/tracking/dto/history-request.dto';
-import type { BottleneckRateLimiterService } from '../../../modules/blockchain/rate-limiting/bottleneck-rate-limiter.service';
-import { TronAddressCodec } from '../../../modules/chains/tron/tron-address.codec';
+} from '../../whales/entities/history-request.dto';
 
 type AppConfigStub = {
   readonly tronGridApiBaseUrl: string;

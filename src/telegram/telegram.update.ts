@@ -28,9 +28,9 @@ import {
   type WalletCallbackTarget,
 } from './telegram.interfaces';
 import type { AppConfigService } from '../config/app-config.service';
+import type { TelegramUserRef } from '../modules/whales/entities/tracking.interfaces';
+import type { TrackingService } from '../modules/whales/services/tracking.service';
 import type { RuntimeStatusService } from '../runtime/runtime-status.service';
-import type { TelegramUserRef } from '../tracking/tracking.interfaces';
-import type { TrackingService } from '../tracking/tracking.service';
 
 @Update()
 export class TelegramUpdate {

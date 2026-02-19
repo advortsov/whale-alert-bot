@@ -12,11 +12,14 @@ import {
   type CommandExecutionResult,
   type WalletCallbackTarget,
 } from './telegram.interfaces';
-import type { HistoryPageResult } from '../tracking/history-page.interfaces';
-import { HistoryRequestSource } from '../tracking/history-rate-limiter.interfaces';
-import type { TelegramUserRef, WalletAlertFilterState } from '../tracking/tracking.interfaces';
-import { AlertFilterToggleTarget } from '../tracking/tracking.interfaces';
-import { TrackingService } from '../tracking/tracking.service';
+import type { HistoryPageResult } from '../modules/whales/entities/history-page.interfaces';
+import { HistoryRequestSource } from '../modules/whales/entities/history-rate-limiter.interfaces';
+import type {
+  TelegramUserRef,
+  WalletAlertFilterState,
+} from '../modules/whales/entities/tracking.interfaces';
+import { AlertFilterToggleTarget } from '../modules/whales/entities/tracking.interfaces';
+import { TrackingService } from '../modules/whales/services/tracking.service';
 
 @Injectable()
 export class TelegramCallbackCommandsServiceDependencies {

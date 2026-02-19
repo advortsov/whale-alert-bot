@@ -1,5 +1,5 @@
-import type { AlertCexFlowMode } from '../../features/alerts/cex-flow.interfaces';
-import type { AlertSmartFilterType } from '../../features/alerts/smart-filter.interfaces';
+import type { AlertCexFlowMode } from '../../modules/whales/entities/cex-flow.interfaces';
+import type { AlertSmartFilterType } from '../../modules/whales/entities/smart-filter.interfaces';
 
 export interface IUserAlertSettingsUpdatePatch {
   readonly thresholdUsd?: number;

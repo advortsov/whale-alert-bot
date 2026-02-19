@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { TronEventClassifierService } from './processors/tron-event-classifier.service';
 import { TronAddressCodec } from './tron-address.codec';
 import { TronChainStreamService } from './tron-chain-stream.service';
-import type { AlertDispatcherService } from '../../../alerts/alert-dispatcher.service';
 import { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
 import {
   ChainId,
@@ -26,6 +25,7 @@ import type {
   ProviderOperation,
 } from '../../blockchain/base/rpc-adapter.interfaces';
 import type { ProviderFailoverService } from '../../blockchain/factory/provider-failover.service';
+import type { AlertDispatcherService } from '../../whales/services/alert-dispatcher.service';
 
 class TronProviderStub {
   public blockHandler: ((blockNumber: number) => Promise<void>) | null = null;

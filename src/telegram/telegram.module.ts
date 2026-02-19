@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { TelegrafModule } from 'nestjs-telegraf';
 import type { TelegrafModuleOptions } from 'nestjs-telegraf/dist/interfaces/telegraf-options.interface';
 
@@ -21,8 +21,8 @@ import { TelegramSenderService } from './telegram-sender.service';
 import { TelegramUiService } from './telegram-ui.service';
 import { TelegramUpdate } from './telegram.update';
 import { AppConfigService } from '../config/app-config.service';
+import { WhalesModule } from '../modules/whales/whales.module';
 import { RuntimeModule } from '../runtime/runtime.module';
-import { TrackingModule } from '../tracking/tracking.module';
 
 const createTelegrafOptions = (appConfigService: AppConfigService): TelegrafModuleOptions => {
   const fallbackToken: string = '0000000000:TEST_TOKEN_FOR_DISABLED_TELEGRAM';
@@ -37,9 +37,10 @@ const createTelegrafOptions = (appConfigService: AppConfigService): TelegrafModu
   };
 };
 
+@Global()
 @Module({
   imports: [
-    TrackingModule,
+    WhalesModule,
     RuntimeModule,
     TelegrafModule.forRootAsync({
       inject: [AppConfigService],

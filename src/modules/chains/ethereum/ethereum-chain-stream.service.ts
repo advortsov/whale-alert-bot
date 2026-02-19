@@ -1,7 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 
 import { EventClassifierService } from './processors/event-classifier.service';
-import { AlertDispatcherService } from '../../../alerts/alert-dispatcher.service';
 import { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
 import {
   ChainId,
@@ -29,6 +28,7 @@ import type {
 import type { ISubscriptionHandle } from '../../blockchain/base/rpc-adapter.interfaces';
 import { ProviderFailoverService } from '../../blockchain/factory/provider-failover.service';
 import { ProviderFactory } from '../../blockchain/factory/provider.factory';
+import { AlertDispatcherService } from '../../whales/services/alert-dispatcher.service';
 
 @Injectable()
 export class ChainStreamServiceDependencies implements IBaseChainStreamDependencies {

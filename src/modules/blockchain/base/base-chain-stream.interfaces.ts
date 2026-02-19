@@ -1,9 +1,9 @@
-import type { AlertDispatcherService } from '../../../alerts/alert-dispatcher.service';
 import type { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
 import type { ChainCheckpointsRepository } from '../../../database/repositories/chain-checkpoints.repository';
 import type { ProcessedEventsRepository } from '../../../database/repositories/processed-events.repository';
 import type { SubscriptionsRepository } from '../../../database/repositories/subscriptions.repository';
 import type { WalletEventsRepository } from '../../../database/repositories/wallet-events.repository';
+import type { AlertDispatcherService } from '../../whales/services/alert-dispatcher.service';
 import type { ProviderFailoverService } from '../factory/provider-failover.service';
 
 export interface IChainStreamConfig {

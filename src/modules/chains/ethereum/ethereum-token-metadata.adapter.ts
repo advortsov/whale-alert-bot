@@ -1,15 +1,15 @@
 import { Injectable } from '@nestjs/common';
 
-import {
-  FALLBACK_TOKEN_METADATA,
-  KNOWN_TOKEN_METADATA,
-} from '../../../alerts/constants/known-token-metadata';
 import type {
   ITokenMetadataAdapter,
   ITokenMetadataDto,
 } from '../../../common/interfaces/token-metadata/token-metadata.interfaces';
 import { SimpleCacheImpl } from '../../../common/utils/cache';
 import { AppConfigService } from '../../../config/app-config.service';
+import {
+  FALLBACK_TOKEN_METADATA,
+  KNOWN_TOKEN_METADATA,
+} from '../../whales/entities/known-token-metadata';
 
 @Injectable()
 export class EthereumTokenMetadataAdapter implements ITokenMetadataAdapter {

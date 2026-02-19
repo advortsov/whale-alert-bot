@@ -1,0 +1,336 @@
+План рефакторинга src/ по ADR-001
+
+Контекст
+
+Текущая структура src/ формировалась органически: 20 директорий верхнего уровня, смешение подходов (hexagonal ports+adapters и модульная структура NestJS). ADR-001 определяет целевую
+архитектуру с чётким разделением на config/, common/, database/, modules/, shared/. Рефакторинг приведёт код в соответствие с ADR — без изменения поведения.
+
+---
+Целевая структура
+
+src/
+├── main.ts
+├── app.module.ts
+├── config/                          # Без изменений
+├── common/
+│   ├── constants/
+│   ├── decorators/                  # stub
+│   ├── filters/                     # stub
+│   ├── guards/                      # stub
+│   ├── interceptors/                # stub
+│   ├── interfaces/                  # chain types, domain interfaces
+│   ├── pipes/                       # stub
+│   ├── utils/                       # cache, release builder
+│   └── common.module.ts
+├── database/
+│   ├── kysely/                      # DatabaseService (connection)
+│   ├── migrations/                  # MigrationService
+│   ├── repositories/                # Все репозитории
+│   └── types/                       # database.types.ts и интерфейсы
+├── modules/
+│   ├── blockchain/
+│   │   ├── base/                    # Абстрактные классы, port-интерфейсы
+│   │   ├── factory/                 # Provider failover, factory
+│   │   ├── health/                  # Health check сервис + контроллер
+│   │   ├── rate-limiting/           # Bottleneck rate limiter
+│   │   └── blockchain.module.ts
+│   ├── chains/
+│   │   ├── ethereum/
+│   │   │   ├── providers/           # Alchemy, Infura, base RPC adapter
+│   │   │   └── processors/          # Event classifier
+│   │   ├── solana/
+│   │   │   ├── providers/           # Helius, public RPC
+│   │   │   └── processors/
+│   │   ├── tron/
+│   │   │   ├── providers/           # TronGrid, public RPC
+│   │   │   └── processors/
+│   │   └── chains.module.ts
+│   ├── whales/
+│   │   ├── entities/                # Domain types/DTOs
+│   │   ├── services/                # Tracking + alerts бизнес-логика
+│   │   └── whales.module.ts
+│   ├── telegram/
+│   │   ├── bot/                     # Команды, handlers, UI
+│   │   ├── tma/                     # stub
+│   │   ├── scenes/                  # stub
+│   │   ├── keyboards/               # stub
+│   │   └── telegram.module.ts
+│   ├── integrations/
+│   │   ├── coingecko/               # Token pricing
+│   │   ├── etherscan/               # Block explorer
+│   │   ├── trongrid/                # TRON explorer
+│   │   └── integrations.module.ts
+│   ├── api/                         # stub
+│   ├── notifications/               # stub
+│   ├── analytics/                   # stub
+│   ├── observability/               # Метрики, /metrics endpoint
+│   └── runtime/                     # Runtime status tracking
+└── shared/                          # stub
+
+---
+Маппинг: текущее → целевое
+┌──────────────────────────────────────────────────┬─────────────────────────────────────┬────────────────────────────────────┐
+│               Текущее расположение               │        Целевое расположение         │             Примечание             │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ config/                                          │ config/                             │ Без изменений                      │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ core/chains/chain-key.interfaces.ts              │ common/interfaces/                  │ Общие chain types                  │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ core/ports/rpc/                                  │ modules/blockchain/base/            │ RPC-интерфейсы                     │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ core/ports/classification/                       │ modules/blockchain/base/            │ Classifier interfaces              │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ core/ports/address/                              │ common/interfaces/                  │ Address codec interfaces           │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ core/ports/explorers/                            │ common/interfaces/                  │ Explorer interfaces                │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ core/ports/token-metadata/                       │ common/interfaces/                  │ Token metadata interfaces          │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ core/ports/token-pricing/                        │ common/interfaces/                  │ Token pricing interfaces           │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ core/services/                                   │ Удалить                             │ Пустая директория                  │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ storage/database.service.ts                      │ database/kysely/                    │ DB connection                      │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ storage/migration.service.ts                     │ database/migrations/                │ Migrations                         │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ storage/database.types.ts                        │ database/types/                     │ DB types                           │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ storage/repositories/                            │ database/repositories/              │ Все репозитории                    │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ storage/storage.module.ts                        │ database/database.module.ts         │ Переименование модуля              │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ chain/base-chain-stream.*                        │ modules/blockchain/base/            │ Abstract base                      │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ chain/chain.types.ts                             │ common/interfaces/                  │ Shared types                       │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ chain/chain.constants.ts                         │ common/constants/                   │ Chain constants                    │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ chain/providers/provider-failover.*              │ modules/blockchain/factory/         │ Failover logic                     │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ chain/providers/provider.factory.*               │ modules/blockchain/factory/         │ Provider factory                   │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ chain/chain-stream.service.ts                    │ modules/chains/ethereum/            │ ETH stream (сейчас живёт в chain/) │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ chain/event-classifier.service.ts                │ modules/chains/ethereum/processors/ │ ETH classifier                     │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ chain/chain.module.ts                            │ modules/chains/chains.module.ts     │ Модуль чейнов                      │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ chains/solana/*                                  │ modules/chains/solana/              │ Solana stream + classifier         │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ chains/tron/*                                    │ modules/chains/tron/                │ TRON stream + classifier           │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ integrations/rpc/ethereum/                       │ modules/chains/ethereum/providers/  │ Alchemy, Infura адаптеры           │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ integrations/rpc/solana/                         │ modules/chains/solana/providers/    │ Helius, public RPC                 │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ integrations/rpc/tron/                           │ modules/chains/tron/providers/      │ TronGrid, public RPC               │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ integrations/address/ethereum/                   │ modules/chains/ethereum/            │ Address codec                      │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ integrations/address/solana/                     │ modules/chains/solana/              │ Address codec                      │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ integrations/address/tron/                       │ modules/chains/tron/                │ Address codec                      │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ integrations/address/address-codec.registry.ts   │ modules/blockchain/                 │ Registry                           │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ integrations/token-pricing/coingecko/            │ modules/integrations/coingecko/     │ По вендору                         │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ integrations/token-metadata/ethereum/            │ modules/chains/ethereum/            │ On-chain metadata                  │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ integrations/explorers/etherscan/                │ modules/integrations/etherscan/     │ По вендору                         │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ integrations/explorers/solana/                   │ modules/chains/solana/              │ Solana RPC history (не вендор)     │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ integrations/explorers/tron/                     │ modules/integrations/trongrid/      │ По вендору                         │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ integrations/explorers/history-explorer-router.* │ modules/whales/services/            │ Роутер истории                     │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ alerts/ (все сервисы)                            │ modules/whales/services/            │ Бизнес-логика алертов              │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ alerts/alerts.module.ts                          │ Удалить (merge в whales.module.ts)  │                                    │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ tracking/ (все сервисы)                          │ modules/whales/services/            │ Бизнес-логика трекинга             │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ tracking/tracking.module.ts                      │ Удалить (merge в whales.module.ts)  │                                    │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ features/alerts/                                 │ modules/whales/entities/            │ Domain interfaces                  │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ features/tracking/dto/                           │ modules/whales/entities/            │ DTOs                               │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ telegram/                                        │ modules/telegram/bot/               │ Bot handlers → bot/                │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ telegram/telegram.module.ts                      │ modules/telegram/telegram.module.ts │                                    │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ health/                                          │ modules/blockchain/health/          │ Health = blockchain health         │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ observability/                                   │ modules/observability/              │ Standalone модуль                  │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ runtime/                                         │ modules/runtime/                    │ Standalone модуль                  │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ rate-limiting/                                   │ modules/blockchain/rate-limiting/   │                                    │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ infra/cache/                                     │ common/utils/cache/                 │ Утилиты кеширования                │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ release/                                         │ common/utils/release/               │ Release notes builder              │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ modules/ (legacy)                                │ Удалить                             │ Пустые dirs                        │
+├──────────────────────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────────┤
+│ infrastructure/ (legacy)                         │ Удалить                             │ Пустые dirs                        │
+└──────────────────────────────────────────────────┴─────────────────────────────────────┴────────────────────────────────────┘
+---
+Фазы выполнения
+
+Фаза 0: Подготовка
+
+- Удалить пустые legacy-директории: modules/, infrastructure/, core/services/
+- Создать полное дерево целевых директорий (mkdir -p)
+- Зафиксировать текущее состояние: npm run check должен быть зелёным
+
+Фаза 1: database/ (из storage/)
+
+Файлы: ~20
+- storage/database.service.ts → database/kysely/database.service.ts
+- storage/migration.service.ts → database/migrations/migration.service.ts
+- storage/database.types.ts + interface файлы → database/types/
+- storage/repositories/*.ts → database/repositories/
+- storage/storage.module.ts → database/database.module.ts (переименовать класс StorageModule → DatabaseModule)
+- Обновить все импорты ../storage/ → ../database/ по всему проекту
+- Верификация: npm run typecheck && npm run test
+
+Фаза 2: common/ (из core/, infra/, release/, chain types)
+
+Файлы: ~25
+- core/chains/chain-key.interfaces.ts → common/interfaces/
+- chain/chain.types.ts → common/interfaces/chain.types.ts
+- chain/chain.constants.ts → common/constants/
+- core/ports/address/ → common/interfaces/address/
+- core/ports/explorers/ → common/interfaces/explorers/
+- core/ports/token-metadata/ → common/interfaces/token-metadata/
+- core/ports/token-pricing/ → common/interfaces/token-pricing/
+- infra/cache/ → common/utils/cache/
+- release/ → common/utils/release/
+- Создать stub-директории: decorators/, filters/, guards/, interceptors/, pipes/
+- Создать common/common.module.ts
+- Обновить все импорты
+- Верификация: npm run typecheck && npm run test
+
+Фаза 3: modules/blockchain/ (из chain/ base, rate-limiting, core/ports/rpc)
+
+Файлы: ~15
+- core/ports/rpc/*.ts (интерфейсы, токены) → modules/blockchain/base/
+- core/ports/classification/*.ts → modules/blockchain/base/
+- chain/base-chain-stream.service.ts + interfaces → modules/blockchain/base/
+- chain/providers/provider-failover.service.ts + spec → modules/blockchain/factory/
+- chain/providers/provider.factory.ts + spec → modules/blockchain/factory/
+- rate-limiting/ (все файлы) → modules/blockchain/rate-limiting/
+- health/ (все файлы) → modules/blockchain/health/
+- integrations/address/address-codec.registry.ts → modules/blockchain/
+- Создать modules/blockchain/blockchain.module.ts
+- Удалить пустые core/, rate-limiting/
+- Верификация: npm run typecheck && npm run test
+
+Фаза 4: modules/chains/ (из chain/, chains/, integrations/rpc/, integrations/address/)
+
+Файлы: ~25
+- Ethereum:
+  - chain/chain-stream.service.ts → modules/chains/ethereum/ethereum-chain-stream.service.ts
+  - chain/event-classifier.service.ts + spec → modules/chains/ethereum/processors/
+  - integrations/rpc/ethereum/*.ts → modules/chains/ethereum/providers/
+  - integrations/address/ethereum/*.ts → modules/chains/ethereum/
+  - integrations/token-metadata/ethereum/*.ts → modules/chains/ethereum/
+- Solana:
+  - chains/solana/*.ts → modules/chains/solana/
+  - integrations/rpc/solana/*.ts → modules/chains/solana/providers/
+  - integrations/address/solana/*.ts → modules/chains/solana/
+  - integrations/explorers/solana/*.ts → modules/chains/solana/
+- TRON:
+  - chains/tron/*.ts → modules/chains/tron/
+  - integrations/rpc/tron/*.ts → modules/chains/tron/providers/
+  - integrations/address/tron/*.ts → modules/chains/tron/
+- chain/chain.module.ts → modules/chains/chains.module.ts
+- Удалить пустые chain/, chains/, integrations/rpc/, integrations/address/
+- Верификация: npm run typecheck && npm run test
+
+Фаза 5: modules/integrations/ (из integrations/ non-RPC, по вендору)
+
+Файлы: ~8
+- integrations/token-pricing/coingecko/*.ts → modules/integrations/coingecko/
+- integrations/explorers/etherscan/*.ts → modules/integrations/etherscan/
+- integrations/explorers/tron/*.ts → modules/integrations/trongrid/
+- integrations/explorers/history-explorer-router.adapter.ts → пока в modules/integrations/ (позже в whales)
+- Создать modules/integrations/integrations.module.ts
+- Удалить пустые integrations/
+- Верификация: npm run typecheck && npm run test
+
+Фаза 6: modules/whales/ (из alerts/, tracking/, features/)
+
+Файлы: ~55 (самая большая фаза)
+- alerts/*.service.ts + specs → modules/whales/services/
+- alerts/*.interfaces.ts → modules/whales/entities/
+- tracking/*.service.ts + specs → modules/whales/services/
+- tracking/*.interfaces.ts → modules/whales/entities/
+- tracking/dto/ → modules/whales/entities/
+- features/alerts/*.ts → modules/whales/entities/
+- features/tracking/dto/*.ts → modules/whales/entities/
+- integrations/explorers/history-explorer-router.adapter.ts → modules/whales/services/
+- Создать modules/whales/whales.module.ts (merge AlertsModule + TrackingModule)
+- Удалить alerts/, tracking/, features/
+- Верификация: npm run typecheck && npm run test
+
+Фаза 7: modules/telegram/ (из telegram/)
+
+Файлы: ~17
+- telegram/*.service.ts, telegram/*.update.ts → modules/telegram/bot/
+- telegram/testing/ → modules/telegram/bot/testing/
+- telegram/telegram.module.ts → modules/telegram/telegram.module.ts
+- Создать stubs: tma/, scenes/, keyboards/
+- Удалить telegram/
+- Верификация: npm run typecheck && npm run test
+
+Фаза 8: modules/observability/ и modules/runtime/
+
+Файлы: ~12
+- observability/ → modules/observability/
+- runtime/ → modules/runtime/
+- Верификация: npm run typecheck && npm run test
+
+Фаза 9: Stubs + shared/
+
+- Создать modules/api/ (api.module.ts, controllers/, dto/, responses/)
+- Создать modules/notifications/ (notifications.module.ts, channels/, templates/, dispatcher/)
+- Создать modules/analytics/ (analytics.module.ts, services/, repositories/)
+- Создать shared/
+- Верификация: npm run typecheck && npm run build
+
+Фаза 10: Финализация
+
+- Обновить app.module.ts — заменить все старые модули на новые
+- Обновить knip.json entry patterns
+- Обновить .eslintrc (boundaries настройки если есть)
+- Обновить tsconfig.json paths (если используются алиасы)
+- Полный прогон: npm run precommit
+- Пересборка Docker: docker compose up --build -d
+- Проверка логов: docker compose logs app --tail=50
+
+---
+Критические риски
+
+1. Объём изменений: ~180 файлов затронуты, сотни импортов. Каждая фаза ломает билд до обновления всех путей.
+2. Merge conflicts: На время рефакторинга нельзя параллельно развивать фичи в dev.
+3. WhalesModule размер: Объединение alerts (~24) + tracking (~28) + features (~7) = ~59 файлов в одном модуле. Это много, но соответствует ADR.
+4. Circular dependencies: При объединении alerts и tracking в whales нужно проверить, нет ли циклических зависимостей между ними.
+5. NestJS DI: При переносе файлов нужно обновить не только import paths, но и providers/exports в модулях.
+
+---
+Верификация (после каждой фазы)
+
+npm run typecheck        # Все импорты корректны
+npm run lint             # Нет lint-ошибок
+npm run test             # Тесты проходят
+npm run build            # NestJS билд успешен
+
+После финальной фазы:
+npm run precommit        # Полный gate
+npx knip                 # Нет мёртвого кода
+docker compose up --build -d && sleep 10 && docker compose logs app --tail=50  # Приложение стартует

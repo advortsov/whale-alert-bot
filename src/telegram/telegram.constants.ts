@@ -1,6 +1,6 @@
 import { SupportedTelegramCommand, WalletCallbackFilterTarget } from './telegram.interfaces';
 import { ChainKey } from '../common/interfaces/chain-key.interfaces';
-import { AlertFilterToggleTarget } from '../tracking/tracking.interfaces';
+import { AlertFilterToggleTarget } from '../modules/whales/entities/tracking.interfaces';
 
 export const USER_NOT_IDENTIFIED_MESSAGE = 'Не удалось определить пользователя.';
 export const DEFAULT_MUTE_MINUTES = 30;

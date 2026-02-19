@@ -3,12 +3,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { SolanaRpcHistoryAdapter } from './solana-rpc-history.adapter';
 import { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
 import type { AppConfigService } from '../../../config/app-config.service';
-import { HistoryDirection, HistoryItemType } from '../../../features/tracking/dto/history-item.dto';
-import {
-  HistoryDirectionFilter,
-  HistoryKind,
-} from '../../../features/tracking/dto/history-request.dto';
 import type { BottleneckRateLimiterService } from '../../blockchain/rate-limiting/bottleneck-rate-limiter.service';
+import { HistoryDirection, HistoryItemType } from '../../whales/entities/history-item.dto';
+import { HistoryDirectionFilter, HistoryKind } from '../../whales/entities/history-request.dto';
 
 type SolanaConfigStub = {
   readonly solanaHeliusHttpUrl: string | null;

@@ -4,11 +4,14 @@ import { describe, expect, it, vi } from 'vitest';
 import { WalletCallbackAction, type WalletCallbackTarget } from './telegram.interfaces';
 import { TelegramUpdate } from './telegram.update';
 import type { AppConfigService } from '../config/app-config.service';
-import { HistoryDirectionFilter, HistoryKind } from '../features/tracking/dto/history-request.dto';
+import { HistoryRequestSource } from '../modules/whales/entities/history-rate-limiter.interfaces';
+import {
+  HistoryDirectionFilter,
+  HistoryKind,
+} from '../modules/whales/entities/history-request.dto';
+import { AlertFilterToggleTarget } from '../modules/whales/entities/tracking.interfaces';
+import type { TrackingService } from '../modules/whales/services/tracking.service';
 import type { RuntimeStatusService } from '../runtime/runtime-status.service';
-import { HistoryRequestSource } from '../tracking/history-rate-limiter.interfaces';
-import { AlertFilterToggleTarget } from '../tracking/tracking.interfaces';
-import type { TrackingService } from '../tracking/tracking.service';
 
 type ParsedMessageCommandView = {
   readonly command: string;

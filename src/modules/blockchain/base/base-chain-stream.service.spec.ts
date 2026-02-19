@@ -9,7 +9,6 @@ import {
 } from './base-chain-stream.service';
 import type { IBlockEnvelope, IReceiptEnvelope } from './block-stream.interfaces';
 import type { ISubscriptionHandle, ProviderOperation } from './rpc-adapter.interfaces';
-import type { AlertDispatcherService } from '../../../alerts/alert-dispatcher.service';
 import type { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
 import type { ClassifiedEvent } from '../../../common/interfaces/chain.types';
 import {
@@ -22,6 +21,7 @@ import type { ChainCheckpointsRepository } from '../../../database/repositories/
 import type { ProcessedEventsRepository } from '../../../database/repositories/processed-events.repository';
 import type { SubscriptionsRepository } from '../../../database/repositories/subscriptions.repository';
 import type { WalletEventsRepository } from '../../../database/repositories/wallet-events.repository';
+import type { AlertDispatcherService } from '../../whales/services/alert-dispatcher.service';
 import type { ProviderFailoverService } from '../factory/provider-failover.service';
 
 const TRACKED_ADDRESS: string = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';

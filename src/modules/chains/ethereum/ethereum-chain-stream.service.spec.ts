@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { ChainStreamService } from './ethereum-chain-stream.service';
 import type { EventClassifierService } from './processors/event-classifier.service';
-import type { AlertDispatcherService } from '../../../alerts/alert-dispatcher.service';
 import {
   AssetStandard,
   ChainId,
@@ -29,6 +28,7 @@ import type {
 } from '../../blockchain/base/rpc-adapter.interfaces';
 import type { ProviderFailoverService } from '../../blockchain/factory/provider-failover.service';
 import type { ProviderFactory } from '../../blockchain/factory/provider.factory';
+import type { AlertDispatcherService } from '../../whales/services/alert-dispatcher.service';
 
 class ProviderStub {
   public blockHandler: ((blockNumber: number) => Promise<void>) | null = null;

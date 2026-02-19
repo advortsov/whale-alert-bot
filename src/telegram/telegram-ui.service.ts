@@ -21,9 +21,15 @@ import {
   type CommandExecutionResult,
   type ReplyOptions,
 } from './telegram.interfaces';
-import { HistoryDirectionFilter, HistoryKind } from '../features/tracking/dto/history-request.dto';
-import type { HistoryPageResult } from '../tracking/history-page.interfaces';
-import type { TrackedWalletOption, WalletAlertFilterState } from '../tracking/tracking.interfaces';
+import type { HistoryPageResult } from '../modules/whales/entities/history-page.interfaces';
+import {
+  HistoryDirectionFilter,
+  HistoryKind,
+} from '../modules/whales/entities/history-request.dto';
+import type {
+  TrackedWalletOption,
+  WalletAlertFilterState,
+} from '../modules/whales/entities/tracking.interfaces';
 
 @Injectable()
 export class TelegramUiService {

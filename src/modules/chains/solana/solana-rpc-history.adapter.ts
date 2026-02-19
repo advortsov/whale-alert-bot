@@ -8,21 +8,21 @@ import { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
 import type { IHistoryExplorerAdapter } from '../../../common/interfaces/explorers/history-explorer.interfaces';
 import { AppConfigService } from '../../../config/app-config.service';
 import {
-  HistoryDirection,
-  HistoryItemType,
-  type IHistoryItemDto,
-  type IHistoryPageDto,
-} from '../../../features/tracking/dto/history-item.dto';
-import {
-  HistoryDirectionFilter,
-  HistoryKind,
-  type IHistoryRequestDto,
-} from '../../../features/tracking/dto/history-request.dto';
-import {
   LimiterKey,
   RequestPriority,
 } from '../../blockchain/rate-limiting/bottleneck-rate-limiter.interfaces';
 import { BottleneckRateLimiterService } from '../../blockchain/rate-limiting/bottleneck-rate-limiter.service';
+import {
+  HistoryDirection,
+  HistoryItemType,
+  type IHistoryItemDto,
+  type IHistoryPageDto,
+} from '../../whales/entities/history-item.dto';
+import {
+  HistoryDirectionFilter,
+  HistoryKind,
+  type IHistoryRequestDto,
+} from '../../whales/entities/history-request.dto';
 
 const SPL_TOKEN_PROGRAM_SUBSTRING = 'tokenkeg';
 const SOLSCAN_TX_BASE_URL = 'https://solscan.io/tx/';

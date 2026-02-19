@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { SolanaEventClassifierService } from './processors/solana-event-classifier.service';
 import { SolanaChainStreamService } from './solana-chain-stream.service';
-import type { AlertDispatcherService } from '../../../alerts/alert-dispatcher.service';
 import { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
 import {
   ChainId,
@@ -26,6 +25,7 @@ import type {
   ProviderOperation,
 } from '../../blockchain/base/rpc-adapter.interfaces';
 import type { ProviderFailoverService } from '../../blockchain/factory/provider-failover.service';
+import type { AlertDispatcherService } from '../../whales/services/alert-dispatcher.service';
 
 class SolanaProviderStub {
   public blockHandler: ((blockNumber: number) => Promise<void>) | null = null;

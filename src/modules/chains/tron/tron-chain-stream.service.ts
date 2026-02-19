@@ -1,7 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 
 import { TronEventClassifierService } from './processors/tron-event-classifier.service';
-import { AlertDispatcherService } from '../../../alerts/alert-dispatcher.service';
 import { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
 import { ChainId, type ClassifiedEvent } from '../../../common/interfaces/chain.types';
 import { AppConfigService } from '../../../config/app-config.service';
@@ -22,6 +21,7 @@ import type {
 import type { IClassificationContextDto } from '../../blockchain/base/chain-classifier.interfaces';
 import type { ISubscriptionHandle } from '../../blockchain/base/rpc-adapter.interfaces';
 import { ProviderFailoverService } from '../../blockchain/factory/provider-failover.service';
+import { AlertDispatcherService } from '../../whales/services/alert-dispatcher.service';
 
 @Injectable()
 export class TronChainStreamServiceDependencies implements IBaseChainStreamDependencies {

@@ -12,8 +12,8 @@ import {
   AlertFilterToggleTarget,
   type TelegramUserRef,
   type WalletAlertFilterState,
-} from '../tracking/tracking.interfaces';
-import { TrackingService } from '../tracking/tracking.service';
+} from '../modules/whales/entities/tracking.interfaces';
+import { TrackingService } from '../modules/whales/services/tracking.service';
 
 @Injectable()
 export class TelegramFilterCommandsServiceDependencies {

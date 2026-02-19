@@ -9,7 +9,7 @@ import {
 } from './telegram.constants';
 import { SupportedTelegramCommand, type ParsedMessageCommand } from './telegram.interfaces';
 import { ChainKey } from '../common/interfaces/chain-key.interfaces';
-import { AlertFilterToggleTarget } from '../tracking/tracking.interfaces';
+import { AlertFilterToggleTarget } from '../modules/whales/entities/tracking.interfaces';
 
 const TRACK_ARGS_WITH_LABEL_COUNT = 3;
 

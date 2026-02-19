@@ -16,7 +16,7 @@ import {
 } from './solana/solana-chain-stream.service';
 import { TronGridPrimaryAdapter } from './tron/providers/tron-grid-primary.adapter';
 import { TronAddressCodec } from './tron/tron-address.codec';
-import { AlertsModule } from '../../alerts/alerts.module';
+import { WhalesModule } from '../whales/whales.module';
 import { SolanaEventClassifierService } from './solana/processors/solana-event-classifier.service';
 import { TronEventClassifierService } from './tron/processors/tron-event-classifier.service';
 import {
@@ -36,7 +36,7 @@ import {
 } from '../blockchain/base/rpc-port.tokens';
 
 @Module({
-  imports: [DatabaseModule, AlertsModule, RuntimeModule, BlockchainModule],
+  imports: [DatabaseModule, WhalesModule, RuntimeModule, BlockchainModule],
   providers: [
     AlchemyPrimaryAdapter,
     InfuraFallbackAdapter,

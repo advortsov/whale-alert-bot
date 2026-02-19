@@ -4,13 +4,13 @@ import { LocalBotHarness } from './local-bot-harness';
 import type { HarnessRunResult, HarnessUser } from './local-bot-harness.interfaces';
 import { ChainKey } from '../../common/interfaces/chain-key.interfaces';
 import type { AppConfigService } from '../../config/app-config.service';
+import { HistoryRequestSource } from '../../modules/whales/entities/history-rate-limiter.interfaces';
 import {
   HistoryDirectionFilter,
   HistoryKind,
-} from '../../features/tracking/dto/history-request.dto';
+} from '../../modules/whales/entities/history-request.dto';
+import type { TrackingService } from '../../modules/whales/services/tracking.service';
 import type { RuntimeStatusService } from '../../runtime/runtime-status.service';
-import { HistoryRequestSource } from '../../tracking/history-rate-limiter.interfaces';
-import type { TrackingService } from '../../tracking/tracking.service';
 
 type TrackingServiceStub = {
   readonly trackAddress: ReturnType<typeof vi.fn>;

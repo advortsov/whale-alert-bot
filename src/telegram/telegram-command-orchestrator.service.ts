@@ -10,7 +10,7 @@ import {
   type UpdateMeta,
   type WalletCallbackTarget,
 } from './telegram.interfaces';
-import type { TelegramUserRef } from '../tracking/tracking.interfaces';
+import type { TelegramUserRef } from '../modules/whales/entities/tracking.interfaces';
 
 type ITelegramCommandHandler = (
   userRef: TelegramUserRef | null,

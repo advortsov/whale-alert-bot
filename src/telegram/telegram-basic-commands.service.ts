@@ -9,11 +9,11 @@ import type {
   UpdateMeta,
 } from './telegram.interfaces';
 import { AppConfigService } from '../config/app-config.service';
+import type { HistoryPageResult } from '../modules/whales/entities/history-page.interfaces';
+import { HistoryRequestSource } from '../modules/whales/entities/history-rate-limiter.interfaces';
+import type { TelegramUserRef } from '../modules/whales/entities/tracking.interfaces';
+import { TrackingService } from '../modules/whales/services/tracking.service';
 import { RuntimeStatusService } from '../runtime/runtime-status.service';
-import type { HistoryPageResult } from '../tracking/history-page.interfaces';
-import { HistoryRequestSource } from '../tracking/history-rate-limiter.interfaces';
-import type { TelegramUserRef } from '../tracking/tracking.interfaces';
-import { TrackingService } from '../tracking/tracking.service';
 
 @Injectable()
 export class TelegramBasicCommandsServiceDependencies {
