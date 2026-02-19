@@ -11,8 +11,8 @@ import type { ITokenPricingPort } from '../../../common/interfaces/token-pricing
 import { AppConfigService } from '../../../config/app-config.service';
 import { SubscriptionsRepository } from '../../../database/repositories/subscriptions.repository';
 import type { SubscriberWalletRecipient } from '../../../database/repositories/subscriptions.repository.interfaces';
-import type { TelegramSendTextOptions } from '../../../telegram/telegram-sender.service';
-import { TelegramSenderService } from '../../../telegram/telegram-sender.service';
+import type { TelegramSendTextOptions } from '../../telegram/bot/telegram-sender.service';
+import { TelegramSenderService } from '../../telegram/bot/telegram-sender.service';
 import type { IDispatchDecision, IEventUsdContext } from '../entities/alert-dispatcher.interfaces';
 
 @Injectable()

@@ -3,7 +3,7 @@ import type { Context } from 'telegraf';
 import type {
   HistoryDirectionFilter,
   HistoryKind,
-} from '../modules/whales/entities/history-request.dto';
+} from '../../whales/entities/history-request.dto';
 
 export enum SupportedTelegramCommand {
   START = 'start',

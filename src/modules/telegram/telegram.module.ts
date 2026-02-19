@@ -5,24 +5,24 @@ import type { TelegrafModuleOptions } from 'nestjs-telegraf/dist/interfaces/tele
 import {
   TelegramBasicCommandsService,
   TelegramBasicCommandsServiceDependencies,
-} from './telegram-basic-commands.service';
+} from './bot/telegram-basic-commands.service';
 import {
   TelegramCallbackCommandsService,
   TelegramCallbackCommandsServiceDependencies,
-} from './telegram-callback-commands.service';
-import { TelegramCallbackParserService } from './telegram-callback-parser.service';
-import { TelegramCommandOrchestratorService } from './telegram-command-orchestrator.service';
+} from './bot/telegram-callback-commands.service';
+import { TelegramCallbackParserService } from './bot/telegram-callback-parser.service';
+import { TelegramCommandOrchestratorService } from './bot/telegram-command-orchestrator.service';
 import {
   TelegramFilterCommandsService,
   TelegramFilterCommandsServiceDependencies,
-} from './telegram-filter-commands.service';
-import { TelegramParserService } from './telegram-parser.service';
-import { TelegramSenderService } from './telegram-sender.service';
-import { TelegramUiService } from './telegram-ui.service';
-import { TelegramUpdate } from './telegram.update';
-import { AppConfigService } from '../config/app-config.service';
-import { WhalesModule } from '../modules/whales/whales.module';
-import { RuntimeModule } from '../runtime/runtime.module';
+} from './bot/telegram-filter-commands.service';
+import { TelegramParserService } from './bot/telegram-parser.service';
+import { TelegramSenderService } from './bot/telegram-sender.service';
+import { TelegramUiService } from './bot/telegram-ui.service';
+import { TelegramUpdate } from './bot/telegram.update';
+import { AppConfigService } from '../../config/app-config.service';
+import { RuntimeModule } from '../../runtime/runtime.module';
+import { WhalesModule } from '../whales/whales.module';
 
 const createTelegrafOptions = (appConfigService: AppConfigService): TelegrafModuleOptions => {
   const fallbackToken: string = '0000000000:TEST_TOKEN_FOR_DISABLED_TELEGRAM';

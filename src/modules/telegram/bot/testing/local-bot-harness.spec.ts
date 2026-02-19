@@ -2,15 +2,12 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { LocalBotHarness } from './local-bot-harness';
 import type { HarnessRunResult, HarnessUser } from './local-bot-harness.interfaces';
-import { ChainKey } from '../../common/interfaces/chain-key.interfaces';
-import type { AppConfigService } from '../../config/app-config.service';
-import { HistoryRequestSource } from '../../modules/whales/entities/history-rate-limiter.interfaces';
-import {
-  HistoryDirectionFilter,
-  HistoryKind,
-} from '../../modules/whales/entities/history-request.dto';
-import type { TrackingService } from '../../modules/whales/services/tracking.service';
-import type { RuntimeStatusService } from '../../runtime/runtime-status.service';
+import { ChainKey } from '../../../../common/interfaces/chain-key.interfaces';
+import type { AppConfigService } from '../../../../config/app-config.service';
+import type { RuntimeStatusService } from '../../../../runtime/runtime-status.service';
+import { HistoryRequestSource } from '../../../whales/entities/history-rate-limiter.interfaces';
+import { HistoryDirectionFilter, HistoryKind } from '../../../whales/entities/history-request.dto';
+import type { TrackingService } from '../../../whales/services/tracking.service';
 
 type TrackingServiceStub = {
   readonly trackAddress: ReturnType<typeof vi.fn>;

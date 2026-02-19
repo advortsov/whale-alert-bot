@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectBot } from 'nestjs-telegraf';
 import type { Telegraf } from 'telegraf';
 
-import { AppConfigService } from '../config/app-config.service';
+import { AppConfigService } from '../../../config/app-config.service';
 
 export type TelegramSendTextOptions = Parameters<Telegraf['telegram']['sendMessage']>[2];
 

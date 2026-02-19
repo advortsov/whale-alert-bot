@@ -1,4 +1,4 @@
-import { type ChainKey } from '../common/interfaces/chain-key.interfaces';
+import { type ChainKey } from '../../../common/interfaces/chain-key.interfaces';
 
 export interface IParsedTrackArgs {
   readonly chainKey: ChainKey;

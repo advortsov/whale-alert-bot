@@ -8,12 +8,12 @@ import type {
   ParsedMessageCommand,
   UpdateMeta,
 } from './telegram.interfaces';
-import { AppConfigService } from '../config/app-config.service';
-import type { HistoryPageResult } from '../modules/whales/entities/history-page.interfaces';
-import { HistoryRequestSource } from '../modules/whales/entities/history-rate-limiter.interfaces';
-import type { TelegramUserRef } from '../modules/whales/entities/tracking.interfaces';
-import { TrackingService } from '../modules/whales/services/tracking.service';
-import { RuntimeStatusService } from '../runtime/runtime-status.service';
+import { AppConfigService } from '../../../config/app-config.service';
+import { RuntimeStatusService } from '../../../runtime/runtime-status.service';
+import type { HistoryPageResult } from '../../whales/entities/history-page.interfaces';
+import { HistoryRequestSource } from '../../whales/entities/history-rate-limiter.interfaces';
+import type { TelegramUserRef } from '../../whales/entities/tracking.interfaces';
+import { TrackingService } from '../../whales/services/tracking.service';
 
 @Injectable()
 export class TelegramBasicCommandsServiceDependencies {

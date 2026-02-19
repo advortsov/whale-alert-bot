@@ -26,7 +26,7 @@ import type { SubscriptionsRepository } from '../../../database/repositories/sub
 import type { UserAlertPreferencesRepository } from '../../../database/repositories/user-alert-preferences.repository';
 import type { UserAlertSettingsRepository } from '../../../database/repositories/user-alert-settings.repository';
 import type { UserWalletAlertPreferencesRepository } from '../../../database/repositories/user-wallet-alert-preferences.repository';
-import type { TelegramSenderService } from '../../../telegram/telegram-sender.service';
+import type { TelegramSenderService } from '../../telegram/bot/telegram-sender.service';
 
 type SubscriptionsRepositoryStub = {
   readonly listSubscriberWalletRecipientsByAddress: ReturnType<typeof vi.fn>;

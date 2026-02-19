@@ -20,10 +20,7 @@ import {
   WALLET_UNTRACK_CALLBACK_PREFIX,
 } from './telegram.constants';
 import { WalletCallbackAction, type WalletCallbackTarget } from './telegram.interfaces';
-import {
-  HistoryDirectionFilter,
-  HistoryKind,
-} from '../modules/whales/entities/history-request.dto';
+import { HistoryDirectionFilter, HistoryKind } from '../../whales/entities/history-request.dto';
 
 @Injectable()
 export class TelegramCallbackParserService {

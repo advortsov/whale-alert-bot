@@ -27,10 +27,10 @@ import {
   type UpdateMeta,
   type WalletCallbackTarget,
 } from './telegram.interfaces';
-import type { AppConfigService } from '../config/app-config.service';
-import type { TelegramUserRef } from '../modules/whales/entities/tracking.interfaces';
-import type { TrackingService } from '../modules/whales/services/tracking.service';
-import type { RuntimeStatusService } from '../runtime/runtime-status.service';
+import type { AppConfigService } from '../../../config/app-config.service';
+import type { RuntimeStatusService } from '../../../runtime/runtime-status.service';
+import type { TelegramUserRef } from '../../whales/entities/tracking.interfaces';
+import type { TrackingService } from '../../whales/services/tracking.service';
 
 @Update()
 export class TelegramUpdate {
