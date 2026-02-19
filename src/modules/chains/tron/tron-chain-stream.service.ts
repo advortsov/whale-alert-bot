@@ -1,6 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 
 import { TronEventClassifierService } from './processors/tron-event-classifier.service';
+import { ALERT_DISPATCHER } from '../../../common/interfaces/alerts/alert-dispatcher-port.tokens';
+import type { IAlertDispatcher } from '../../../common/interfaces/alerts/alert-dispatcher.interfaces';
 import { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
 import { ChainId, type ClassifiedEvent } from '../../../common/interfaces/chain.types';
 import { AppConfigService } from '../../../config/app-config.service';
@@ -21,7 +23,6 @@ import type {
 import type { IClassificationContextDto } from '../../blockchain/base/chain-classifier.interfaces';
 import type { ISubscriptionHandle } from '../../blockchain/base/rpc-adapter.interfaces';
 import { ProviderFailoverService } from '../../blockchain/factory/provider-failover.service';
-import { AlertDispatcherService } from '../../whales/services/alert-dispatcher.service';
 
 @Injectable()
 export class TronChainStreamServiceDependencies implements IBaseChainStreamDependencies {
@@ -43,8 +44,8 @@ export class TronChainStreamServiceDependencies implements IBaseChainStreamDepen
   @Inject(WalletEventsRepository)
   public readonly walletEventsRepository!: WalletEventsRepository;
 
-  @Inject(AlertDispatcherService)
-  public readonly alertDispatcherService!: AlertDispatcherService;
+  @Inject(ALERT_DISPATCHER)
+  public readonly alertDispatcherService!: IAlertDispatcher;
 
   @Inject(TronEventClassifierService)
   public readonly tronEventClassifierService!: TronEventClassifierService;

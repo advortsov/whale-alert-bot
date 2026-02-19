@@ -4,6 +4,7 @@ import { AlertEnrichmentService } from './alert-enrichment.service';
 import { AlertMessageFormatter } from './alert-message.formatter';
 import { AlertRecipientEvaluatorService } from './alert-recipient-evaluator.service';
 import { AlertSuppressionService } from './alert-suppression.service';
+import type { IAlertDispatcher } from '../../../common/interfaces/alerts/alert-dispatcher.interfaces';
 import { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
 import { ChainId, type ClassifiedEvent } from '../../../common/interfaces/chain.types';
 import { TOKEN_PRICING_PORT } from '../../../common/interfaces/token-pricing/token-pricing-port.tokens';
@@ -43,7 +44,7 @@ export class AlertDispatcherDependencies {
 }
 
 @Injectable()
-export class AlertDispatcherService {
+export class AlertDispatcherService implements IAlertDispatcher {
   private readonly logger: Logger = new Logger(AlertDispatcherService.name);
   private readonly subscriptionsRepository: SubscriptionsRepository;
   private readonly alertEnrichmentService: AlertEnrichmentService;

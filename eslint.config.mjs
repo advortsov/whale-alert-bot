@@ -38,52 +38,22 @@ export default tseslint.config(
       'import/resolver': {
         typescript: true,
       },
-      // 🔥 ИСПРАВЛЕННАЯ НАСТРОЙКА ГРАНИЦ ДЛЯ BOUNDARIES v5.x
+      // 🔥 НАСТРОЙКА ГРАНИЦ ДЛЯ НОВОЙ СТРУКТУРЫ ADR-001
       'boundaries/elements': [
-        {
-          type: 'core',
-          pattern: 'src/core/**/*.ts',
-        },
-        {
-          type: 'features',
-          pattern: 'src/features/**/*.ts',
-        },
-        {
-          type: 'integrations',
-          pattern: 'src/integrations/**/*.ts',
-        },
-        {
-          type: 'shared',
-          pattern: 'src/shared/**/*.ts',
-        },
-        {
-          type: 'config',
-          pattern: 'src/config/**/*.ts',
-        },
-        {
-          type: 'storage',
-          pattern: 'src/storage/**/*.ts',
-        },
-        {
-          type: 'chain',
-          pattern: 'src/chain/**/*.ts',
-        },
-        {
-          type: 'telegram',
-          pattern: 'src/telegram/**/*.ts',
-        },
-        {
-          type: 'health',
-          pattern: 'src/health/**/*.ts',
-        },
-        {
-          type: 'runtime',
-          pattern: 'src/runtime/**/*.ts',
-        },
-        {
-          type: 'app',
-          pattern: 'src/**/*.ts',
-        },
+        { type: 'common', pattern: 'src/common/**/*.ts' },
+        { type: 'config', pattern: 'src/config/**/*.ts' },
+        { type: 'database', pattern: 'src/database/**/*.ts' },
+        { type: 'blockchain', pattern: 'src/modules/blockchain/**/*.ts' },
+        { type: 'chains', pattern: 'src/modules/chains/**/*.ts' },
+        { type: 'whales', pattern: 'src/modules/whales/**/*.ts' },
+        { type: 'telegram', pattern: 'src/modules/telegram/**/*.ts' },
+        { type: 'observability', pattern: 'src/modules/observability/**/*.ts' },
+        { type: 'runtime', pattern: 'src/modules/runtime/**/*.ts' },
+        { type: 'integrations', pattern: 'src/modules/integrations/**/*.ts' },
+        { type: 'api', pattern: 'src/modules/api/**/*.ts' },
+        { type: 'notifications', pattern: 'src/modules/notifications/**/*.ts' },
+        { type: 'analytics', pattern: 'src/modules/analytics/**/*.ts' },
+        { type: 'shared', pattern: 'src/shared/**/*.ts' },
       ],
     },
     plugins: {
@@ -386,7 +356,7 @@ export default tseslint.config(
 
   // 5. СПЕЦИАЛЬНЫЕ ПРАВИЛА ДЛЯ MIGRATION SCRIPTS
   {
-    files: ['database/migrations/**/*.sql.ts', 'src/storage/migrations/**/*.ts'],
+    files: ['database/migrations/**/*.sql.ts'],
     rules: {
       'no-magic-numbers': 'off',
       'max-lines': 'off',

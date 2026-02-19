@@ -1,11 +1,7 @@
-FROM node:22-alpine AS deps
+FROM node:22-alpine AS build
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
-
-FROM node:22-alpine AS build
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
 
@@ -16,4 +12,4 @@ COPY package*.json ./
 RUN npm ci --omit=dev --ignore-scripts
 COPY --from=build /app/dist ./dist
 COPY database ./database
-CMD ["node", "dist/src/main.js"]
+CMD ["npm", "run", "start:prod"]

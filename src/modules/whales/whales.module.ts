@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 
 import {
   AlertDispatcherDependencies,
@@ -36,30 +36,27 @@ import {
 } from './services/tracking-wallets.service';
 import { TrackingService } from './services/tracking.service';
 import { ADDRESS_CODEC_REGISTRY } from '../../common/interfaces/address/address-port.tokens';
+import { ALERT_DISPATCHER } from '../../common/interfaces/alerts/alert-dispatcher-port.tokens';
 import { HISTORY_EXPLORER_ADAPTER } from '../../common/interfaces/explorers/explorer-port.tokens';
 import { TOKEN_METADATA_ADAPTER } from '../../common/interfaces/token-metadata/token-metadata-port.tokens';
 import { TOKEN_PRICING_PORT } from '../../common/interfaces/token-pricing/token-pricing-port.tokens';
 import { DatabaseModule } from '../../database/database.module';
-import { AddressCodecRegistry } from '../blockchain/address-codec.registry';
 import { RateLimitingModule } from '../blockchain/rate-limiting/rate-limiting.module';
-import { EthereumAddressCodec } from '../chains/ethereum/ethereum-address.codec';
+import { AddressCodecRegistry } from '../chains/address-codec.registry';
+import { ChainsModule } from '../chains/chains.module';
 import { EthereumTokenMetadataAdapter } from '../chains/ethereum/ethereum-token-metadata.adapter';
-import { SolanaAddressCodec } from '../chains/solana/solana-address.codec';
 import { SolanaRpcHistoryAdapter } from '../chains/solana/solana-rpc-history.adapter';
-import { TronAddressCodec } from '../chains/tron/tron-address.codec';
 import { CoinGeckoPricingAdapter } from '../integrations/coingecko/coingecko-pricing.adapter';
 import { EtherscanHistoryAdapter } from '../integrations/etherscan/etherscan-history.adapter';
 import { TronGridHistoryAdapter } from '../integrations/trongrid/tron-grid-history.adapter';
 
 @Module({
-  imports: [DatabaseModule, RateLimitingModule],
+  imports: [DatabaseModule, RateLimitingModule, forwardRef(() => ChainsModule)],
   providers: [
     // --- Address codecs + registry ---
-    EthereumAddressCodec,
-    SolanaAddressCodec,
-    TronAddressCodec,
     AddressCodecRegistry,
     { provide: ADDRESS_CODEC_REGISTRY, useExisting: AddressCodecRegistry },
+    { provide: ALERT_DISPATCHER, useExisting: AlertDispatcherService },
     // --- History adapters + router ---
     EtherscanHistoryAdapter,
     SolanaRpcHistoryAdapter,
@@ -109,6 +106,7 @@ import { TronGridHistoryAdapter } from '../integrations/trongrid/tron-grid-histo
     AlertMessageFormatter,
     AlertRecipientEvaluatorService,
     AlertDispatcherService,
+    ALERT_DISPATCHER,
   ],
 })
 export class WhalesModule {}
