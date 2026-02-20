@@ -274,6 +274,110 @@ describe('TronGridHistoryAdapter', (): void => {
     expect(result.items[0]?.txHash).toBe('native-tx-after-retry');
   });
 
+  it('uses resolved fallback policy for subsequent pages after first page HTTP 400', async (): Promise<void> => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      // call 1: policy[0] (with order_by) → 400
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ success: false, error: 'bad request' }), {
+          status: 400,
+          headers: { 'content-type': 'application/json' },
+        }),
+      )
+      // call 2: policy[1] (without order_by) → 200, page 1 + fingerprint
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            data: [
+              {
+                txID: 'native-page1-tx',
+                block_timestamp: 1770000000000,
+                ret: [{ contractRet: 'SUCCESS' }],
+                raw_data: {
+                  contract: [
+                    {
+                      type: 'TransferContract',
+                      parameter: {
+                        value: {
+                          owner_address: '412886B63A4A06A134FD7E93B5BE37E5DCC4A36A9D',
+                          to_address: '4174472E7D35395A6B5ADD427EECB7F4B62AD2B071',
+                          amount: '1000000',
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+            meta: { fingerprint: 'fp-page1' },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      )
+      // call 3: policy[1] (without order_by) + fingerprint → 200, page 2
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            data: [
+              {
+                txID: 'native-page2-tx',
+                block_timestamp: 1769990000000,
+                ret: [{ contractRet: 'SUCCESS' }],
+                raw_data: {
+                  contract: [
+                    {
+                      type: 'TransferContract',
+                      parameter: {
+                        value: {
+                          owner_address: '412886B63A4A06A134FD7E93B5BE37E5DCC4A36A9D',
+                          to_address: '4174472E7D35395A6B5ADD427EECB7F4B62AD2B071',
+                          amount: '2000000',
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+            meta: {},
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      );
+
+    const adapter: TronGridHistoryAdapter = new TronGridHistoryAdapter(
+      {
+        tronGridApiBaseUrl: 'https://api.trongrid.io',
+        tronGridApiKey: null,
+        tronscanTxBaseUrl: 'https://tronscan.org/#/transaction/',
+      } as unknown as AppConfigService,
+      new TronAddressCodec(),
+      {
+        schedule: async (_k: unknown, op: () => Promise<unknown>): Promise<unknown> => op(),
+      } as unknown as BottleneckRateLimiterService,
+    );
+
+    const result = await adapter.loadRecentTransactions(
+      createRequest({ kind: HistoryKind.ETH, limit: 10 }),
+    );
+
+    // 3 fetch calls: 400, 200 (page 1), 200 (page 2)
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+
+    const thirdCall: readonly unknown[] | undefined = fetchMock.mock.calls[2];
+    const thirdInput: unknown = thirdCall ? thirdCall[0] : undefined;
+    const thirdUrl: string = toRequestUrl(thirdInput);
+
+    // page 2 must NOT contain order_by (policy was locked to fallback from page 1)
+    expect(thirdUrl).not.toContain('order_by=');
+    // page 2 must contain the fingerprint from page 1
+    expect(thirdUrl).toContain('fingerprint=fp-page1');
+
+    expect(result.items).toHaveLength(2);
+    expect(result.items[0]?.txHash).toBe('native-page1-tx');
+    expect(result.items[1]?.txHash).toBe('native-page2-tx');
+  });
+
   it('throws for unsupported chain key', async (): Promise<void> => {
     const adapter: TronGridHistoryAdapter = new TronGridHistoryAdapter(
       {
