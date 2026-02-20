@@ -24,9 +24,15 @@ import {
   AlertFilterToggleTarget,
   type TelegramUserRef,
   type TrackedWalletOption,
-  type UserAlertSettingsSnapshot,
   type WalletAlertFilterState,
 } from '../entities/tracking.interfaces';
+import type {
+  IMuteWalletResult,
+  ITrackWalletResult,
+  IUntrackResult,
+  IWalletDetailResult,
+  IWalletListResult,
+} from '../interfaces/tracking-wallets.result';
 
 const DEFAULT_HISTORY_LIMIT = 5;
 const WALLET_CARD_RECENT_EVENTS_LIMIT = 3;
@@ -77,14 +83,14 @@ export class TrackingWalletsService {
 
   public constructor(private readonly deps: TrackingWalletsServiceDependencies) {}
 
-  public async trackAddress(
+  public async trackWallet(
     userRef: TelegramUserRef,
     rawAddress: string,
     label: string | null,
     chainKey: ChainKey,
-  ): Promise<string> {
+  ): Promise<ITrackWalletResult> {
     this.logger.debug(
-      `trackAddress start telegramId=${userRef.telegramId} chainKey=${chainKey} rawAddress=${rawAddress} label=${label ?? 'n/a'}`,
+      `trackWallet start telegramId=${userRef.telegramId} chainKey=${chainKey} rawAddress=${rawAddress} label=${label ?? 'n/a'}`,
     );
     const addressCodec = this.deps.addressCodecRegistry.getCodec(chainKey);
 
@@ -111,21 +117,58 @@ export class TrackingWalletsService {
       wallet.id,
     );
 
-    if (!insertedSubscription) {
+    return {
+      walletId: wallet.id,
+      address: normalizedAddress,
+      label,
+      chainKey,
+      isNewSubscription: insertedSubscription !== null,
+    };
+  }
+
+  public async trackAddress(
+    userRef: TelegramUserRef,
+    rawAddress: string,
+    label: string | null,
+    chainKey: ChainKey,
+  ): Promise<string> {
+    const result: ITrackWalletResult = await this.trackWallet(userRef, rawAddress, label, chainKey);
+
+    if (!result.isNewSubscription) {
       return [
-        `Адрес уже отслеживается: #${wallet.id} [${chainKey}] ${normalizedAddress}.`,
-        `История: /history #${wallet.id} ${DEFAULT_HISTORY_LIMIT}`,
+        `Адрес уже отслеживается: #${result.walletId} [${result.chainKey}] ${result.address}.`,
+        `История: /history #${result.walletId} ${DEFAULT_HISTORY_LIMIT}`,
       ].join('\n');
     }
 
-    return this.buildTrackSuccessMessage(wallet.id, chainKey, normalizedAddress, label);
+    return this.buildTrackSuccessMessage(
+      result.walletId,
+      result.chainKey,
+      result.address,
+      result.label,
+    );
   }
 
-  public async listTrackedAddresses(userRef: TelegramUserRef): Promise<string> {
+  public async listWallets(userRef: TelegramUserRef): Promise<IWalletListResult> {
     const user = await this.deps.usersRepository.findOrCreate(userRef.telegramId, userRef.username);
     const subscriptions = await this.deps.subscriptionsRepository.listByUserId(user.id);
 
-    if (subscriptions.length === 0) {
+    return {
+      wallets: subscriptions.map((s) => ({
+        walletId: s.walletId,
+        address: s.walletAddress,
+        label: s.walletLabel,
+        chainKey: s.chainKey,
+        createdAt: s.createdAt,
+      })),
+      totalCount: subscriptions.length,
+    };
+  }
+
+  public async listTrackedAddresses(userRef: TelegramUserRef): Promise<string> {
+    const result: IWalletListResult = await this.listWallets(userRef);
+
+    if (result.totalCount === 0) {
       return [
         'Список отслеживания пуст.',
         'Добавь первый адрес:',
@@ -133,22 +176,18 @@ export class TrackingWalletsService {
       ].join('\n');
     }
 
-    const rows: string[] = subscriptions.map((subscription, index: number): string => {
-      const walletId: number | null = this.deps.trackingAddressService.normalizeDbId(
-        subscription.walletId,
-      );
-      const walletIdText: string =
-        walletId !== null ? String(walletId) : String(subscription.walletId);
-      const labelPart: string = subscription.walletLabel ? ` (${subscription.walletLabel})` : '';
+    const rows: string[] = result.wallets.map((wallet, index: number): string => {
+      const walletIdText: string = String(wallet.walletId);
+      const labelPart: string = wallet.label ? ` (${wallet.label})` : '';
       return [
         `${index + 1}. #${walletIdText}${labelPart}`,
-        `   ${subscription.walletAddress}`,
+        `   ${wallet.address}`,
         `   История: /history #${walletIdText} ${DEFAULT_HISTORY_LIMIT}`,
         `   Удалить: /untrack #${walletIdText}`,
       ].join('\n');
     });
 
-    return [`Отслеживаемые адреса (${subscriptions.length}):`, ...rows].join('\n');
+    return [`Отслеживаемые адреса (${result.totalCount}):`, ...rows].join('\n');
   }
 
   public async listTrackedWalletOptions(
@@ -175,14 +214,17 @@ export class TrackingWalletsService {
     return options;
   }
 
-  public async getWalletDetails(userRef: TelegramUserRef, rawWalletId: string): Promise<string> {
+  public async getWalletDetail(
+    userRef: TelegramUserRef,
+    rawWalletId: string,
+  ): Promise<IWalletDetailResult> {
     const user = await this.deps.usersRepository.findOrCreate(userRef.telegramId, userRef.username);
     const walletSubscription = await this.deps.trackingAddressService.resolveWalletSubscription(
       user.id,
       rawWalletId,
     );
 
-    const [globalPreferences, settings, walletPreferences, activeMute, recentEvents] =
+    const [globalPreferencesRow, settingsRow, walletPreferences, activeMute, recentEvents] =
       await Promise.all([
         this.deps.userAlertPreferencesRepository.findOrCreateByUserId(user.id),
         this.deps.userAlertSettingsRepository.findOrCreateByUserAndChain(
@@ -205,39 +247,84 @@ export class TrackingWalletsService {
           0,
         ),
       ]);
-    const settingsSnapshot: UserAlertSettingsSnapshot =
-      this.deps.settingsParserService.mapSettings(settings);
-    const allowTransfer: boolean = walletPreferences
-      ? walletPreferences.allow_transfer
-      : globalPreferences.allow_transfer;
-    const allowSwap: boolean = walletPreferences
-      ? walletPreferences.allow_swap
-      : globalPreferences.allow_swap;
-    const filterSource: string = walletPreferences === null ? 'global' : 'wallet override';
+
+    const globalPreferences = this.deps.settingsParserService.mapPreferences(globalPreferencesRow);
+    const settingsSnapshot = this.deps.settingsParserService.mapSettings(settingsRow);
+
+    return {
+      walletId: walletSubscription.walletId,
+      address: walletSubscription.walletAddress,
+      label: walletSubscription.walletLabel,
+      chainKey: walletSubscription.chainKey,
+      globalPreferences,
+      walletPreferences: walletPreferences
+        ? {
+            allowTransfer: walletPreferences.allow_transfer,
+            allowSwap: walletPreferences.allow_swap,
+            hasOverride: true,
+          }
+        : null,
+      settings: settingsSnapshot,
+      activeMute: activeMute?.mute_until ?? null,
+      recentEvents,
+    };
+  }
+
+  public async getWalletDetails(userRef: TelegramUserRef, rawWalletId: string): Promise<string> {
+    const detail: IWalletDetailResult = await this.getWalletDetail(userRef, rawWalletId);
+    const allowTransfer: boolean = detail.walletPreferences
+      ? detail.walletPreferences.allowTransfer
+      : detail.globalPreferences.allowTransfer;
+    const allowSwap: boolean = detail.walletPreferences
+      ? detail.walletPreferences.allowSwap
+      : detail.globalPreferences.allowSwap;
+    const filterSource: string = detail.walletPreferences === null ? 'global' : 'wallet override';
     const recentEventRows: readonly string[] =
-      this.deps.historyFormatter.formatWalletCardRecentEvents(recentEvents);
+      this.deps.historyFormatter.formatWalletCardRecentEvents(detail.recentEvents);
     const muteStatusText: string =
-      activeMute === null
+      detail.activeMute === null
         ? 'off'
-        : this.deps.settingsParserService.formatTimestamp(activeMute.mute_until);
+        : this.deps.settingsParserService.formatTimestamp(detail.activeMute);
 
     return [
-      `💼 Кошелек #${walletSubscription.walletId}`,
-      `⛓ Сеть: ${walletSubscription.chainKey}`,
-      `🏷 Label: ${walletSubscription.walletLabel ?? 'без ярлыка'}`,
-      `📍 Address: ${walletSubscription.walletAddress}`,
-      `🔔 Фильтры: transfer=${allowTransfer ? 'on' : 'off'}, swap=${allowSwap ? 'on' : 'off'} (${filterSource})`,
-      `💵 USD filter: >= ${settingsSnapshot.thresholdUsd.toFixed(2)}`,
-      `🏦 CEX flow: ${settingsSnapshot.cexFlowMode}`,
-      `🧠 Smart: type=${settingsSnapshot.smartFilterType}, include_dex=${this.deps.settingsParserService.formatDexFilter(settingsSnapshot.includeDexes)}, exclude_dex=${this.deps.settingsParserService.formatDexFilter(settingsSnapshot.excludeDexes)}`,
-      `🌙 Quiet: ${this.deps.settingsParserService.formatQuietHours(settingsSnapshot)} (${settingsSnapshot.timezone})`,
-      `🚫 Ignore 24h до: ${muteStatusText}`,
+      `\u{1F4BC} \u041A\u043E\u0448\u0435\u043B\u0435\u043A #${detail.walletId}`,
+      `\u26D3 \u0421\u0435\u0442\u044C: ${detail.chainKey}`,
+      `\u{1F3F7} Label: ${detail.label ?? '\u0431\u0435\u0437 \u044F\u0440\u043B\u044B\u043A\u0430'}`,
+      `\u{1F4CD} Address: ${detail.address}`,
+      `\u{1F514} \u0424\u0438\u043B\u044C\u0442\u0440\u044B: transfer=${allowTransfer ? 'on' : 'off'}, swap=${allowSwap ? 'on' : 'off'} (${filterSource})`,
+      `\u{1F4B5} USD filter: >= ${detail.settings.thresholdUsd.toFixed(2)}`,
+      `\u{1F3E6} CEX flow: ${detail.settings.cexFlowMode}`,
+      `\u{1F9E0} Smart: type=${detail.settings.smartFilterType}, include_dex=${this.deps.settingsParserService.formatDexFilter(detail.settings.includeDexes)}, exclude_dex=${this.deps.settingsParserService.formatDexFilter(detail.settings.excludeDexes)}`,
+      `\u{1F319} Quiet: ${this.deps.settingsParserService.formatQuietHours(detail.settings)} (${detail.settings.timezone})`,
+      `\u{1F6AB} Ignore 24h \u0434\u043E: ${muteStatusText}`,
       '',
-      `🧾 Последние события (${recentEvents.length}/${WALLET_CARD_RECENT_EVENTS_LIMIT}):`,
+      `\u{1F9FE} \u041F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0435 \u0441\u043E\u0431\u044B\u0442\u0438\u044F (${detail.recentEvents.length}/${WALLET_CARD_RECENT_EVENTS_LIMIT}):`,
       ...recentEventRows,
       '',
-      '👇 Действия доступны кнопками ниже.',
+      '\u{1F447} \u0414\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u044B \u043A\u043D\u043E\u043F\u043A\u0430\u043C\u0438 \u043D\u0438\u0436\u0435.',
     ].join('\n');
+  }
+
+  public async removeWallet(userRef: TelegramUserRef, walletId: number): Promise<IUntrackResult> {
+    const user = await this.deps.usersRepository.findOrCreate(userRef.telegramId, userRef.username);
+    const walletSubscription = await this.deps.trackingAddressService.resolveWalletSubscription(
+      user.id,
+      `#${String(walletId)}`,
+    );
+    const removed: boolean = await this.deps.subscriptionsRepository.removeByWalletId(
+      user.id,
+      walletSubscription.walletId,
+    );
+
+    if (!removed) {
+      throw new Error(`Subscription not found for wallet #${String(walletId)}`);
+    }
+
+    return {
+      walletId: walletSubscription.walletId,
+      address: walletSubscription.walletAddress,
+      chainKey: walletSubscription.chainKey,
+    };
   }
 
   public async untrackAddress(userRef: TelegramUserRef, rawIdentifier: string): Promise<string> {
@@ -287,12 +374,12 @@ export class TrackingWalletsService {
     return `Адрес ${normalizedAddresses[0]?.address ?? rawIdentifier} не найден в списке. Проверь /list.`;
   }
 
-  public async muteWalletAlertsForDuration(
+  public async muteWallet(
     userRef: TelegramUserRef,
     rawWalletId: string,
     muteMinutes: number,
     source: string,
-  ): Promise<string> {
+  ): Promise<IMuteWalletResult> {
     const user = await this.deps.usersRepository.findOrCreate(userRef.telegramId, userRef.username);
     const walletSubscription = await this.deps.trackingAddressService.resolveWalletSubscription(
       user.id,
@@ -312,9 +399,28 @@ export class TrackingWalletsService {
       source,
     });
 
+    return {
+      walletId: walletSubscription.walletId,
+      mutedUntil: upsertedMute.mute_until,
+    };
+  }
+
+  public async muteWalletAlertsForDuration(
+    userRef: TelegramUserRef,
+    rawWalletId: string,
+    muteMinutes: number,
+    source: string,
+  ): Promise<string> {
+    const result: IMuteWalletResult = await this.muteWallet(
+      userRef,
+      rawWalletId,
+      muteMinutes,
+      source,
+    );
+
     return [
-      `Кошелек #${String(walletSubscription.walletId)} (${walletSubscription.walletLabel ?? 'без ярлыка'}) временно отключен.`,
-      `До: ${this.deps.settingsParserService.formatTimestamp(upsertedMute.mute_until)}`,
+      `Кошелек #${String(result.walletId)} временно отключен.`,
+      `До: ${this.deps.settingsParserService.formatTimestamp(result.mutedUntil)}`,
     ].join('\n');
   }
 

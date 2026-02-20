@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import { TrackingHistoryService } from './tracking-history.service';
-import { TrackingSettingsService } from './tracking-settings.service';
+import { type ISettingsPatch, TrackingSettingsService } from './tracking-settings.service';
 import { TrackingWalletsService } from './tracking-wallets.service';
 import { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
 import type { HistoryPageResult } from '../entities/history-page.interfaces';
@@ -15,6 +15,17 @@ import {
   type TrackedWalletOption,
   type WalletAlertFilterState,
 } from '../entities/tracking.interfaces';
+import type {
+  IUserSettingsResult,
+  IUserStatusResult,
+} from '../interfaces/tracking-settings.result';
+import type {
+  IMuteWalletResult,
+  ITrackWalletResult,
+  IUntrackResult,
+  IWalletDetailResult,
+  IWalletListResult,
+} from '../interfaces/tracking-wallets.result';
 
 @Injectable()
 export class TrackingService {
@@ -152,5 +163,55 @@ export class TrackingService {
     request: ITrackingHistoryRequestDto,
   ): Promise<string> {
     return this.historyService.getAddressHistoryWithPolicy(userRef, request);
+  }
+
+  // --- Structured API methods ---
+
+  public async trackWallet(
+    userRef: TelegramUserRef,
+    rawAddress: string,
+    label: string | null,
+    chainKey: ChainKey,
+  ): Promise<ITrackWalletResult> {
+    return this.walletsService.trackWallet(userRef, rawAddress, label, chainKey);
+  }
+
+  public async listWallets(userRef: TelegramUserRef): Promise<IWalletListResult> {
+    return this.walletsService.listWallets(userRef);
+  }
+
+  public async getWalletDetail(
+    userRef: TelegramUserRef,
+    rawWalletId: string,
+  ): Promise<IWalletDetailResult> {
+    return this.walletsService.getWalletDetail(userRef, rawWalletId);
+  }
+
+  public async removeWallet(userRef: TelegramUserRef, walletId: number): Promise<IUntrackResult> {
+    return this.walletsService.removeWallet(userRef, walletId);
+  }
+
+  public async muteWallet(
+    userRef: TelegramUserRef,
+    rawWalletId: string,
+    muteMinutes: number,
+    source: string,
+  ): Promise<IMuteWalletResult> {
+    return this.walletsService.muteWallet(userRef, rawWalletId, muteMinutes, source);
+  }
+
+  public async getSettings(userRef: TelegramUserRef): Promise<IUserSettingsResult> {
+    return this.settingsService.getSettings(userRef);
+  }
+
+  public async getStatusStructured(userRef: TelegramUserRef): Promise<IUserStatusResult> {
+    return this.settingsService.getStatus(userRef);
+  }
+
+  public async updateSettings(
+    userRef: TelegramUserRef,
+    patch: ISettingsPatch,
+  ): Promise<IUserSettingsResult> {
+    return this.settingsService.updateSettings(userRef, patch);
   }
 }

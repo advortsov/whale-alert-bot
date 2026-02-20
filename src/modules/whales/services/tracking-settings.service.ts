@@ -19,6 +19,24 @@ import {
   type UserAlertPreferences,
   type UserAlertSettingsSnapshot,
 } from '../entities/tracking.interfaces';
+import type {
+  IUserSettingsResult,
+  IUserStatusResult,
+} from '../interfaces/tracking-settings.result';
+
+export interface ISettingsPatch {
+  readonly thresholdUsd?: number | undefined;
+  readonly mutedMinutes?: number | null | undefined;
+  readonly cexFlowMode?: AlertCexFlowMode | undefined;
+  readonly smartFilterType?: AlertSmartFilterType | undefined;
+  readonly includeDexes?: readonly string[] | undefined;
+  readonly excludeDexes?: readonly string[] | undefined;
+  readonly quietHoursFrom?: string | null | undefined;
+  readonly quietHoursTo?: string | null | undefined;
+  readonly timezone?: string | undefined;
+  readonly allowTransfer?: boolean | undefined;
+  readonly allowSwap?: boolean | undefined;
+}
 
 @Injectable()
 export class TrackingSettingsServiceDependencies {
@@ -41,6 +59,95 @@ export class TrackingSettingsServiceDependencies {
 @Injectable()
 export class TrackingSettingsService {
   public constructor(private readonly deps: TrackingSettingsServiceDependencies) {}
+
+  public async getSettings(userRef: TelegramUserRef): Promise<IUserSettingsResult> {
+    const user = await this.deps.usersRepository.findOrCreate(userRef.telegramId, userRef.username);
+    const [preferencesRow, settingsRow] = await Promise.all([
+      this.deps.userAlertPreferencesRepository.findOrCreateByUserId(user.id),
+      this.deps.userAlertSettingsRepository.findOrCreateByUserAndChain(
+        user.id,
+        ChainKey.ETHEREUM_MAINNET,
+      ),
+    ]);
+
+    return {
+      preferences: this.deps.settingsParserService.mapPreferences(preferencesRow),
+      settings: this.deps.settingsParserService.mapSettings(settingsRow),
+    };
+  }
+
+  public async getStatus(userRef: TelegramUserRef): Promise<IUserStatusResult> {
+    const result: IUserSettingsResult = await this.getSettings(userRef);
+    const historyQuota = this.deps.historyRateLimiterService.getSnapshot(userRef.telegramId);
+
+    return {
+      ...result,
+      historyQuota: {
+        minuteUsed: historyQuota.minuteUsed,
+        minuteLimit: historyQuota.minuteLimit,
+        minuteRemaining: historyQuota.minuteRemaining,
+      },
+    };
+  }
+
+  public async updateSettings(
+    userRef: TelegramUserRef,
+    patch: ISettingsPatch,
+  ): Promise<IUserSettingsResult> {
+    const user = await this.deps.usersRepository.findOrCreate(userRef.telegramId, userRef.username);
+
+    await this.applyPreferencePatch(user.id, patch);
+    await this.applySettingsPatch(user.id, patch);
+
+    return this.getSettings(userRef);
+  }
+
+  private async applyPreferencePatch(userId: number, patch: ISettingsPatch): Promise<void> {
+    if (patch.mutedMinutes !== undefined) {
+      const mutedUntil: Date | null =
+        patch.mutedMinutes === null ? null : new Date(Date.now() + patch.mutedMinutes * 60 * 1000);
+      await this.deps.userAlertPreferencesRepository.updateMute(userId, mutedUntil);
+    }
+
+    if (patch.allowTransfer !== undefined) {
+      await this.deps.userAlertPreferencesRepository.updateEventType(
+        userId,
+        AlertEventFilterType.TRANSFER,
+        patch.allowTransfer,
+      );
+    }
+
+    if (patch.allowSwap !== undefined) {
+      await this.deps.userAlertPreferencesRepository.updateEventType(
+        userId,
+        AlertEventFilterType.SWAP,
+        patch.allowSwap,
+      );
+    }
+  }
+
+  private async applySettingsPatch(userId: number, patch: ISettingsPatch): Promise<void> {
+    const mapped: Record<string, unknown> = {};
+    if (patch.thresholdUsd !== undefined) {
+      mapped['thresholdUsd'] = patch.thresholdUsd;
+      mapped['minAmountUsd'] = patch.thresholdUsd;
+    }
+    if (patch.cexFlowMode !== undefined) mapped['cexFlowMode'] = patch.cexFlowMode;
+    if (patch.smartFilterType !== undefined) mapped['smartFilterType'] = patch.smartFilterType;
+    if (patch.includeDexes !== undefined) mapped['includeDexes'] = patch.includeDexes;
+    if (patch.excludeDexes !== undefined) mapped['excludeDexes'] = patch.excludeDexes;
+    if (patch.quietHoursFrom !== undefined) mapped['quietFrom'] = patch.quietHoursFrom;
+    if (patch.quietHoursTo !== undefined) mapped['quietTo'] = patch.quietHoursTo;
+    if (patch.timezone !== undefined) mapped['timezone'] = patch.timezone;
+
+    if (Object.keys(mapped).length > 0) {
+      await this.deps.userAlertSettingsRepository.updateByUserAndChain(
+        userId,
+        ChainKey.ETHEREUM_MAINNET,
+        mapped,
+      );
+    }
+  }
 
   public async getUserAlertFilters(userRef: TelegramUserRef): Promise<string> {
     const user = await this.deps.usersRepository.findOrCreate(userRef.telegramId, userRef.username);

@@ -67,6 +67,8 @@ const DEFAULT_RATE_LIMIT_COINGECKO_MIN_TIME_MS = 2000;
 const DEFAULT_RATE_LIMIT_COINGECKO_MAX_CONCURRENT = 1;
 const DEFAULT_RATE_LIMIT_ETH_RPC_MIN_TIME_MS = 350;
 const DEFAULT_RATE_LIMIT_ETH_RPC_MAX_CONCURRENT = 2;
+const DEFAULT_JWT_ACCESS_TTL_SEC = 900;
+const DEFAULT_JWT_REFRESH_TTL_SEC = 604_800;
 
 const optionalNonEmptyStringSchema = z
   .string()
@@ -218,6 +220,9 @@ export const envSchema = z.object({
     .int()
     .positive()
     .default(DEFAULT_RATE_LIMIT_ETH_RPC_MAX_CONCURRENT),
+  JWT_SECRET: optionalNonEmptyStringSchema,
+  JWT_ACCESS_TTL_SEC: z.coerce.number().int().positive().default(DEFAULT_JWT_ACCESS_TTL_SEC),
+  JWT_REFRESH_TTL_SEC: z.coerce.number().int().positive().default(DEFAULT_JWT_REFRESH_TTL_SEC),
 });
 
 export type ParsedEnv = z.infer<typeof envSchema>;
