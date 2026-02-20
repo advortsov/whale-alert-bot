@@ -29,6 +29,11 @@ interface ITronGridPageLoadResult<TItem> {
   readonly nextFingerprint: string | null;
 }
 
+interface ITronGridFallbackResult {
+  readonly payload: ITronGridListResponse<unknown>;
+  readonly resolvedPolicy: ITronGridRequestQueryPolicy;
+}
+
 interface ITronGridRequestQueryPolicy {
   readonly includeOnlyConfirmed: boolean;
   readonly includeOrderBy: boolean;
@@ -114,31 +119,31 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
     const results: IHistoryItemDto[] = [];
     let fingerprint: string | null = null;
     let requestCount: number = 0;
+    let resolvedPolicy: ITronGridRequestQueryPolicy | null = null;
 
     while (results.length < targetItemsCount && requestCount < TRON_MAX_PAGE_REQUESTS) {
       const pageSize: number = this.resolvePageSize(targetItemsCount, results.length);
-      const page: ITronGridPageLoadResult<ITronGridNativeTransactionItem> =
-        await this.requestNativePage({
-          path: `/v1/accounts/${address}/transactions`,
-          pageSize,
-          fingerprint,
-        });
+      const options: ITronGridPageRequestOptions = {
+        path: `/v1/accounts/${address}/transactions`,
+        pageSize,
+        fingerprint,
+      };
+
+      let page: ITronGridPageLoadResult<ITronGridNativeTransactionItem>;
+
+      if (resolvedPolicy === null) {
+        const result = await this.requestNativePageWithFallback(options);
+        page = result.page;
+        resolvedPolicy = result.resolvedPolicy;
+      } else {
+        page = await this.requestNativePage(options, resolvedPolicy);
+      }
 
       if (page.items.length === 0) {
         break;
       }
 
-      for (const item of page.items) {
-        const mappedItem: IHistoryItemDto | null = this.mapper.mapNativeTransaction(item, address);
-
-        if (mappedItem !== null) {
-          results.push(mappedItem);
-        }
-
-        if (results.length >= targetItemsCount) {
-          break;
-        }
-      }
+      this.collectNativeItems(page.items, address, results, targetItemsCount);
 
       if (page.nextFingerprint === null) {
         break;
@@ -149,6 +154,25 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
     }
 
     return results.slice(0, targetItemsCount);
+  }
+
+  private collectNativeItems(
+    items: readonly ITronGridNativeTransactionItem[],
+    address: string,
+    results: IHistoryItemDto[],
+    targetItemsCount: number,
+  ): void {
+    for (const item of items) {
+      const mappedItem: IHistoryItemDto | null = this.mapper.mapNativeTransaction(item, address);
+
+      if (mappedItem !== null) {
+        results.push(mappedItem);
+      }
+
+      if (results.length >= targetItemsCount) {
+        break;
+      }
+    }
   }
 
   private async loadTrc20Transactions(
@@ -158,31 +182,31 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
     const results: IHistoryItemDto[] = [];
     let fingerprint: string | null = null;
     let requestCount: number = 0;
+    let resolvedPolicy: ITronGridRequestQueryPolicy | null = null;
 
     while (results.length < targetItemsCount && requestCount < TRON_MAX_PAGE_REQUESTS) {
       const pageSize: number = this.resolvePageSize(targetItemsCount, results.length);
-      const page: ITronGridPageLoadResult<ITronGridTrc20TransactionItem> =
-        await this.requestTrc20Page({
-          path: `/v1/accounts/${address}/transactions/trc20`,
-          pageSize,
-          fingerprint,
-        });
+      const options: ITronGridPageRequestOptions = {
+        path: `/v1/accounts/${address}/transactions/trc20`,
+        pageSize,
+        fingerprint,
+      };
+
+      let page: ITronGridPageLoadResult<ITronGridTrc20TransactionItem>;
+
+      if (resolvedPolicy === null) {
+        const result = await this.requestTrc20PageWithFallback(options);
+        page = result.page;
+        resolvedPolicy = result.resolvedPolicy;
+      } else {
+        page = await this.requestTrc20Page(options, resolvedPolicy);
+      }
 
       if (page.items.length === 0) {
         break;
       }
 
-      for (const item of page.items) {
-        const mappedItem: IHistoryItemDto | null = this.mapper.mapTrc20Transaction(item, address);
-
-        if (mappedItem !== null) {
-          results.push(mappedItem);
-        }
-
-        if (results.length >= targetItemsCount) {
-          break;
-        }
-      }
+      this.collectTrc20Items(page.items, address, results, targetItemsCount);
 
       if (page.nextFingerprint === null) {
         break;
@@ -195,14 +219,53 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
     return results.slice(0, targetItemsCount);
   }
 
+  private collectTrc20Items(
+    items: readonly ITronGridTrc20TransactionItem[],
+    address: string,
+    results: IHistoryItemDto[],
+    targetItemsCount: number,
+  ): void {
+    for (const item of items) {
+      const mappedItem: IHistoryItemDto | null = this.mapper.mapTrc20Transaction(item, address);
+
+      if (mappedItem !== null) {
+        results.push(mappedItem);
+      }
+
+      if (results.length >= targetItemsCount) {
+        break;
+      }
+    }
+  }
+
   private resolvePageSize(targetItemsCount: number, currentItemsCount: number): number {
     return Math.min(TRON_MAX_PAGE_SIZE, Math.max(targetItemsCount - currentItemsCount, 1));
   }
 
+  private async requestNativePageWithFallback(options: ITronGridPageRequestOptions): Promise<{
+    readonly page: ITronGridPageLoadResult<ITronGridNativeTransactionItem>;
+    readonly resolvedPolicy: ITronGridRequestQueryPolicy;
+  }> {
+    const fallbackResult: ITronGridFallbackResult = await this.requestPageWithFallback(options);
+
+    return {
+      page: this.parseNativePagePayload(fallbackResult.payload),
+      resolvedPolicy: fallbackResult.resolvedPolicy,
+    };
+  }
+
   private async requestNativePage(
     options: ITronGridPageRequestOptions,
+    queryPolicy: ITronGridRequestQueryPolicy,
   ): Promise<ITronGridPageLoadResult<ITronGridNativeTransactionItem>> {
-    const payload: ITronGridListResponse<unknown> = await this.requestPage(options);
+    const payload: ITronGridListResponse<unknown> = await this.requestPage(options, queryPolicy);
+
+    return this.parseNativePagePayload(payload);
+  }
+
+  private parseNativePagePayload(
+    payload: ITronGridListResponse<unknown>,
+  ): ITronGridPageLoadResult<ITronGridNativeTransactionItem> {
     const rawItems: readonly unknown[] = this.resolveResponseData(payload);
     const parsedItems: ITronGridNativeTransactionItem[] = rawItems
       .map((item: unknown): ITronGridNativeTransactionItem | null =>
@@ -220,10 +283,30 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
     };
   }
 
+  private async requestTrc20PageWithFallback(options: ITronGridPageRequestOptions): Promise<{
+    readonly page: ITronGridPageLoadResult<ITronGridTrc20TransactionItem>;
+    readonly resolvedPolicy: ITronGridRequestQueryPolicy;
+  }> {
+    const fallbackResult: ITronGridFallbackResult = await this.requestPageWithFallback(options);
+
+    return {
+      page: this.parseTrc20PagePayload(fallbackResult.payload),
+      resolvedPolicy: fallbackResult.resolvedPolicy,
+    };
+  }
+
   private async requestTrc20Page(
     options: ITronGridPageRequestOptions,
+    queryPolicy: ITronGridRequestQueryPolicy,
   ): Promise<ITronGridPageLoadResult<ITronGridTrc20TransactionItem>> {
-    const payload: ITronGridListResponse<unknown> = await this.requestPage(options);
+    const payload: ITronGridListResponse<unknown> = await this.requestPage(options, queryPolicy);
+
+    return this.parseTrc20PagePayload(payload);
+  }
+
+  private parseTrc20PagePayload(
+    payload: ITronGridListResponse<unknown>,
+  ): ITronGridPageLoadResult<ITronGridTrc20TransactionItem> {
     const rawItems: readonly unknown[] = this.resolveResponseData(payload);
     const parsedItems: ITronGridTrc20TransactionItem[] = rawItems
       .map((item: unknown): ITronGridTrc20TransactionItem | null =>
@@ -241,8 +324,39 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
     };
   }
 
+  private async requestPageWithFallback(
+    options: ITronGridPageRequestOptions,
+  ): Promise<ITronGridFallbackResult> {
+    let lastError: Error | null = null;
+
+    for (const queryPolicy of QUERY_POLICIES) {
+      try {
+        const payload: ITronGridListResponse<unknown> = await this.requestPage(
+          options,
+          queryPolicy,
+        );
+
+        return { payload, resolvedPolicy: queryPolicy };
+      } catch (error: unknown) {
+        if (!(error instanceof TronGridBadRequestError)) {
+          throw error;
+        }
+
+        lastError = error;
+        this.logger.warn(
+          `tron history HTTP 400, retry with next query policy` +
+            ` onlyConfirmed=${String(queryPolicy.includeOnlyConfirmed)}` +
+            ` orderBy=${String(queryPolicy.includeOrderBy)}`,
+        );
+      }
+    }
+
+    throw lastError ?? new Error('TRON history request failed without response details.');
+  }
+
   private async requestPage(
     options: ITronGridPageRequestOptions,
+    queryPolicy: ITronGridRequestQueryPolicy,
   ): Promise<ITronGridListResponse<unknown>> {
     const headers: Record<string, string> = {};
 
@@ -250,48 +364,40 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
       headers['TRON-PRO-API-KEY'] = this.appConfigService.tronGridApiKey;
     }
 
-    let lastError: Error | null = null;
+    const requestUrl: URL = this.buildRequestUrl(options, queryPolicy);
+    this.logger.debug(`tron history request url=${requestUrl.toString()}`);
 
-    for (const queryPolicy of QUERY_POLICIES) {
-      const requestUrl: URL = this.buildRequestUrl(options, queryPolicy);
-      this.logger.debug(`tron history request url=${requestUrl.toString()}`);
+    const response: Response = await this.rateLimiterService.schedule(
+      LimiterKey.TRON_GRID,
+      async (): Promise<Response> =>
+        fetch(requestUrl, {
+          method: 'GET',
+          headers,
+          signal: AbortSignal.timeout(TRON_HISTORY_REQUEST_TIMEOUT_MS),
+        }),
+      RequestPriority.NORMAL,
+    );
 
-      const response: Response = await this.rateLimiterService.schedule(
-        LimiterKey.TRON_GRID,
-        async (): Promise<Response> =>
-          fetch(requestUrl, {
-            method: 'GET',
-            headers,
-            signal: AbortSignal.timeout(TRON_HISTORY_REQUEST_TIMEOUT_MS),
-          }),
-        RequestPriority.NORMAL,
-      );
+    if (response.ok) {
+      const payload: unknown = await response.json();
 
-      if (response.ok) {
-        const payload: unknown = await response.json();
-
-        if (!payload || typeof payload !== 'object') {
-          throw new Error('TRON history response is not an object.');
-        }
-
-        return payload as ITronGridListResponse<unknown>;
+      if (!payload || typeof payload !== 'object') {
+        throw new Error('TRON history response is not an object.');
       }
 
-      const responseDetails: string = await this.readResponseDetails(response);
-      lastError = new Error(
-        `TRON history HTTP ${response.status}${responseDetails.length > 0 ? `: ${responseDetails}` : ''}`,
-      );
-
-      if (response.status !== HTTP_STATUS_BAD_REQUEST) {
-        throw lastError;
-      }
-
-      this.logger.warn(
-        `tron history HTTP 400, retry with fallback query policy onlyConfirmed=${String(queryPolicy.includeOnlyConfirmed)} orderBy=${String(queryPolicy.includeOrderBy)}`,
-      );
+      return payload as ITronGridListResponse<unknown>;
     }
 
-    throw lastError ?? new Error('TRON history request failed without response details.');
+    const responseDetails: string = await this.readResponseDetails(response);
+    const errorMessage: string =
+      `TRON history HTTP ${response.status}` +
+      (responseDetails.length > 0 ? `: ${responseDetails}` : '');
+
+    if (response.status === HTTP_STATUS_BAD_REQUEST) {
+      throw new TronGridBadRequestError(errorMessage);
+    }
+
+    throw new Error(errorMessage);
   }
 
   private buildRequestUrl(
@@ -378,5 +484,12 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
     }
 
     return normalizedValue;
+  }
+}
+
+class TronGridBadRequestError extends Error {
+  public constructor(message: string) {
+    super(message);
+    this.name = 'TronGridBadRequestError';
   }
 }
