@@ -120,9 +120,9 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
     let fingerprint: string | null = null;
     let requestCount: number = 0;
     let resolvedPolicy: ITronGridRequestQueryPolicy | null = null;
+    const pageSize: number = Math.min(TRON_MAX_PAGE_SIZE, targetItemsCount);
 
     while (results.length < targetItemsCount && requestCount < TRON_MAX_PAGE_REQUESTS) {
-      const pageSize: number = this.resolvePageSize(targetItemsCount, results.length);
       const options: ITronGridPageRequestOptions = {
         path: `/v1/accounts/${address}/transactions`,
         pageSize,
@@ -183,9 +183,9 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
     let fingerprint: string | null = null;
     let requestCount: number = 0;
     let resolvedPolicy: ITronGridRequestQueryPolicy | null = null;
+    const pageSize: number = Math.min(TRON_MAX_PAGE_SIZE, targetItemsCount);
 
     while (results.length < targetItemsCount && requestCount < TRON_MAX_PAGE_REQUESTS) {
-      const pageSize: number = this.resolvePageSize(targetItemsCount, results.length);
       const options: ITronGridPageRequestOptions = {
         path: `/v1/accounts/${address}/transactions/trc20`,
         pageSize,
@@ -236,10 +236,6 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
         break;
       }
     }
-  }
-
-  private resolvePageSize(targetItemsCount: number, currentItemsCount: number): number {
-    return Math.min(TRON_MAX_PAGE_SIZE, Math.max(targetItemsCount - currentItemsCount, 1));
   }
 
   private async requestNativePageWithFallback(options: ITronGridPageRequestOptions): Promise<{
