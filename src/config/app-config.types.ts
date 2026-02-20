@@ -68,4 +68,7 @@ export type AppConfig = {
   readonly rateLimitCoingeckoMaxConcurrent: number;
   readonly rateLimitEthRpcMinTimeMs: number;
   readonly rateLimitEthRpcMaxConcurrent: number;
+  readonly jwtSecret: string | null;
+  readonly jwtAccessTtlSec: number;
+  readonly jwtRefreshTtlSec: number;
 };

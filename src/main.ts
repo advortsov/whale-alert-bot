@@ -1,5 +1,6 @@
 import { type LogLevel, Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 import { AppModule } from './app.module';
 import { AppConfigService } from './config/app-config.service';
@@ -32,6 +33,15 @@ const bootstrap = async (): Promise<void> => {
   logger.log(
     `Runtime config: nodeEnv=${appConfigService.nodeEnv}, telegramEnabled=${String(appConfigService.telegramEnabled)}, chainWatcherEnabled=${String(appConfigService.chainWatcherEnabled)}`,
   );
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle('Whale Alert Bot API')
+    .setDescription('REST API for crypto wallet monitoring')
+    .setVersion(appConfigService.appVersion)
+    .addBearerAuth()
+    .build();
+  const document = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('api/docs', app, document);
+
   await app.listen(appConfigService.port);
   logger.log(`Whale Alert Bot is listening on port ${appConfigService.port}.`);
 };

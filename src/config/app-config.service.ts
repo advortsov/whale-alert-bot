@@ -274,6 +274,18 @@ export class AppConfigService {
     return this.config.rateLimitEthRpcMaxConcurrent;
   }
 
+  public get jwtSecret(): string | null {
+    return this.config.jwtSecret;
+  }
+
+  public get jwtAccessTtlSec(): number {
+    return this.config.jwtAccessTtlSec;
+  }
+
+  public get jwtRefreshTtlSec(): number {
+    return this.config.jwtRefreshTtlSec;
+  }
+
   private mapConfig(parsedEnv: ParsedEnv): AppConfig {
     return {
       ...this.mapCoreConfig(parsedEnv),
@@ -437,6 +449,9 @@ export class AppConfigService {
     | 'rateLimitCoingeckoMaxConcurrent'
     | 'rateLimitEthRpcMinTimeMs'
     | 'rateLimitEthRpcMaxConcurrent'
+    | 'jwtSecret'
+    | 'jwtAccessTtlSec'
+    | 'jwtRefreshTtlSec'
   > {
     return {
       metricsEnabled: parsedEnv.METRICS_ENABLED,
@@ -450,6 +465,9 @@ export class AppConfigService {
       rateLimitCoingeckoMaxConcurrent: parsedEnv.RATE_LIMIT_COINGECKO_MAX_CONCURRENT,
       rateLimitEthRpcMinTimeMs: parsedEnv.RATE_LIMIT_ETH_RPC_MIN_TIME_MS,
       rateLimitEthRpcMaxConcurrent: parsedEnv.RATE_LIMIT_ETH_RPC_MAX_CONCURRENT,
+      jwtSecret: parsedEnv.JWT_SECRET ?? null,
+      jwtAccessTtlSec: parsedEnv.JWT_ACCESS_TTL_SEC,
+      jwtRefreshTtlSec: parsedEnv.JWT_REFRESH_TTL_SEC,
     };
   }
 

@@ -33,6 +33,91 @@ Telegram-бот на `NestJS + TypeScript` для отслеживания ак�
 - `/mute <minutes|off>` - временно выключить все алерты.
 - `/help` - полная справка с примерами.
 
+## REST API
+
+Полный REST API для веб- и мобильных клиентов с JWT-аутентификацией через Telegram Login Widget.
+
+### Аутентификация
+
+API использует JWT-токены. Для получения токенов нужно авторизоваться через Telegram Login Widget.
+
+**Переменные окружения:**
+
+```env
+JWT_SECRET=your-secret-key          # обязателен в production
+JWT_ACCESS_TTL_SEC=900              # access token TTL (по умолчанию 15 мин)
+JWT_REFRESH_TTL_SEC=604800          # refresh token TTL (по умолчанию 7 дней)
+```
+
+**Шаг 1. Получение токенов (Telegram Login Widget)**
+
+Telegram Login Widget отдаёт объект с данными пользователя и подписью `hash`.
+Этот объект отправляется в `POST /api/auth/telegram`:
+
+```bash
+curl -X POST http://localhost:3000/api/auth/telegram \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": 123456789,
+    "first_name": "User",
+    "username": "myuser",
+    "auth_date": 1771529725,
+    "hash": "<hash из Telegram Login Widget>"
+  }'
+```
+
+Ответ:
+
+```json
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiIs..."
+}
+```
+
+Верификация: сервер проверяет `hash` через HMAC-SHA256(SHA256(BOT_TOKEN), data_check_string). `auth_date` не должен быть старше 5 минут.
+
+Если пользователь ещё не существует в БД, он создаётся автоматически при первом входе.
+
+**Шаг 2. Использование access token**
+
+Все защищённые эндпоинты требуют заголовок `Authorization: Bearer <accessToken>`:
+
+```bash
+curl http://localhost:3000/api/wallets \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIs..."
+```
+
+**Шаг 3. Обновление токенов**
+
+Когда access token истекает, используйте refresh token для получения новой пары:
+
+```bash
+curl -X POST http://localhost:3000/api/auth/refresh \
+  -H "Content-Type: application/json" \
+  -d '{"refreshToken": "eyJhbGciOiJIUzI1NiIs..."}'
+```
+
+### Эндпоинты
+
+| Метод | Путь | Описание |
+|-------|------|----------|
+| POST | `/api/auth/telegram` | Вход через Telegram Login Widget |
+| POST | `/api/auth/refresh` | Обновление пары токенов |
+| POST | `/api/wallets` | Добавить кошелёк (`{ chainKey, address, label? }`) |
+| GET | `/api/wallets` | Список кошельков |
+| GET | `/api/wallets/:id` | Детали кошелька |
+| DELETE | `/api/wallets/:id` | Удалить кошелёк |
+| POST | `/api/wallets/:id/mute` | Замьютить кошелёк (`{ minutes }`) |
+| GET | `/api/wallets/:id/filters` | Фильтры кошелька |
+| PATCH | `/api/wallets/:id/filters` | Обновить фильтр (`{ target, enabled }`) |
+| GET | `/api/wallets/:id/history` | История транзакций (`?limit&offset&kind&direction`) |
+| GET | `/api/settings` | Настройки пользователя |
+| PATCH | `/api/settings` | Обновить настройки (partial) |
+| GET | `/api/status` | Статус, настройки и квота history |
+
+Без токена или с невалидным токеном все защищённые эндпоинты возвращают `401 Unauthorized`.
+
 ## Быстрый старт
 
 ```bash
