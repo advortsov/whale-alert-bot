@@ -12,4 +12,4 @@ COPY package*.json ./
 RUN npm ci --omit=dev --ignore-scripts
 COPY --from=build /app/dist ./dist
 COPY database ./database
-CMD ["npm", "run", "start:prod"]
+CMD ["node", "dist/src/main.js"]

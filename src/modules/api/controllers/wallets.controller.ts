@@ -11,7 +11,6 @@ import {
   Post,
   Query,
   UseGuards,
-  UsePipes,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -76,10 +75,9 @@ export class WalletsController {
   @ApiOperation({ summary: 'Track a new wallet' })
   @ApiBody({ schema: TRACK_WALLET_BODY_SCHEMA })
   @ApiResponse({ status: 201, description: 'Wallet tracked', schema: TRACK_WALLET_RESULT_SCHEMA })
-  @UsePipes(new ZodValidationPipe(trackWalletSchema))
   public async trackWallet(
     @CurrentUser() user: TelegramUserRef,
-    @Body() body: TrackWalletDto,
+    @Body(new ZodValidationPipe(trackWalletSchema)) body: TrackWalletDto,
   ): Promise<ITrackWalletResult> {
     const chainKey: ChainKey = CHAIN_KEY_MAP[body.chainKey] ?? ChainKey.ETHEREUM_MAINNET;
     return this.trackingService.trackWallet(user, body.address, body.label, chainKey);
