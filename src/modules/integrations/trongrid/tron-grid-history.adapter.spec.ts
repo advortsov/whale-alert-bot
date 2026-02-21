@@ -378,6 +378,248 @@ describe('TronGridHistoryAdapter', (): void => {
     expect(result.items[1]?.txHash).toBe('native-page2-tx');
   });
 
+  it('keeps page size constant across pages when some items are unmappable', async (): Promise<void> => {
+    // Сценарий: limit=5 → targetItemsCount=6. Страница 1 возвращает 6 raw-элементов,
+    // но только 2 из них TransferContract (остальные — TriggerSmartContract с amount=0,
+    // маппер их пропускает). Нужна вторая страница с тем же limit=6.
+    // Раньше resolvePageSize(6, 2) уменьшал limit до 4 → fingerprint mismatch.
+    const makeTransfer = (txId: string, timestamp: number): Record<string, unknown> => ({
+      txID: txId,
+      block_timestamp: timestamp,
+      ret: [{ contractRet: 'SUCCESS' }],
+      raw_data: {
+        contract: [
+          {
+            type: 'TransferContract',
+            parameter: {
+              value: {
+                owner_address: '412886B63A4A06A134FD7E93B5BE37E5DCC4A36A9D',
+                to_address: '4174472E7D35395A6B5ADD427EECB7F4B62AD2B071',
+                amount: '1000000',
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    const makeTrigger = (txId: string, timestamp: number): Record<string, unknown> => ({
+      txID: txId,
+      block_timestamp: timestamp,
+      ret: [{ contractRet: 'SUCCESS' }],
+      raw_data: {
+        contract: [
+          {
+            type: 'TriggerSmartContract',
+            parameter: {
+              value: {
+                owner_address: '412886B63A4A06A134FD7E93B5BE37E5DCC4A36A9D',
+                contract_address: '4174472E7D35395A6B5ADD427EECB7F4B62AD2B071',
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      // page 1: 6 items, 2 transfers + 4 triggers (unmappable) → 2 mapped
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            data: [
+              makeTransfer('tx-1', 1770000000000),
+              makeTrigger('trigger-1', 1769999000000),
+              makeTrigger('trigger-2', 1769998000000),
+              makeTransfer('tx-2', 1769997000000),
+              makeTrigger('trigger-3', 1769996000000),
+              makeTrigger('trigger-4', 1769995000000),
+            ],
+            meta: { fingerprint: 'fp-fixed-size-test' },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      )
+      // page 2: 4 more transfers → all mapped, total 6 >= targetItemsCount
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            data: [
+              makeTransfer('tx-3', 1769994000000),
+              makeTransfer('tx-4', 1769993000000),
+              makeTransfer('tx-5', 1769992000000),
+              makeTransfer('tx-6', 1769991000000),
+            ],
+            meta: {},
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      );
+
+    const adapter: TronGridHistoryAdapter = new TronGridHistoryAdapter(
+      {
+        tronGridApiBaseUrl: 'https://api.trongrid.io',
+        tronGridApiKey: null,
+        tronscanTxBaseUrl: 'https://tronscan.org/#/transaction/',
+      } as unknown as AppConfigService,
+      new TronAddressCodec(),
+      {
+        schedule: async (_k: unknown, op: () => Promise<unknown>): Promise<unknown> => op(),
+      } as unknown as BottleneckRateLimiterService,
+    );
+
+    const result = await adapter.loadRecentTransactions(
+      createRequest({ kind: HistoryKind.ETH, limit: 5 }),
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    // page 1 and page 2 must have the same limit parameter
+    const page1Url: string = toRequestUrl(fetchMock.mock.calls[0]?.[0]);
+    const page2Url: string = toRequestUrl(fetchMock.mock.calls[1]?.[0]);
+
+    const page1Limit: string | null = new URL(page1Url).searchParams.get('limit');
+    const page2Limit: string | null = new URL(page2Url).searchParams.get('limit');
+    expect(page1Limit).toBe('6');
+    expect(page2Limit).toBe('6');
+
+    // page 2 must carry fingerprint from page 1
+    expect(page2Url).toContain('fingerprint=fp-fixed-size-test');
+
+    expect(result.items).toHaveLength(5);
+    expect(result.items[0]?.txHash).toBe('tx-1');
+    expect(result.items[4]?.txHash).toBe('tx-5');
+  });
+
+  it('combines fallback policy lock and fixed page size across pages', async (): Promise<void> => {
+    // Полный продакшен-сценарий:
+    // 1) policy[0] (order_by) → 400
+    // 2) policy[1] (без order_by) → 200, page 1 с unmappable items + fingerprint
+    // 3) policy[1] (без order_by) + fingerprint + тот же limit → 200, page 2
+    const makeTransfer = (txId: string, timestamp: number): Record<string, unknown> => ({
+      txID: txId,
+      block_timestamp: timestamp,
+      ret: [{ contractRet: 'SUCCESS' }],
+      raw_data: {
+        contract: [
+          {
+            type: 'TransferContract',
+            parameter: {
+              value: {
+                owner_address: '412886B63A4A06A134FD7E93B5BE37E5DCC4A36A9D',
+                to_address: '4174472E7D35395A6B5ADD427EECB7F4B62AD2B071',
+                amount: '500000',
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    const makeTrigger = (txId: string, timestamp: number): Record<string, unknown> => ({
+      txID: txId,
+      block_timestamp: timestamp,
+      ret: [{ contractRet: 'SUCCESS' }],
+      raw_data: {
+        contract: [
+          {
+            type: 'TriggerSmartContract',
+            parameter: {
+              value: {
+                owner_address: '412886B63A4A06A134FD7E93B5BE37E5DCC4A36A9D',
+                contract_address: '4174472E7D35395A6B5ADD427EECB7F4B62AD2B071',
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      // call 1: policy[0] (order_by + only_confirmed) → 400
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: false,
+            error: 'fingerprint does not match current set of params',
+          }),
+          { status: 400, headers: { 'content-type': 'application/json' } },
+        ),
+      )
+      // call 2: policy[1] (only_confirmed, no order_by) → 200, mixed items + fingerprint
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            data: [
+              makeTransfer('combo-tx-1', 1770000000000),
+              makeTrigger('combo-trigger-1', 1769999000000),
+              makeTrigger('combo-trigger-2', 1769998000000),
+            ],
+            meta: { fingerprint: 'fp-combo' },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      )
+      // call 3: policy[1] + fingerprint + same limit → 200, page 2
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            data: [
+              makeTransfer('combo-tx-2', 1769997000000),
+              makeTransfer('combo-tx-3', 1769996000000),
+              makeTransfer('combo-tx-4', 1769995000000),
+            ],
+            meta: {},
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      );
+
+    const adapter: TronGridHistoryAdapter = new TronGridHistoryAdapter(
+      {
+        tronGridApiBaseUrl: 'https://api.trongrid.io',
+        tronGridApiKey: null,
+        tronscanTxBaseUrl: 'https://tronscan.org/#/transaction/',
+      } as unknown as AppConfigService,
+      new TronAddressCodec(),
+      {
+        schedule: async (_k: unknown, op: () => Promise<unknown>): Promise<unknown> => op(),
+      } as unknown as BottleneckRateLimiterService,
+    );
+
+    const result = await adapter.loadRecentTransactions(
+      createRequest({ kind: HistoryKind.ETH, limit: 3 }),
+    );
+
+    // 3 calls: 400 (policy[0]), 200 (policy[1] page 1), 200 (policy[1] page 2)
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+
+    const call1Url: string = toRequestUrl(fetchMock.mock.calls[0]?.[0]);
+    const call2Url: string = toRequestUrl(fetchMock.mock.calls[1]?.[0]);
+    const call3Url: string = toRequestUrl(fetchMock.mock.calls[2]?.[0]);
+
+    // call 1: policy[0] — has order_by
+    expect(call1Url).toContain('order_by=');
+
+    // call 2: policy[1] — no order_by
+    expect(call2Url).not.toContain('order_by=');
+
+    // call 3: same policy[1] (no order_by), same limit, with fingerprint
+    expect(call3Url).not.toContain('order_by=');
+    expect(call3Url).toContain('fingerprint=fp-combo');
+
+    const call2Limit: string | null = new URL(call2Url).searchParams.get('limit');
+    const call3Limit: string | null = new URL(call3Url).searchParams.get('limit');
+    expect(call2Limit).toBe(call3Limit);
+
+    expect(result.items).toHaveLength(3);
+    expect(result.items[0]?.txHash).toBe('combo-tx-1');
+    expect(result.items[1]?.txHash).toBe('combo-tx-2');
+    expect(result.items[2]?.txHash).toBe('combo-tx-3');
+  });
+
   it('throws for unsupported chain key', async (): Promise<void> => {
     const adapter: TronGridHistoryAdapter = new TronGridHistoryAdapter(
       {
