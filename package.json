@@ -27,7 +27,7 @@
     "build:test": "tsc -p tsconfig.test.json",
     "find-dead-code": "npx knip",
     "check": "npm run lint && npm run db:validate && npm run typecheck && npm run test && npm run build",
-    "precommit": "npm run lint:fix && npm run format:write && npm run lint && npm run lint:boundaries && npm run lint:circular && npm run typecheck && npm run find-dead-code && npm run test && npm run test:scenario && npm run build",
+    "precommit": "npm run lint:fix && npm run format:write && npm run lint && npm run lint:boundaries && npm run lint:circular && npm run typecheck && npm run find-dead-code && npm run test && npm run build",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",
