@@ -4,7 +4,7 @@ import type {
   ITokenMetadataAdapter,
   ITokenMetadataDto,
 } from '../../../common/interfaces/token-metadata/token-metadata.interfaces';
-import { SimpleCacheImpl } from '../../../common/utils/cache';
+import { registerCache, SimpleCacheImpl } from '../../../common/utils/cache';
 import { AppConfigService } from '../../../config/app-config.service';
 import {
   FALLBACK_TOKEN_METADATA,
@@ -19,6 +19,7 @@ export class EthereumTokenMetadataAdapter implements ITokenMetadataAdapter {
     this.metadataCache = new SimpleCacheImpl<ITokenMetadataDto>({
       ttlSec: this.appConfigService.tokenMetaCacheTtlSec,
     });
+    registerCache('token_metadata', this.metadataCache as SimpleCacheImpl<unknown>);
   }
 
   public getMetadata(contractAddress: string | null): ITokenMetadataDto {

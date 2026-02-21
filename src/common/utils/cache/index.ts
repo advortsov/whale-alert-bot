@@ -2,3 +2,4 @@ export { type ISimpleCache, type ICacheStats, type SimpleCacheOptions } from './
 export { type TieredCacheOptions } from './cache.interfaces';
 export { SimpleCacheImpl } from './simple-cache';
 export { TieredCache } from './tiered-cache';
+export { registerCache, getAllCacheStats } from './cache-stats-registry';

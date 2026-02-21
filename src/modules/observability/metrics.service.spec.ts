@@ -35,4 +35,18 @@ describe('MetricsService', (): void => {
     expect(metrics).toContain('rate_limit_queue_size');
     expect(metrics).toContain('etherscan');
   });
+
+  it('tracks cache metrics gauges', async (): Promise<void> => {
+    const service: MetricsService = new MetricsService();
+
+    service.cacheKeys.set({ cache: 'history' }, 10);
+    service.cacheHitsTotal.set({ cache: 'history' }, 42);
+    service.cacheMissesTotal.set({ cache: 'history' }, 7);
+
+    const metrics: string = await service.getMetrics();
+    expect(metrics).toContain('cache_keys');
+    expect(metrics).toContain('cache_hits_total');
+    expect(metrics).toContain('cache_misses_total');
+    expect(metrics).toContain('history');
+  });
 });

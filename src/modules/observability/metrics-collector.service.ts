@@ -1,6 +1,7 @@
 import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 
 import { MetricsService } from './metrics.service';
+import { type ICacheStats, getAllCacheStats } from '../../common/utils/cache';
 import { AppConfigService } from '../../config/app-config.service';
 import { DatabaseService } from '../../database/kysely/database.service';
 import type {
@@ -32,6 +33,7 @@ export class MetricsCollectorService implements OnModuleInit, OnModuleDestroy {
     this.intervalHandle = setInterval((): void => {
       this.collectRateLimiterMetrics();
       this.collectPgPoolMetrics();
+      this.collectCacheMetrics();
     }, COLLECT_INTERVAL_MS);
 
     this.logger.log(`Metrics collector started, interval=${String(COLLECT_INTERVAL_MS)}ms`);
@@ -58,5 +60,14 @@ export class MetricsCollectorService implements OnModuleInit, OnModuleDestroy {
     this.metricsService.pgPoolTotal.set(pool.totalCount);
     this.metricsService.pgPoolIdle.set(pool.idleCount);
     this.metricsService.pgPoolWaiting.set(pool.waitingCount);
+  }
+
+  private collectCacheMetrics(): void {
+    const allStats: ReadonlyMap<string, ICacheStats> = getAllCacheStats();
+    for (const [name, stats] of allStats) {
+      this.metricsService.cacheKeys.set({ cache: name }, stats.keys);
+      this.metricsService.cacheHitsTotal.set({ cache: name }, stats.hits);
+      this.metricsService.cacheMissesTotal.set({ cache: name }, stats.misses);
+    }
   }
 }

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import { SimpleCacheImpl } from '../../../common/utils/cache';
+import { registerCache, SimpleCacheImpl } from '../../../common/utils/cache';
 import { AppConfigService } from '../../../config/app-config.service';
 import type { HistoryCacheEntry, HistoryCacheKey } from '../entities/history-cache.interfaces';
 import { HistoryDirectionFilter, HistoryKind } from '../entities/history-request.dto';
@@ -27,6 +27,7 @@ export class HistoryCacheService {
     this.cache = new SimpleCacheImpl<HistoryCacheEntry>({
       ttlSec: staleTtlSec,
     });
+    registerCache('history', this.cache as SimpleCacheImpl<unknown>);
   }
 
   public getFresh(

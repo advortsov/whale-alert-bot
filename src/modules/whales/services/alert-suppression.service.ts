@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import { ClassifiedEventType, type ClassifiedEvent } from '../../../common/interfaces/chain.types';
-import { SimpleCacheImpl } from '../../../common/utils/cache';
+import { registerCache, SimpleCacheImpl } from '../../../common/utils/cache';
 import { AppConfigService } from '../../../config/app-config.service';
 import {
   AlertSuppressionReason,
@@ -16,6 +16,7 @@ export class AlertSuppressionService {
     this.suppressionCache = new SimpleCacheImpl<true>({
       ttlSec: this.appConfigService.alertMinSendIntervalSec,
     });
+    registerCache('alert_suppression', this.suppressionCache as SimpleCacheImpl<unknown>);
   }
 
   public shouldSuppress(event: ClassifiedEvent): AlertSuppressionDecision {

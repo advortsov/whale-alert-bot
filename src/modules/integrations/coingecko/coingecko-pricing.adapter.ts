@@ -12,7 +12,7 @@ import {
   type IPriceQuoteDto,
   type IPriceRequestDto,
 } from '../../../common/interfaces/token-pricing/token-pricing.interfaces';
-import { SimpleCacheImpl } from '../../../common/utils/cache';
+import { registerCache, SimpleCacheImpl } from '../../../common/utils/cache';
 import { AppConfigService } from '../../../config/app-config.service';
 import {
   LimiterKey,
@@ -46,6 +46,7 @@ export class CoinGeckoPricingAdapter implements ITokenPricingPort {
       ttlSec: this.appConfigService.priceCacheStaleTtlSec,
       maxKeys: this.appConfigService.priceCacheMaxEntries,
     });
+    registerCache('price', this.cache as SimpleCacheImpl<unknown>);
   }
 
   public async getUsdQuote(request: IPriceRequestDto): Promise<IPriceQuoteDto | null> {
