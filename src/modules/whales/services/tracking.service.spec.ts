@@ -14,10 +14,8 @@ import {
   TrackingSettingsService,
   TrackingSettingsServiceDependencies,
 } from './tracking-settings.service';
-import {
-  TrackingWalletsService,
-  TrackingWalletsServiceDependencies,
-} from './tracking-wallets.service';
+import { TrackingWalletsServiceDependencies } from './tracking-wallets.dependencies';
+import { TrackingWalletsService } from './tracking-wallets.service';
 import { TrackingService } from './tracking.service';
 import type { IAddressCodecRegistry } from '../../../common/interfaces/address/address-codec-registry.interfaces';
 import type { IAddressCodec } from '../../../common/interfaces/address/address-codec.interfaces';
@@ -99,6 +97,7 @@ type UserWalletAlertPreferencesRepositoryStub = {
 type AlertMutesRepositoryStub = {
   readonly findActiveMute: ReturnType<typeof vi.fn>;
   readonly upsertMute: ReturnType<typeof vi.fn>;
+  readonly deleteMute: ReturnType<typeof vi.fn>;
 };
 
 type WalletEventsRepositoryStub = {
@@ -173,6 +172,7 @@ const createTestContext = (): TestContext => {
   const alertMutesRepositoryStub: AlertMutesRepositoryStub = {
     findActiveMute: vi.fn(),
     upsertMute: vi.fn(),
+    deleteMute: vi.fn(),
   };
   const walletEventsRepositoryStub: WalletEventsRepositoryStub = {
     listRecentByTrackedAddress: vi.fn(),
@@ -290,6 +290,7 @@ const createTestContext = (): TestContext => {
   });
   walletEventsRepositoryStub.listRecentByTrackedAddress.mockResolvedValue([]);
   alertMutesRepositoryStub.findActiveMute.mockResolvedValue(null);
+  alertMutesRepositoryStub.deleteMute.mockResolvedValue(true);
   alertMutesRepositoryStub.upsertMute.mockResolvedValue({
     id: 1,
     user_id: 7,
@@ -780,6 +781,32 @@ describe('TrackingService', (): void => {
       }),
     );
     expect(message).toContain('Кошелек #9');
+  });
+
+  it('removes wallet mute and returns null mutedUntil', async (): Promise<void> => {
+    const context: TestContext = createTestContext();
+    context.subscriptionsRepositoryStub.listByUserId.mockResolvedValue([
+      {
+        subscriptionId: 1,
+        walletId: 9,
+        chainKey: ChainKey.ETHEREUM_MAINNET,
+        walletAddress: '0x2F0b23f53734252Bda2277357e97e1517d6B042A',
+        walletLabel: 'Maker_ETH_Vault',
+        createdAt: new Date('2026-02-01T00:00:00.000Z'),
+      },
+    ]);
+
+    const result = await context.service.unmuteWallet(context.userRef, '#9');
+
+    expect(context.alertMutesRepositoryStub.deleteMute).toHaveBeenCalledWith({
+      userId: 7,
+      chainKey: ChainKey.ETHEREUM_MAINNET,
+      walletId: 9,
+    });
+    expect(result).toEqual({
+      walletId: 9,
+      mutedUntil: null,
+    });
   });
 
   it('returns wallet filters state with chain key', async (): Promise<void> => {

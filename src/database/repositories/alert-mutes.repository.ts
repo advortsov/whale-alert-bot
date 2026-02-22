@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 
-import type { IUpsertAlertMuteInput } from './alert-mutes.repository.interfaces';
+import type {
+  IDeleteAlertMuteInput,
+  IUpsertAlertMuteInput,
+} from './alert-mutes.repository.interfaces';
 import type { ChainKey } from '../../common/interfaces/chain-key.interfaces';
 import { DatabaseService } from '../kysely/database.service';
 import type { AlertMuteRow, NewAlertMuteRow } from '../types/database.types';
@@ -55,5 +58,21 @@ export class AlertMutesRepository {
       .executeTakeFirst();
 
     return row ?? null;
+  }
+
+  public async deleteMute(input: IDeleteAlertMuteInput): Promise<boolean> {
+    const deleteResult = await this.databaseService
+      .getDb()
+      .deleteFrom('alert_mutes')
+      .where('user_id', '=', input.userId)
+      .where('chain_key', '=', input.chainKey)
+      .where('wallet_id', '=', input.walletId)
+      .executeTakeFirst();
+
+    const deletedRowsRaw: bigint | number = deleteResult.numDeletedRows;
+    const deletedRows: number =
+      typeof deletedRowsRaw === 'bigint' ? Number(deletedRowsRaw) : Number(deletedRowsRaw);
+
+    return deletedRows > 0;
   }
 }

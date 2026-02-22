@@ -22,6 +22,7 @@ import type {
 import type {
   IMuteWalletResult,
   ITrackWalletResult,
+  IUnmuteWalletResult,
   IUntrackResult,
   IWalletDetailResult,
   IWalletListResult,
@@ -198,6 +199,13 @@ export class TrackingService {
     source: string,
   ): Promise<IMuteWalletResult> {
     return this.walletsService.muteWallet(userRef, rawWalletId, muteMinutes, source);
+  }
+
+  public async unmuteWallet(
+    userRef: TelegramUserRef,
+    rawWalletId: string,
+  ): Promise<IUnmuteWalletResult> {
+    return this.walletsService.unmuteWallet(userRef, rawWalletId);
   }
 
   public async getSettings(userRef: TelegramUserRef): Promise<IUserSettingsResult> {

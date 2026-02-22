@@ -52,3 +52,8 @@ export interface IMuteWalletResult {
   readonly walletId: number;
   readonly mutedUntil: Date;
 }
+
+export interface IUnmuteWalletResult {
+  readonly walletId: number;
+  readonly mutedUntil: null;
+}

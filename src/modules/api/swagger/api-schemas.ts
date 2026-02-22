@@ -188,6 +188,15 @@ export const MUTE_WALLET_RESULT_SCHEMA: SchemaObject = {
   required: ['walletId', 'mutedUntil'],
 };
 
+export const UNMUTE_WALLET_RESULT_SCHEMA: SchemaObject = {
+  type: 'object',
+  properties: {
+    walletId: { type: 'integer' },
+    mutedUntil: { type: 'string', nullable: true, example: null },
+  },
+  required: ['walletId', 'mutedUntil'],
+};
+
 export const WALLET_ALERT_FILTER_STATE_SCHEMA: SchemaObject = {
   type: 'object',
   properties: {

@@ -115,6 +115,7 @@ curl -X POST http://localhost:3000/api/auth/refresh \
 | GET | `/api/wallets/:id` | Детали кошелька |
 | DELETE | `/api/wallets/:id` | Удалить кошелёк |
 | POST | `/api/wallets/:id/mute` | Замьютить кошелёк (`{ minutes }`) |
+| DELETE | `/api/wallets/:id/mute` | Снять mute с кошелька |
 | GET | `/api/wallets/:id/filters` | Фильтры кошелька |
 | PATCH | `/api/wallets/:id/filters` | Обновить фильтр (`{ target, enabled }`) |
 | GET | `/api/wallets/:id/history` | История транзакций (`?limit&offset&kind&direction`) |
@@ -123,6 +124,10 @@ curl -X POST http://localhost:3000/api/auth/refresh \
 | GET | `/api/status` | Статус, настройки и квота history |
 
 Без токена или с невалидным токеном все защищённые эндпоинты возвращают `401 Unauthorized`.
+
+Mute/unmute кошелька:
+- `POST /api/wallets/:id/mute` принимает `{ "minutes": 1440 }` и возвращает `mutedUntil`.
+- `DELETE /api/wallets/:id/mute` снимает wallet-mute сразу и возвращает `mutedUntil: null`.
 
 ## Быстрый старт
 

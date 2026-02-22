@@ -30,10 +30,8 @@ import {
   TrackingSettingsService,
   TrackingSettingsServiceDependencies,
 } from './services/tracking-settings.service';
-import {
-  TrackingWalletsService,
-  TrackingWalletsServiceDependencies,
-} from './services/tracking-wallets.service';
+import { TrackingWalletsServiceDependencies } from './services/tracking-wallets.dependencies';
+import { TrackingWalletsService } from './services/tracking-wallets.service';
 import { TrackingService } from './services/tracking.service';
 import { ADDRESS_CODEC_REGISTRY } from '../../common/interfaces/address/address-port.tokens';
 import { ALERT_DISPATCHER } from '../../common/interfaces/alerts/alert-dispatcher-port.tokens';

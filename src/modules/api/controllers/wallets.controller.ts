@@ -33,6 +33,7 @@ import type {
 import type {
   IMuteWalletResult,
   ITrackWalletResult,
+  IUnmuteWalletResult,
   IUntrackResult,
   IWalletDetailResult,
   IWalletListResult,
@@ -50,6 +51,7 @@ import {
   MUTE_WALLET_RESULT_SCHEMA,
   TRACK_WALLET_BODY_SCHEMA,
   TRACK_WALLET_RESULT_SCHEMA,
+  UNMUTE_WALLET_RESULT_SCHEMA,
   UNTRACK_RESULT_SCHEMA,
   WALLET_ALERT_FILTER_STATE_SCHEMA,
   WALLET_DETAIL_RESULT_SCHEMA,
@@ -124,6 +126,18 @@ export class WalletsController {
     @Body(new ZodValidationPipe(muteWalletSchema)) body: MuteWalletDto,
   ): Promise<IMuteWalletResult> {
     return this.trackingService.muteWallet(user, `#${String(id)}`, body.minutes, 'api');
+  }
+
+  @Delete(':id/mute')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Unmute wallet alerts' })
+  @ApiParam({ name: 'id', type: 'integer', description: 'Wallet ID' })
+  @ApiResponse({ status: 200, description: 'Wallet unmuted', schema: UNMUTE_WALLET_RESULT_SCHEMA })
+  public async unmuteWallet(
+    @CurrentUser() user: TelegramUserRef,
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<IUnmuteWalletResult> {
+    return this.trackingService.unmuteWallet(user, `#${String(id)}`);
   }
 
   @Get(':id/filters')

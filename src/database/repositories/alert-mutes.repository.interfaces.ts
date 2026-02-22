@@ -7,3 +7,9 @@ export interface IUpsertAlertMuteInput {
   readonly muteUntil: Date;
   readonly source: string;
 }
+
+export interface IDeleteAlertMuteInput {
+  readonly userId: number;
+  readonly chainKey: ChainKey;
+  readonly walletId: number;
+}

@@ -1,20 +1,8 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 
-import { TrackingAddressService } from './tracking-address.service';
-import { TrackingHistoryFormatterService } from './tracking-history-formatter.service';
-import { TrackingSettingsParserService } from './tracking-settings-parser.service';
-import type { IAddressCodecRegistry } from '../../../common/interfaces/address/address-codec-registry.interfaces';
-import { ADDRESS_CODEC_REGISTRY } from '../../../common/interfaces/address/address-port.tokens';
+import { TrackingWalletsServiceDependencies } from './tracking-wallets.dependencies';
 import { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
-import { AlertMutesRepository } from '../../../database/repositories/alert-mutes.repository';
-import { SubscriptionsRepository } from '../../../database/repositories/subscriptions.repository';
-import { TrackedWalletsRepository } from '../../../database/repositories/tracked-wallets.repository';
 import { AlertEventFilterType } from '../../../database/repositories/user-alert-preferences.interfaces';
-import { UserAlertPreferencesRepository } from '../../../database/repositories/user-alert-preferences.repository';
-import { UserAlertSettingsRepository } from '../../../database/repositories/user-alert-settings.repository';
-import { UserWalletAlertPreferencesRepository } from '../../../database/repositories/user-wallet-alert-preferences.repository';
-import { UsersRepository } from '../../../database/repositories/users.repository';
-import { WalletEventsRepository } from '../../../database/repositories/wallet-events.repository';
 import type {
   AlertMuteRow,
   UserAlertPreferenceRow,
@@ -29,6 +17,7 @@ import {
 import type {
   IMuteWalletResult,
   ITrackWalletResult,
+  IUnmuteWalletResult,
   IUntrackResult,
   IWalletDetailResult,
   IWalletListResult,
@@ -37,45 +26,6 @@ import type {
 const DEFAULT_HISTORY_LIMIT = 5;
 const WALLET_CARD_RECENT_EVENTS_LIMIT = 3;
 const MINUTES_TO_MS = 60_000;
-
-@Injectable()
-export class TrackingWalletsServiceDependencies {
-  @Inject(UsersRepository)
-  public readonly usersRepository!: UsersRepository;
-
-  @Inject(TrackedWalletsRepository)
-  public readonly trackedWalletsRepository!: TrackedWalletsRepository;
-
-  @Inject(SubscriptionsRepository)
-  public readonly subscriptionsRepository!: SubscriptionsRepository;
-
-  @Inject(ADDRESS_CODEC_REGISTRY)
-  public readonly addressCodecRegistry!: IAddressCodecRegistry;
-
-  @Inject(TrackingAddressService)
-  public readonly trackingAddressService!: TrackingAddressService;
-
-  @Inject(UserAlertPreferencesRepository)
-  public readonly userAlertPreferencesRepository!: UserAlertPreferencesRepository;
-
-  @Inject(UserAlertSettingsRepository)
-  public readonly userAlertSettingsRepository!: UserAlertSettingsRepository;
-
-  @Inject(UserWalletAlertPreferencesRepository)
-  public readonly userWalletAlertPreferencesRepository!: UserWalletAlertPreferencesRepository;
-
-  @Inject(AlertMutesRepository)
-  public readonly alertMutesRepository!: AlertMutesRepository;
-
-  @Inject(WalletEventsRepository)
-  public readonly walletEventsRepository!: WalletEventsRepository;
-
-  @Inject(TrackingSettingsParserService)
-  public readonly settingsParserService!: TrackingSettingsParserService;
-
-  @Inject(TrackingHistoryFormatterService)
-  public readonly historyFormatter!: TrackingHistoryFormatterService;
-}
 
 @Injectable()
 export class TrackingWalletsService {
@@ -422,6 +372,28 @@ export class TrackingWalletsService {
       `Кошелек #${String(result.walletId)} временно отключен.`,
       `До: ${this.deps.settingsParserService.formatTimestamp(result.mutedUntil)}`,
     ].join('\n');
+  }
+
+  public async unmuteWallet(
+    userRef: TelegramUserRef,
+    rawWalletId: string,
+  ): Promise<IUnmuteWalletResult> {
+    const user = await this.deps.usersRepository.findOrCreate(userRef.telegramId, userRef.username);
+    const walletSubscription = await this.deps.trackingAddressService.resolveWalletSubscription(
+      user.id,
+      rawWalletId,
+    );
+
+    await this.deps.alertMutesRepository.deleteMute({
+      userId: user.id,
+      chainKey: walletSubscription.chainKey,
+      walletId: walletSubscription.walletId,
+    });
+
+    return {
+      walletId: walletSubscription.walletId,
+      mutedUntil: null,
+    };
   }
 
   public async getWalletAlertFilterState(
