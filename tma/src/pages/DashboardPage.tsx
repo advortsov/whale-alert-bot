@@ -7,13 +7,30 @@ import { useTmaInit } from '../hooks/useTmaInit';
 
 export const DashboardPage = (): React.JSX.Element => {
   const initQuery = useTmaInit();
+  const errorMessage: string | null =
+    initQuery.error instanceof Error ? initQuery.error.message : null;
 
   if (initQuery.isLoading) {
     return <LoadingSpinner />;
   }
 
   if (initQuery.isError || initQuery.data === undefined) {
-    return <p>Не удалось загрузить dashboard.</p>;
+    return (
+      <section className="screen-panel">
+        <h1 className="screen-title">Не удалось загрузить dashboard</h1>
+        <p className="screen-text">
+          {errorMessage ?? 'Ошибка сети или недоступен endpoint /api/tma/init.'}
+        </p>
+        <button
+          type="button"
+          onClick={(): void => {
+            void initQuery.refetch();
+          }}
+        >
+          Повторить
+        </button>
+      </section>
+    );
   }
 
   const wallets = initQuery.data.wallets.wallets;

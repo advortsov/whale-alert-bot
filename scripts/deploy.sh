@@ -63,6 +63,9 @@ if [[ ! -f .env ]]; then
 fi
 
 # Сборка и запуск
+echo "==> Сборка TMA (React SPA)..."
+docker run --rm -v "${DEPLOY_DIR}/tma:/app" -w /app node:22-alpine sh -lc "npm ci --no-audit --no-fund && npm run build"
+
 echo "==> Сборка и запуск контейнеров..."
 docker compose -f "${COMPOSE_FILE}" up --build -d
 

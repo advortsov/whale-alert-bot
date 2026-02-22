@@ -48,3 +48,9 @@ jobs:
       - run: npm run typecheck
       - run: npm run test
       - run: npm run build
+      - name: Build TMA
+        run: |
+          cd tma
+          npm ci
+          npm run typecheck
+          npm run build

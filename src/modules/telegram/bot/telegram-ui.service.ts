@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Markup } from 'telegraf';
-import type { InlineKeyboardButton } from 'telegraf/types';
+import type { InlineKeyboardButton, KeyboardButton } from 'telegraf/types';
 
 import {
   CALLBACK_HISTORY_LIMIT,
@@ -36,6 +36,7 @@ export class TelegramUiService {
   public buildStartMessage(): string {
     return [
       'Whale Alert Bot готов к работе.',
+      '🚀 Mini App вынесен в верхнюю кнопку меню и кнопку ниже.',
       'Ниже есть меню-кнопки для быстрых действий.',
       '',
       'Что умею:',
@@ -295,13 +296,32 @@ export class TelegramUiService {
   }
 
   public buildReplyOptions(): ReplyOptions {
-    return Markup.keyboard([
-      ['🏠 Главное меню', '📱 Приложение', '📋 Мой список'],
-      ['➕ Добавить адрес', '📜 История', '📈 Статус'],
-      ['⚙️ Фильтры', '🗑 Удалить адрес', '❓ Помощь'],
-    ])
-      .resize()
-      .persistent();
+    const appUrl: string | null = this.resolveTmaBaseUrl();
+    const rows: (string | KeyboardButton)[][] = [
+      ['➕ Добавить адрес', '📋 Мой список', '📜 История'],
+      ['⚙️ Фильтры', '📈 Статус', '❓ Помощь'],
+      ['🗑 Удалить адрес', '🏠 Главное меню'],
+    ];
+
+    if (appUrl !== null) {
+      rows.unshift([
+        {
+          text: '🚀 Mini App',
+          web_app: {
+            url: appUrl,
+          },
+        },
+      ]);
+    } else {
+      rows.unshift(['📱 Приложение']);
+    }
+
+    return Markup.keyboard(rows).resize().persistent();
+  }
+
+  public buildStartReplyOptions(): ReplyOptions | null {
+    const appEntryResult: CommandExecutionResult = this.buildAppEntryResult();
+    return appEntryResult.replyOptions;
   }
 
   public buildHistoryReplyOptions(): ReplyOptions {

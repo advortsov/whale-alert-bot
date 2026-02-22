@@ -5,13 +5,13 @@ import type { ITmaInitResult } from '../types/api.types';
 import { useAuth } from './useAuth';
 
 export const useTmaInit = (): UseQueryResult<ITmaInitResult> => {
-  const { apiClient, isReady } = useAuth();
+  const { apiClient, isReady, authError } = useAuth();
 
   return useQuery<ITmaInitResult>({
     queryKey: ['tma-init'],
     queryFn: async (): Promise<ITmaInitResult> => {
       return loadTmaInit(apiClient);
     },
-    enabled: isReady,
+    enabled: isReady && authError === null,
   });
 };

@@ -39,6 +39,7 @@ export const SUPPORTED_COMMAND_MAP: Readonly<Record<string, SupportedTelegramCom
 export const MENU_BUTTON_COMMAND_MAP: Readonly<Record<string, SupportedTelegramCommand>> = {
   '🏠 Главное меню': SupportedTelegramCommand.START,
   '📱 Приложение': SupportedTelegramCommand.APP,
+  '🚀 Mini App': SupportedTelegramCommand.APP,
   '➕ Добавить адрес': SupportedTelegramCommand.TRACK_HINT,
   '📋 Мой список': SupportedTelegramCommand.LIST,
   '📈 Статус': SupportedTelegramCommand.STATUS,

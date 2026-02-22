@@ -43,6 +43,10 @@ export class TelegramBasicCommandsService {
     return this.deps.uiService.buildStartMessage();
   }
 
+  public buildStartReplyOptions(): CommandExecutionResult['replyOptions'] {
+    return this.deps.uiService.buildStartReplyOptions();
+  }
+
   public buildHelpMessage(): string {
     return this.deps.uiService.buildHelpMessage();
   }

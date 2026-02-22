@@ -201,6 +201,52 @@ describe('TelegramUpdate', (): void => {
     });
   });
 
+  it('handles /start command and returns prominent mini app button', async (): Promise<void> => {
+    const trackingServiceStub: TrackingService = {} as TrackingService;
+    const update: TelegramUpdate = createUpdate(trackingServiceStub);
+    const replyMock: ReturnType<typeof vi.fn> = vi.fn().mockResolvedValue({
+      message_id: 405,
+      text: 'ok',
+    });
+    const textContext = {
+      message: {
+        text: '/start',
+        message_id: 201,
+      },
+      from: {
+        id: 42,
+        username: 'tester',
+      },
+      chat: {
+        id: 42,
+      },
+      update: {
+        update_id: 202,
+      },
+      reply: replyMock,
+    };
+
+    await update.onText(textContext as unknown as Context);
+
+    expect(replyMock).toHaveBeenCalledTimes(1);
+    const replyCall = replyMock.mock.calls[0];
+    expect(replyCall?.[0]).toContain('Mini App');
+    expect(replyCall?.[1]).toMatchObject({
+      reply_markup: {
+        inline_keyboard: [
+          [
+            {
+              text: '📱 Открыть приложение',
+              web_app: {
+                url: 'https://1303118-cr22992.tw1.ru/tma',
+              },
+            },
+          ],
+        ],
+      },
+    });
+  });
+
   it('parses alert ignore callback payload', (): void => {
     const trackingServiceStub: TrackingService = {} as TrackingService;
     const update: TelegramUpdate = createUpdate(trackingServiceStub);

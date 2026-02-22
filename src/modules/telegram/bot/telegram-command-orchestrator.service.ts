@@ -101,7 +101,7 @@ export class TelegramCommandOrchestratorService {
     return {
       lineNumber: commandEntry.lineNumber,
       message: this.basicCommandsService.buildStartMessage(),
-      replyOptions: null,
+      replyOptions: this.basicCommandsService.buildStartReplyOptions(),
     };
   }
 
