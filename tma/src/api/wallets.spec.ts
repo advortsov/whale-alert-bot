@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { addWallet, muteWallet, unmuteWallet } from './wallets';
+import {
+  addWallet,
+  loadWalletHistory,
+  muteWallet,
+  normalizeWalletHistoryResult,
+  unmuteWallet,
+} from './wallets';
 import type { ApiClient } from './client';
 
 type ApiClientStub = {
@@ -53,6 +59,54 @@ describe('tma wallets api', (): void => {
       chainKey: 'ethereum_mainnet',
       address: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
       label: 'vitalik',
+    });
+  });
+
+  it('normalizes malformed history payload to empty items', async (): Promise<void> => {
+    const apiClientStub: ApiClientStub = {
+      request: vi.fn().mockResolvedValue({
+        message: 'history text only',
+        limit: 10,
+        offset: 0,
+      }),
+    };
+
+    const result = await loadWalletHistory(apiClientStub as unknown as ApiClient, 16, 0, 10);
+
+    expect(result).toEqual({
+      items: [],
+      nextOffset: null,
+    });
+  });
+
+  it('normalizes valid history payload and keeps typed items', (): void => {
+    const result = normalizeWalletHistoryResult({
+      items: [
+        {
+          txHash: '0xabc',
+          occurredAt: '2026-02-22T00:00:00.000Z',
+          eventType: 'TRANSFER',
+          direction: 'IN',
+          amountText: '1 ETH',
+        },
+        {
+          txHash: 123,
+        },
+      ],
+      nextOffset: 20,
+    });
+
+    expect(result).toEqual({
+      items: [
+        {
+          txHash: '0xabc',
+          occurredAt: '2026-02-22T00:00:00.000Z',
+          eventType: 'TRANSFER',
+          direction: 'IN',
+          amountText: '1 ETH',
+        },
+      ],
+      nextOffset: 20,
     });
   });
 });

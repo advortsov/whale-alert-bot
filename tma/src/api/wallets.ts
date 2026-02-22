@@ -4,11 +4,53 @@ import type {
   ITrackWalletRequest,
   ITrackWalletResult,
   IUnmuteWalletResult,
+  IWalletHistoryItem,
   IWalletDetailDto,
   IWalletHistoryResult,
   IWalletListResult,
   IWalletSummaryDto,
 } from '../types/api.types';
+
+interface IRawWalletHistoryResult {
+  readonly items?: unknown;
+  readonly nextOffset?: unknown;
+}
+
+const isHistoryItem = (value: unknown): value is IWalletHistoryItem => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const item = value as Record<string, unknown>;
+  return (
+    typeof item['txHash'] === 'string' &&
+    typeof item['occurredAt'] === 'string' &&
+    typeof item['eventType'] === 'string' &&
+    typeof item['direction'] === 'string' &&
+    typeof item['amountText'] === 'string'
+  );
+};
+
+export const normalizeWalletHistoryResult = (raw: unknown): IWalletHistoryResult => {
+  if (typeof raw !== 'object' || raw === null) {
+    return { items: [], nextOffset: null };
+  }
+
+  const candidate = raw as IRawWalletHistoryResult;
+  const itemsRaw: unknown = candidate.items;
+  const items: readonly IWalletHistoryItem[] = Array.isArray(itemsRaw)
+    ? itemsRaw.filter((item: unknown): item is IWalletHistoryItem => isHistoryItem(item))
+    : [];
+
+  const nextOffsetRaw: unknown = candidate.nextOffset;
+  const nextOffset: number | null =
+    typeof nextOffsetRaw === 'number' && Number.isInteger(nextOffsetRaw) ? nextOffsetRaw : null;
+
+  return {
+    items,
+    nextOffset,
+  };
+};
 
 export const loadWallets = async (
   apiClient: ApiClient,
@@ -35,10 +77,12 @@ export const loadWalletHistory = async (
     limit: String(limit),
   });
 
-  return apiClient.request<IWalletHistoryResult>(
+  const rawResult: unknown = await apiClient.request<unknown>(
     'GET',
     `/api/wallets/${walletId}/history?${queryParams.toString()}`,
   );
+
+  return normalizeWalletHistoryResult(rawResult);
 };
 
 export const addWallet = async (
