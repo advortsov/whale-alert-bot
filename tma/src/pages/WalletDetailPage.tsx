@@ -1,5 +1,13 @@
 import React from 'react';
 import {
+  Button,
+  Cell,
+  Placeholder,
+  Section,
+  Text,
+  Title,
+} from '@telegram-apps/telegram-ui';
+import {
   useMutation,
   useQuery,
   useQueryClient,
@@ -77,7 +85,11 @@ export const WalletDetailPage = (): React.JSX.Element => {
   });
 
   if (!Number.isInteger(walletId)) {
-    return <p>Некорректный id кошелька.</p>;
+    return (
+      <section className="tma-screen tma-screen-centered">
+        <Placeholder header="Некорректный id кошелька" description="Проверь ссылку и повтори." />
+      </section>
+    );
   }
 
   if (walletQuery.isLoading || historyQuery.isLoading) {
@@ -90,52 +102,77 @@ export const WalletDetailPage = (): React.JSX.Element => {
     walletQuery.data === undefined ||
     historyQuery.data === undefined
   ) {
-    return <p>Не удалось загрузить карточку кошелька.</p>;
+    return (
+      <section className="tma-screen tma-screen-centered">
+        <Placeholder header="Не удалось загрузить карточку кошелька" />
+      </section>
+    );
   }
 
   const isMuted: boolean = walletQuery.data.activeMute !== null;
   const isActionPending: boolean = muteMutation.isPending || unmuteMutation.isPending;
 
   return (
-    <section style={{ display: 'grid', gap: 12 }}>
-      <h1>Кошелёк #{walletQuery.data.walletId}</h1>
-      <p>Chain: {walletQuery.data.chainKey}</p>
-      <p>Address: {walletQuery.data.address}</p>
-      <p>Label: {walletQuery.data.label ?? '-'}</p>
-      <p>
-        Mute: {walletQuery.data.activeMute === null ? 'off' : walletQuery.data.activeMute}
-      </p>
+    <section className="tma-screen">
+      <Section>
+        <Title level="2" weight="2">
+          Кошелёк #{walletQuery.data.walletId}
+        </Title>
+        <Text>{walletQuery.data.label ?? 'Без label'}</Text>
+      </Section>
 
-      <h2>History</h2>
-      <ul style={{ margin: 0, paddingLeft: 20 }}>
-        {historyQuery.data.items.map((item) => (
-          <li key={item.txHash}>
-            {item.eventType} • {item.direction} • {item.amountText}
-          </li>
-        ))}
-      </ul>
+      <Section header="Детали">
+        <Cell subhead="Сеть">{walletQuery.data.chainKey}</Cell>
+        <Cell subhead="Адрес" multiline>
+          {walletQuery.data.address}
+        </Cell>
+        <Cell subhead="Mute">{walletQuery.data.activeMute === null ? 'off' : walletQuery.data.activeMute}</Cell>
+      </Section>
 
-      {actionStatus === null ? null : <p>{actionStatus}</p>}
+      <Section header="Последние события">
+        {historyQuery.data.items.length === 0 ? (
+          <Placeholder header="Пока нет событий" />
+        ) : (
+          historyQuery.data.items.map((item) => (
+            <Cell key={item.txHash} subtitle={item.occurredAt}>
+              {item.eventType} • {item.direction} • {item.amountText}
+            </Cell>
+          ))
+        )}
+      </Section>
 
-      <div style={{ display: 'flex', gap: 12 }}>
-        <button
-          type="button"
-          disabled={isActionPending}
-          onClick={(): void => {
-            if (isMuted) {
-              unmuteMutation.mutate();
-              return;
-            }
+      {actionStatus === null ? null : (
+        <Section>
+          <Text>{actionStatus}</Text>
+        </Section>
+      )}
 
-            muteMutation.mutate();
-          }}
-        >
-          {isMuted ? '🔔 Unmute' : '🔕 Mute 24h'}
-        </button>
-        <button type="button">⚙️ Filters</button>
-        <button type="button">📜 History</button>
-      </div>
-      <Link to="/wallets">Назад</Link>
+      <Section>
+        <div className="tma-actions">
+          <Button
+            type="button"
+            mode={isMuted ? 'gray' : 'filled'}
+            size="m"
+            stretched
+            disabled={isActionPending}
+            onClick={(): void => {
+              if (isMuted) {
+                unmuteMutation.mutate();
+                return;
+              }
+
+              muteMutation.mutate();
+            }}
+          >
+            {isMuted ? '🔔 Unmute' : '🔕 Mute 24h'}
+          </Button>
+          <Link to="/wallets" className="tma-link-reset">
+            <Button mode="outline" size="m" stretched>
+              Назад к списку
+            </Button>
+          </Link>
+        </div>
+      </Section>
     </section>
   );
 };

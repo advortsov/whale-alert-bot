@@ -1,4 +1,5 @@
 import React from 'react';
+import { Button, Card, Placeholder, Section, Text, Title } from '@telegram-apps/telegram-ui';
 import { Link } from 'react-router-dom';
 
 import { WalletCard } from '../components/WalletCard';
@@ -16,19 +17,22 @@ export const DashboardPage = (): React.JSX.Element => {
 
   if (initQuery.isError || initQuery.data === undefined) {
     return (
-      <section className="screen-panel">
-        <h1 className="screen-title">Не удалось загрузить dashboard</h1>
-        <p className="screen-text">
-          {errorMessage ?? 'Ошибка сети или недоступен endpoint /api/tma/init.'}
-        </p>
-        <button
-          type="button"
-          onClick={(): void => {
-            void initQuery.refetch();
-          }}
+      <section className="tma-screen tma-screen-centered">
+        <Placeholder
+          header="Не удалось загрузить dashboard"
+          description={errorMessage ?? 'Ошибка сети или недоступен endpoint /api/tma/init.'}
         >
-          Повторить
-        </button>
+          <Button
+            mode="filled"
+            size="m"
+            stretched
+            onClick={(): void => {
+              void initQuery.refetch();
+            }}
+          >
+            Повторить
+          </Button>
+        </Placeholder>
       </section>
     );
   }
@@ -36,19 +40,46 @@ export const DashboardPage = (): React.JSX.Element => {
   const wallets = initQuery.data.wallets.wallets;
 
   return (
-    <section style={{ display: 'grid', gap: 12 }}>
-      <h1>Whale Alert</h1>
-      <p>Алертов сегодня: {initQuery.data.todayAlertCount}</p>
-      <div style={{ display: 'grid', gap: 8 }}>
+    <section className="tma-screen">
+      <Section>
+        <Title level="1" weight="2">
+          Whale Alert
+        </Title>
+        <Card className="tma-card">
+          <Text>Алертов сегодня: {initQuery.data.todayAlertCount}</Text>
+        </Card>
+      </Section>
+
+      <Section header="Кошельки">
+        <div className="tma-grid">
+          {wallets.length === 0 ? (
+            <Placeholder header="Список пуст" description="Добавь первый кошелёк для отслеживания." />
+          ) : null}
         {wallets.slice(0, 5).map((wallet) => (
           <WalletCard key={wallet.walletId} wallet={wallet} />
         ))}
-      </div>
-      <div style={{ display: 'flex', gap: 12 }}>
-        <Link to="/wallets">Все кошельки</Link>
-        <Link to="/wallets/add">Добавить</Link>
-        <Link to="/settings">Настройки</Link>
-      </div>
+        </div>
+      </Section>
+
+      <Section>
+        <div className="tma-actions">
+          <Link to="/wallets" className="tma-link-reset">
+            <Button mode="filled" size="m" stretched>
+              Все кошельки
+            </Button>
+          </Link>
+          <Link to="/wallets/add" className="tma-link-reset">
+            <Button mode="bezeled" size="m" stretched>
+              Добавить
+            </Button>
+          </Link>
+          <Link to="/settings" className="tma-link-reset">
+            <Button mode="gray" size="m" stretched>
+              Настройки
+            </Button>
+          </Link>
+        </div>
+      </Section>
     </section>
   );
 };

@@ -1,4 +1,5 @@
 import React from 'react';
+import { Cell, Switch } from '@telegram-apps/telegram-ui';
 
 interface IFilterToggleProps {
   readonly label: string;
@@ -8,15 +9,16 @@ interface IFilterToggleProps {
 
 export const FilterToggle = ({ label, value, onChange }: IFilterToggleProps): React.JSX.Element => {
   return (
-    <label style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
-      <span>{label}</span>
-      <input
-        type="checkbox"
-        checked={value}
-        onChange={(event: React.ChangeEvent<HTMLInputElement>): void => {
-          onChange(event.target.checked);
-        }}
-      />
-    </label>
+    <Cell
+      before={<span className="tma-setting-label">{label}</span>}
+      after={
+        <Switch
+          checked={value}
+          onChange={(event: React.ChangeEvent<HTMLInputElement>): void => {
+            onChange(event.target.checked);
+          }}
+        />
+      }
+    />
   );
 };

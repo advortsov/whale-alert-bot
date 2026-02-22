@@ -1,10 +1,12 @@
 import React from 'react';
+import { Placeholder, Spinner } from '@telegram-apps/telegram-ui';
 
 export const LoadingSpinner = (): React.JSX.Element => {
   return (
-    <section className="screen-panel">
-      <h1 className="screen-title">Whale Alert</h1>
-      <p className="screen-text">Загружаю Mini App...</p>
+    <section className="tma-screen tma-screen-centered">
+      <Placeholder header="Whale Alert" description="Загружаю Mini App...">
+        <Spinner size="l" />
+      </Placeholder>
     </section>
   );
 };

@@ -1,4 +1,5 @@
 import React from 'react';
+import { AppRoot } from '@telegram-apps/telegram-ui';
 import { RouterProvider } from 'react-router-dom';
 
 import { AuthErrorPanel } from './components/AuthErrorPanel';
@@ -9,13 +10,17 @@ import { router } from './router';
 export const App = (): React.JSX.Element => {
   const { isReady, authError } = useAuth();
 
+  let content: React.JSX.Element = <RouterProvider router={router} />;
+
   if (!isReady) {
-    return <LoadingSpinner />;
+    content = <LoadingSpinner />;
+  } else if (authError !== null) {
+    content = <AuthErrorPanel message={authError} />;
   }
 
-  if (authError !== null) {
-    return <AuthErrorPanel message={authError} />;
-  }
-
-  return <RouterProvider router={router} />;
+  return (
+    <AppRoot appearance="dark" className="tma-app-root">
+      {content}
+    </AppRoot>
+  );
 };

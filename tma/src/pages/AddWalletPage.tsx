@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Button, Input, Placeholder, Section, Select, Title } from '@telegram-apps/telegram-ui';
 import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 
@@ -37,28 +38,54 @@ export const AddWalletPage = (): React.JSX.Element => {
   };
 
   return (
-    <section style={{ display: 'grid', gap: 12 }}>
-      <h1>Добавить кошелёк</h1>
-      <form onSubmit={onSubmit} style={{ display: 'grid', gap: 8 }}>
-        <label>
-          Chain
-          <select value={chainKey} onChange={(event): void => setChainKey(event.target.value)}>
+    <section className="tma-screen">
+      <Section>
+        <Title level="2" weight="2">
+          Добавить кошелёк
+        </Title>
+      </Section>
+      <Section>
+        <form onSubmit={onSubmit} className="tma-form">
+          <Select
+            header="Сеть"
+            value={chainKey}
+            onChange={(event: React.ChangeEvent<HTMLSelectElement>): void => {
+              setChainKey(event.target.value);
+            }}
+          >
             <option value="ethereum_mainnet">ETH</option>
             <option value="solana_mainnet">SOL</option>
             <option value="tron_mainnet">TRON</option>
-          </select>
-        </label>
-        <label>
-          Address
-          <input value={address} onChange={(event): void => setAddress(event.target.value)} />
-        </label>
-        <label>
-          Label
-          <input value={label} onChange={(event): void => setLabel(event.target.value)} />
-        </label>
-        <button type="submit">Добавить</button>
-      </form>
-      {addWalletMutation.isError ? <p>Не удалось добавить кошелек.</p> : null}
+          </Select>
+          <Input
+            header="Адрес"
+            value={address}
+            onChange={(event: React.ChangeEvent<HTMLInputElement>): void => {
+              setAddress(event.target.value);
+            }}
+            placeholder="Вставь адрес кошелька"
+          />
+          <Input
+            header="Label"
+            value={label}
+            onChange={(event: React.ChangeEvent<HTMLInputElement>): void => {
+              setLabel(event.target.value);
+            }}
+            placeholder="Необязательно"
+          />
+          <Button mode="filled" size="m" stretched type="submit" disabled={addWalletMutation.isPending}>
+            Добавить
+          </Button>
+        </form>
+      </Section>
+      {addWalletMutation.isError ? (
+        <Section>
+          <Placeholder
+            header="Не удалось добавить кошелёк"
+            description="Проверь адрес и попробуй снова."
+          />
+        </Section>
+      ) : null}
     </section>
   );
 };

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Button, Input, Placeholder, Section, Title } from '@telegram-apps/telegram-ui';
 import { useMutation, useQuery } from '@tanstack/react-query';
 
 import { loadSettings, updateSettings } from '../api/settings';
@@ -49,18 +50,26 @@ export const SettingsPage = (): React.JSX.Element => {
   }
 
   if (settingsQuery.isError) {
-    return <p>Не удалось загрузить настройки.</p>;
+    return (
+      <section className="tma-screen tma-screen-centered">
+        <Placeholder header="Не удалось загрузить настройки" description="Повтори попытку чуть позже." />
+      </section>
+    );
   }
 
   return (
-    <section style={{ display: 'grid', gap: 12 }}>
-      <h1>Настройки</h1>
+    <section className="tma-screen">
+      <Section>
+        <Title level="2" weight="2">
+          Настройки
+        </Title>
+      </Section>
 
-      <label>
-        Threshold USD
-        <input
+      <Section>
+        <Input
           type="number"
-          value={formState.thresholdUsd ?? ''}
+          header="Threshold USD"
+          value={String(formState.thresholdUsd ?? 0)}
           onChange={(event: React.ChangeEvent<HTMLInputElement>): void => {
             const parsed: number = Number.parseFloat(event.target.value);
             setFormState({
@@ -69,33 +78,40 @@ export const SettingsPage = (): React.JSX.Element => {
             });
           }}
         />
-      </label>
+        <FilterToggle
+          label="Transfer alerts"
+          value={formState.allowTransfer}
+          onChange={(nextValue: boolean): void => {
+            setFormState({ ...formState, allowTransfer: nextValue });
+          }}
+        />
+        <FilterToggle
+          label="Swap alerts"
+          value={formState.allowSwap}
+          onChange={(nextValue: boolean): void => {
+            setFormState({ ...formState, allowSwap: nextValue });
+          }}
+        />
+      </Section>
 
-      <FilterToggle
-        label="Transfer alerts"
-        value={formState.allowTransfer}
-        onChange={(nextValue: boolean): void => {
-          setFormState({ ...formState, allowTransfer: nextValue });
-        }}
-      />
-      <FilterToggle
-        label="Swap alerts"
-        value={formState.allowSwap}
-        onChange={(nextValue: boolean): void => {
-          setFormState({ ...formState, allowSwap: nextValue });
-        }}
-      />
-
-      <button
-        type="button"
-        onClick={(): void => {
-          void updateMutation.mutateAsync(formState);
-        }}
-      >
-        Сохранить
-      </button>
-      {updateMutation.isError ? <p>Ошибка сохранения.</p> : null}
-      {updateMutation.isSuccess ? <p>Сохранено.</p> : null}
+      <Section>
+        <Button
+          type="button"
+          mode="filled"
+          size="m"
+          stretched
+          disabled={updateMutation.isPending}
+          onClick={(): void => {
+            void updateMutation.mutateAsync(formState);
+          }}
+        >
+          Сохранить
+        </Button>
+        {updateMutation.isError ? (
+          <Placeholder header="Ошибка" description="Не удалось сохранить настройки." />
+        ) : null}
+        {updateMutation.isSuccess ? <Placeholder header="Готово" description="Сохранено." /> : null}
+      </Section>
     </section>
   );
 };

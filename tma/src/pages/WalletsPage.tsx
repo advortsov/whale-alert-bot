@@ -1,4 +1,5 @@
 import React from 'react';
+import { Button, Placeholder, Section, Title } from '@telegram-apps/telegram-ui';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 
@@ -25,18 +26,37 @@ export const WalletsPage = (): React.JSX.Element => {
   }
 
   if (walletsQuery.isError || walletsQuery.data === undefined) {
-    return <p>Не удалось загрузить кошельки.</p>;
+    return (
+      <section className="tma-screen tma-screen-centered">
+        <Placeholder header="Не удалось загрузить кошельки" description="Проверь сеть и попробуй снова." />
+      </section>
+    );
   }
 
   return (
-    <section style={{ display: 'grid', gap: 12 }}>
-      <h1>Кошельки</h1>
-      <div style={{ display: 'grid', gap: 8 }}>
+    <section className="tma-screen">
+      <Section>
+        <Title level="2" weight="2">
+          Кошельки
+        </Title>
+      </Section>
+      <Section>
+        <div className="tma-grid">
+          {walletsQuery.data.length === 0 ? (
+            <Placeholder header="Нет кошельков" description="Добавь новый адрес для отслеживания." />
+          ) : null}
         {walletsQuery.data.map((wallet) => (
           <WalletCard key={wallet.walletId} wallet={wallet} />
         ))}
-      </div>
-      <Link to="/wallets/add">+ Добавить кошелёк</Link>
+        </div>
+      </Section>
+      <Section>
+        <Link to="/wallets/add" className="tma-link-reset">
+          <Button mode="filled" size="m" stretched>
+            + Добавить кошелёк
+          </Button>
+        </Link>
+      </Section>
     </section>
   );
 };
