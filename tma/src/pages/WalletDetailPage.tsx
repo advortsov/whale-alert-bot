@@ -5,7 +5,7 @@ import { Link, useParams } from 'react-router-dom';
 import { loadWalletById, loadWalletHistory } from '../api/wallets';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { useAuth } from '../hooks/useAuth';
-import type { IWalletHistoryResult, IWalletItem } from '../types/api.types';
+import type { IWalletDetailDto, IWalletHistoryResult } from '../types/api.types';
 
 const DEFAULT_HISTORY_OFFSET: number = 0;
 const DEFAULT_HISTORY_LIMIT: number = 20;
@@ -15,9 +15,9 @@ export const WalletDetailPage = (): React.JSX.Element => {
   const walletId: number = Number.parseInt(params.id ?? '', 10);
   const { apiClient, isReady } = useAuth();
 
-  const walletQuery: UseQueryResult<IWalletItem> = useQuery<IWalletItem>({
+  const walletQuery: UseQueryResult<IWalletDetailDto> = useQuery<IWalletDetailDto>({
     queryKey: ['wallet', walletId],
-    queryFn: async (): Promise<IWalletItem> => {
+    queryFn: async (): Promise<IWalletDetailDto> => {
       return loadWalletById(apiClient, walletId);
     },
     enabled: isReady && Number.isInteger(walletId),
@@ -50,7 +50,7 @@ export const WalletDetailPage = (): React.JSX.Element => {
 
   return (
     <section style={{ display: 'grid', gap: 12 }}>
-      <h1>Кошелёк #{walletQuery.data.id}</h1>
+      <h1>Кошелёк #{walletQuery.data.walletId}</h1>
       <p>Chain: {walletQuery.data.chainKey}</p>
       <p>Address: {walletQuery.data.address}</p>
       <p>Label: {walletQuery.data.label ?? '-'}</p>

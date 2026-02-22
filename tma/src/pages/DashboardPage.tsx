@@ -41,7 +41,7 @@ export const DashboardPage = (): React.JSX.Element => {
       <p>Алертов сегодня: {initQuery.data.todayAlertCount}</p>
       <div style={{ display: 'grid', gap: 8 }}>
         {wallets.slice(0, 5).map((wallet) => (
-          <WalletCard key={wallet.id} wallet={wallet} />
+          <WalletCard key={wallet.walletId} wallet={wallet} />
         ))}
       </div>
       <div style={{ display: 'flex', gap: 12 }}>

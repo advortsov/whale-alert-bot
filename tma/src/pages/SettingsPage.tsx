@@ -25,14 +25,16 @@ export const SettingsPage = (): React.JSX.Element => {
     }
 
     setFormState({
-      thresholdUsd: settingsQuery.data.thresholdUsd,
-      minAmountUsd: settingsQuery.data.minAmountUsd,
-      quietHoursFrom: settingsQuery.data.quietHoursFrom,
-      quietHoursTo: settingsQuery.data.quietHoursTo,
-      timezone: settingsQuery.data.timezone,
-      cexFlowMode: settingsQuery.data.cexFlowMode,
-      transferEnabled: settingsQuery.data.transferEnabled,
-      swapEnabled: settingsQuery.data.swapEnabled,
+      thresholdUsd: settingsQuery.data.settings.thresholdUsd,
+      quietHoursFrom: settingsQuery.data.settings.quietHoursFrom,
+      quietHoursTo: settingsQuery.data.settings.quietHoursTo,
+      timezone: settingsQuery.data.settings.timezone,
+      cexFlowMode: settingsQuery.data.settings.cexFlowMode,
+      smartFilterType: settingsQuery.data.settings.smartFilterType,
+      includeDexes: settingsQuery.data.settings.includeDexes,
+      excludeDexes: settingsQuery.data.settings.excludeDexes,
+      allowTransfer: settingsQuery.data.preferences.allowTransfer,
+      allowSwap: settingsQuery.data.preferences.allowSwap,
     });
   }, [settingsQuery.data]);
 
@@ -63,7 +65,7 @@ export const SettingsPage = (): React.JSX.Element => {
             const parsed: number = Number.parseFloat(event.target.value);
             setFormState({
               ...formState,
-              thresholdUsd: Number.isFinite(parsed) ? parsed : null,
+              thresholdUsd: Number.isFinite(parsed) ? parsed : 0,
             });
           }}
         />
@@ -71,16 +73,16 @@ export const SettingsPage = (): React.JSX.Element => {
 
       <FilterToggle
         label="Transfer alerts"
-        value={formState.transferEnabled}
+        value={formState.allowTransfer}
         onChange={(nextValue: boolean): void => {
-          setFormState({ ...formState, transferEnabled: nextValue });
+          setFormState({ ...formState, allowTransfer: nextValue });
         }}
       />
       <FilterToggle
         label="Swap alerts"
-        value={formState.swapEnabled}
+        value={formState.allowSwap}
         onChange={(nextValue: boolean): void => {
-          setFormState({ ...formState, swapEnabled: nextValue });
+          setFormState({ ...formState, allowSwap: nextValue });
         }}
       />
 

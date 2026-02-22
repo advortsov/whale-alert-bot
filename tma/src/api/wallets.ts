@@ -1,18 +1,25 @@
 import type { ApiClient } from './client';
 import type {
   ITrackWalletRequest,
+  ITrackWalletResult,
+  IWalletDetailDto,
   IWalletHistoryResult,
-  IWalletItem,
   IWalletListResult,
+  IWalletSummaryDto,
 } from '../types/api.types';
 
-export const loadWallets = async (apiClient: ApiClient): Promise<readonly IWalletItem[]> => {
+export const loadWallets = async (
+  apiClient: ApiClient,
+): Promise<readonly IWalletSummaryDto[]> => {
   const result: IWalletListResult = await apiClient.request<IWalletListResult>('GET', '/api/wallets');
   return result.wallets;
 };
 
-export const loadWalletById = async (apiClient: ApiClient, walletId: number): Promise<IWalletItem> => {
-  return apiClient.request<IWalletItem>('GET', `/api/wallets/${walletId}`);
+export const loadWalletById = async (
+  apiClient: ApiClient,
+  walletId: number,
+): Promise<IWalletDetailDto> => {
+  return apiClient.request<IWalletDetailDto>('GET', `/api/wallets/${walletId}`);
 };
 
 export const loadWalletHistory = async (
@@ -35,6 +42,6 @@ export const loadWalletHistory = async (
 export const addWallet = async (
   apiClient: ApiClient,
   request: ITrackWalletRequest,
-): Promise<IWalletItem> => {
-  return apiClient.request<IWalletItem>('POST', '/api/wallets', request);
+): Promise<ITrackWalletResult> => {
+  return apiClient.request<ITrackWalletResult>('POST', '/api/wallets', request);
 };

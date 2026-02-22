@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { addWallet } from '../api/wallets';
 import { useAuth } from '../hooks/useAuth';
-import type { ITrackWalletRequest, IWalletItem } from '../types/api.types';
+import type { ITrackWalletRequest, ITrackWalletResult } from '../types/api.types';
 
 const DEFAULT_CHAIN_KEY: string = 'ethereum_mainnet';
 
@@ -16,11 +16,11 @@ export const AddWalletPage = (): React.JSX.Element => {
   const [label, setLabel] = useState<string>('');
 
   const addWalletMutation = useMutation({
-    mutationFn: async (payload: ITrackWalletRequest): Promise<IWalletItem> => {
+    mutationFn: async (payload: ITrackWalletRequest): Promise<ITrackWalletResult> => {
       return addWallet(apiClient, payload);
     },
-    onSuccess: (wallet: IWalletItem): void => {
-      void navigate(`/wallets/${wallet.id}`);
+    onSuccess: (wallet: ITrackWalletResult): void => {
+      void navigate(`/wallets/${wallet.walletId}`);
     },
   });
 

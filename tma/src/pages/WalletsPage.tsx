@@ -6,13 +6,15 @@ import { loadWallets } from '../api/wallets';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { WalletCard } from '../components/WalletCard';
 import { useAuth } from '../hooks/useAuth';
-import type { IWalletItem } from '../types/api.types';
+import type { IWalletSummaryDto } from '../types/api.types';
 
 export const WalletsPage = (): React.JSX.Element => {
   const { apiClient, isReady } = useAuth();
-  const walletsQuery: UseQueryResult<readonly IWalletItem[]> = useQuery<readonly IWalletItem[]>({
+  const walletsQuery: UseQueryResult<readonly IWalletSummaryDto[]> = useQuery<
+    readonly IWalletSummaryDto[]
+  >({
     queryKey: ['wallets'],
-    queryFn: async (): Promise<readonly IWalletItem[]> => {
+    queryFn: async (): Promise<readonly IWalletSummaryDto[]> => {
       return loadWallets(apiClient);
     },
     enabled: isReady,
@@ -31,7 +33,7 @@ export const WalletsPage = (): React.JSX.Element => {
       <h1>Кошельки</h1>
       <div style={{ display: 'grid', gap: 8 }}>
         {walletsQuery.data.map((wallet) => (
-          <WalletCard key={wallet.id} wallet={wallet} />
+          <WalletCard key={wallet.walletId} wallet={wallet} />
         ))}
       </div>
       <Link to="/wallets/add">+ Добавить кошелёк</Link>

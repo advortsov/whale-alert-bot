@@ -3,33 +3,55 @@ export interface ITokens {
   readonly refreshToken: string;
 }
 
-export interface IWalletItem {
-  readonly id: number;
+export interface IWalletSummaryDto {
+  readonly walletId: number;
   readonly chainKey: string;
   readonly address: string;
   readonly label: string | null;
-  readonly mutedUntil: string | null;
+  readonly createdAt: string;
 }
 
 export interface IWalletListResult {
-  readonly wallets: readonly IWalletItem[];
+  readonly wallets: readonly IWalletSummaryDto[];
+  readonly totalCount: number;
 }
 
-export interface IUserSettingsResult {
-  readonly thresholdUsd: number | null;
-  readonly minAmountUsd: number | null;
+export interface IUserAlertPreferencesDto {
+  readonly minAmount: number;
+  readonly allowTransfer: boolean;
+  readonly allowSwap: boolean;
+  readonly mutedUntil: string | null;
+}
+
+export interface IUserAlertSettingsDto {
+  readonly thresholdUsd: number;
+  readonly minAmountUsd: number;
+  readonly cexFlowMode: string;
+  readonly smartFilterType: string;
+  readonly includeDexes: readonly string[];
+  readonly excludeDexes: readonly string[];
   readonly quietHoursFrom: string | null;
   readonly quietHoursTo: string | null;
   readonly timezone: string;
-  readonly cexFlowMode: string;
-  readonly transferEnabled: boolean;
-  readonly swapEnabled: boolean;
+}
+
+export interface IUserSettingsResult {
+  readonly preferences: IUserAlertPreferencesDto;
+  readonly settings: IUserAlertSettingsDto;
 }
 
 export interface ITmaInitResult {
   readonly wallets: IWalletListResult;
   readonly settings: IUserSettingsResult;
   readonly todayAlertCount: number;
+}
+
+export interface IWalletDetailDto {
+  readonly walletId: number;
+  readonly chainKey: string;
+  readonly address: string;
+  readonly label: string | null;
+  readonly activeMute: string | null;
 }
 
 export interface IWalletHistoryItem {
@@ -45,6 +67,14 @@ export interface IWalletHistoryResult {
   readonly nextOffset: number | null;
 }
 
+export interface ITrackWalletResult {
+  readonly walletId: number;
+  readonly address: string;
+  readonly label: string | null;
+  readonly chainKey: string;
+  readonly isNewSubscription: boolean;
+}
+
 export interface ITrackWalletRequest {
   readonly chainKey: string;
   readonly address: string;
@@ -52,12 +82,15 @@ export interface ITrackWalletRequest {
 }
 
 export interface IUpdateSettingsRequest {
-  readonly thresholdUsd: number | null;
-  readonly minAmountUsd: number | null;
+  readonly thresholdUsd?: number;
+  readonly mutedMinutes?: number | null;
+  readonly cexFlowMode?: string;
+  readonly smartFilterType?: string;
+  readonly includeDexes?: readonly string[];
+  readonly excludeDexes?: readonly string[];
   readonly quietHoursFrom: string | null;
   readonly quietHoursTo: string | null;
   readonly timezone: string;
-  readonly cexFlowMode: string;
-  readonly transferEnabled: boolean;
-  readonly swapEnabled: boolean;
+  readonly allowTransfer: boolean;
+  readonly allowSwap: boolean;
 }
