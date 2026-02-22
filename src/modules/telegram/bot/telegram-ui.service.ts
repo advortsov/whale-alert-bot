@@ -296,7 +296,7 @@ export class TelegramUiService {
   }
 
   public buildReplyOptions(): ReplyOptions {
-    const appUrl: string | null = this.resolveTmaBaseUrl();
+    const appUrl: string | null = this.resolveTmaRootUrl();
     const rows: (string | KeyboardButton)[][] = [
       ['➕ Добавить адрес', '📋 Мой список', '📜 История'],
       ['⚙️ Фильтры', '📈 Статус', '❓ Помощь'],
@@ -348,7 +348,7 @@ export class TelegramUiService {
   }
 
   public buildAppEntryResult(): CommandExecutionResult {
-    const appUrl: string | null = this.resolveTmaBaseUrl();
+    const appUrl: string | null = this.resolveTmaRootUrl();
 
     if (appUrl === null) {
       return {
@@ -485,5 +485,15 @@ export class TelegramUiService {
     }
 
     return configuredUrlRaw.replace(/\/+$/, '');
+  }
+
+  private resolveTmaRootUrl(): string | null {
+    const baseUrl: string | null = this.resolveTmaBaseUrl();
+
+    if (baseUrl === null) {
+      return null;
+    }
+
+    return `${baseUrl}/`;
   }
 }

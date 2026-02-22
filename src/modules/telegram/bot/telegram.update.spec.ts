@@ -192,7 +192,7 @@ describe('TelegramUpdate', (): void => {
             {
               text: '📱 Открыть приложение',
               web_app: {
-                url: 'https://1303118-cr22992.tw1.ru/tma',
+                url: 'https://1303118-cr22992.tw1.ru/tma/',
               },
             },
           ],
@@ -238,7 +238,7 @@ describe('TelegramUpdate', (): void => {
             {
               text: '📱 Открыть приложение',
               web_app: {
-                url: 'https://1303118-cr22992.tw1.ru/tma',
+                url: 'https://1303118-cr22992.tw1.ru/tma/',
               },
             },
           ],

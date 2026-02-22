@@ -15,7 +15,7 @@
 
 ```env
 TMA_ENABLED=true
-TMA_BASE_URL=https://1303118-cr22992.tw1.ru/tma
+TMA_BASE_URL=https://1303118-cr22992.tw1.ru/tma/
 TMA_BOT_USERNAME=whale_alert_test_bot
 TMA_ALLOWED_ORIGINS=https://1303118-cr22992.tw1.ru
 ```
@@ -24,8 +24,9 @@ TMA_ALLOWED_ORIGINS=https://1303118-cr22992.tw1.ru
 
 1. `TMA_ENABLED=false` по умолчанию, чтобы не ломать текущий runtime.
 2. `TMA_BASE_URL` используется для `web_app` кнопок (`/app`, `/wallet #id`).
-3. `TMA_BOT_USERNAME` используется для deep-link кнопки `📱 TMA` в live-alert.
-4. `TMA_ALLOWED_ORIGINS` дополняет CORS allow-list.
+3. Бот принудительно использует root URL с завершающим `/`, чтобы не было `302` редиректа и потери `initData`.
+4. `TMA_BOT_USERNAME` используется для deep-link кнопки `📱 TMA` в live-alert.
+5. `TMA_ALLOWED_ORIGINS` дополняет CORS allow-list.
 
 ## 3. Локальная проверка
 

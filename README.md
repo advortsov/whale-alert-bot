@@ -498,8 +498,9 @@ npm run build
 
 Для корректной работы нужны:
 
-1. `TMA_BASE_URL` — публичный URL Mini App (например `https://domain/tma`).
-2. `TMA_BOT_USERNAME` — username бота для deep-link из алертов.
+1. `TMA_BASE_URL` — публичный URL Mini App (например `https://domain/tma` или `https://domain/tma/`).
+2. Для кнопок `web_app` бот теперь всегда отдает URL с завершающим `/`, чтобы избежать `302 /tma -> /tma/` и потери Telegram launch-параметров (`initData`).
+3. `TMA_BOT_USERNAME` — username бота для deep-link из алертов.
 
 ## CI
 
