@@ -117,3 +117,4 @@ location /tma/ {
 3. `POST https://<domain>/api/auth/tma` отвечает (для пустого body ожидаемо `400`, но не `404`/`502`).
 4. На сервере после деплоя существует `/opt/whale-alert-bot/tma/dist`.
 5. В логах app нет ошибок `TMA auth` и `CORS`.
+6. Если есть `400 Invalid Telegram TMA hash`, проверь запуск только через `web_app` кнопки бота; сервер умеет обрабатывать частый кейс `query_id` с пробелами вместо `+`, но корректный источник — Telegram launch params.

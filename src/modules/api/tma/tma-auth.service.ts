@@ -79,12 +79,22 @@ export class TmaAuthService {
 
     for (const [key, value] of params.entries()) {
       if (key !== 'hash') {
-        entries.push([key, value]);
+        entries.push([key, this.normalizeValueForHash(key, value)]);
       }
     }
 
     entries.sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey));
     return entries.map(([key, value]) => `${key}=${value}`).join('\n');
+  }
+
+  private normalizeValueForHash(key: string, value: string): string {
+    if (key !== 'query_id') {
+      return value;
+    }
+
+    // Некоторые клиенты могут передать query_id с пробелами вместо "+".
+    // Для проверки Telegram hash восстанавливаем исходный вид query_id.
+    return value.replaceAll(' ', '+');
   }
 
   private hashesEqual(leftHashHex: string, rightHashHex: string): boolean {

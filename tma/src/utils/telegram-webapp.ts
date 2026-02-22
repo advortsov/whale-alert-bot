@@ -45,21 +45,47 @@ export const getStartParam = (): string | null => {
 };
 
 const readParamFromLocation = (paramName: string): string | null => {
-  const searchParams: URLSearchParams = new URLSearchParams(window.location.search);
-  const valueFromSearch: string | null = searchParams.get(paramName);
+  const valueFromSearch: string | null = readRawParam(window.location.search, paramName);
 
   if (valueFromSearch !== null && valueFromSearch.trim().length > 0) {
     return valueFromSearch;
   }
 
-  const hashRaw: string = window.location.hash.startsWith('#')
-    ? window.location.hash.slice(1)
-    : window.location.hash;
-  const hashParams: URLSearchParams = new URLSearchParams(hashRaw);
-  const valueFromHash: string | null = hashParams.get(paramName);
+  const valueFromHash: string | null = readRawParam(window.location.hash, paramName);
 
   if (valueFromHash !== null && valueFromHash.trim().length > 0) {
     return valueFromHash;
+  }
+
+  return null;
+};
+
+const readRawParam = (source: string, paramName: string): string | null => {
+  const normalizedSource: string =
+    source.startsWith('?') || source.startsWith('#') ? source.slice(1) : source;
+
+  if (normalizedSource.length === 0) {
+    return null;
+  }
+
+  const parts: string[] = normalizedSource.split('&');
+  const keyPrefix: string = `${paramName}=`;
+
+  for (const part of parts) {
+    if (!part.startsWith(keyPrefix)) {
+      continue;
+    }
+
+    const rawValue: string = part.slice(keyPrefix.length);
+    if (rawValue.length === 0) {
+      return null;
+    }
+
+    try {
+      return decodeURIComponent(rawValue);
+    } catch {
+      return rawValue;
+    }
   }
 
   return null;

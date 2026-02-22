@@ -20,11 +20,12 @@ const buildSignedInitData = (
   botToken: string,
   userSeed: ITmaUserSeed,
   authDate: number = Math.floor(Date.now() / 1000),
+  queryId: string = 'test-query-id',
 ): string => {
   const userJson: string = JSON.stringify(userSeed);
   const fields: Record<string, string> = {
     auth_date: String(authDate),
-    query_id: 'test-query-id',
+    query_id: queryId,
     user: userJson,
   };
   const dataCheckString: string = Object.entries(fields)
@@ -64,6 +65,24 @@ describe('TmaAuthService', () => {
   it('returns jwt tokens for valid initData', async (): Promise<void> => {
     const initData: string = buildSignedInitData(BOT_TOKEN, { id: 12345, username: 'alice' });
     const tokens = await service.loginWithInitData(initData);
+
+    expect(tokens.accessToken).toBeDefined();
+    expect(tokens.refreshToken).toBeDefined();
+    expect(usersRepositoryStub.findOrCreate).toHaveBeenCalledWith('12345', 'alice');
+  });
+
+  it('returns jwt tokens when query_id contains spaces instead of plus', async (): Promise<void> => {
+    const validInitData: string = buildSignedInitData(
+      BOT_TOKEN,
+      { id: 12345, username: 'alice' },
+      Math.floor(Date.now() / 1000),
+      'query+with+plus',
+    );
+    const params: URLSearchParams = new URLSearchParams(validInitData);
+    params.set('query_id', 'query with plus');
+    const brokenInitData: string = params.toString();
+
+    const tokens = await service.loginWithInitData(brokenInitData);
 
     expect(tokens.accessToken).toBeDefined();
     expect(tokens.refreshToken).toBeDefined();
