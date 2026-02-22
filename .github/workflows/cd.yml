@@ -25,7 +25,8 @@ jobs:
             cd /opt/whale-alert-bot
             git fetch origin main
             git reset --hard origin/main
-            docker run --rm -v /opt/whale-alert-bot/tma:/app -w /app node:22-alpine sh -lc "npm ci --no-audit --no-fund && npm run build"
-            docker compose -f docker-compose.prod.yml up --build -d
+            docker run --rm -v /opt/whale-alert-bot/tma:/app -w /app node:22-alpine sh -lc "rm -rf dist && npm ci --no-audit --no-fund && npm run build"
+            docker compose -f docker-compose.prod.yml up -d postgres prometheus grafana
+            docker compose -f docker-compose.prod.yml up --build -d --force-recreate app
             sleep 15
             curl -sf http://localhost:3000/health || echo "Health check failed"

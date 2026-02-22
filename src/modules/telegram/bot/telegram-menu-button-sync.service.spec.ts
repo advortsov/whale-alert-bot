@@ -7,6 +7,7 @@ import type { AppConfigService } from '../../../config/app-config.service';
 interface IAppConfigServiceStub {
   readonly telegramEnabled: boolean;
   readonly tmaBaseUrl: string | null;
+  readonly appVersion: string;
 }
 
 interface ITelegramStub {
@@ -30,6 +31,7 @@ const createService = (params: {
   const appConfigServiceStub: IAppConfigServiceStub = {
     telegramEnabled: params.telegramEnabled,
     tmaBaseUrl: params.tmaRootUrl,
+    appVersion: '0.1.0-test',
   };
 
   return new TelegramMenuButtonSyncService(
@@ -55,7 +57,7 @@ describe('TelegramMenuButtonSyncService', (): void => {
         type: 'web_app',
         text: '🚀 Mini App',
         web_app: {
-          url: 'https://1303118-cr22992.tw1.ru/tma/',
+          url: 'https://1303118-cr22992.tw1.ru/tma/?v=0.1.0-test',
         },
       },
     });

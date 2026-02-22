@@ -192,7 +192,7 @@ describe('TelegramUpdate', (): void => {
             {
               text: '📱 Открыть приложение',
               web_app: {
-                url: 'https://1303118-cr22992.tw1.ru/tma/',
+                url: 'https://1303118-cr22992.tw1.ru/tma/?v=0.1.0-test',
               },
             },
           ],
@@ -238,7 +238,7 @@ describe('TelegramUpdate', (): void => {
             {
               text: '📱 Открыть приложение',
               web_app: {
-                url: 'https://1303118-cr22992.tw1.ru/tma/',
+                url: 'https://1303118-cr22992.tw1.ru/tma/?v=0.1.0-test',
               },
             },
           ],
@@ -368,7 +368,7 @@ describe('TelegramUpdate', (): void => {
         row.some(
           (button) =>
             button.text === '📱 Открыть в TMA' &&
-            button.web_app?.url === 'https://1303118-cr22992.tw1.ru/tma/wallets/16',
+            button.web_app?.url === 'https://1303118-cr22992.tw1.ru/tma/wallets/16?v=0.1.0-test',
         ),
       ) ?? false;
     expect(hasTmaWalletButton).toBe(true);

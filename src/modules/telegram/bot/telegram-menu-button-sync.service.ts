@@ -3,6 +3,7 @@ import { InjectBot } from 'nestjs-telegraf';
 import type { Telegraf } from 'telegraf';
 import type { MenuButton } from 'telegraf/types';
 
+import { appendVersionQuery } from './telegram-webapp-url.util';
 import { AppConfigService } from '../../../config/app-config.service';
 
 @Injectable()
@@ -49,6 +50,7 @@ export class TelegramMenuButtonSyncService implements OnModuleInit {
       return null;
     }
 
-    return `${configuredUrlRaw.trim().replace(/\/+$/, '')}/`;
+    const baseUrl: string = `${configuredUrlRaw.trim().replace(/\/+$/, '')}/`;
+    return appendVersionQuery(baseUrl, this.appConfigService.appVersion);
   }
 }

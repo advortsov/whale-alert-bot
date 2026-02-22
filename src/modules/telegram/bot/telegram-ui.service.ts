@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Markup } from 'telegraf';
 import type { InlineKeyboardButton, KeyboardButton } from 'telegraf/types';
 
+import { appendVersionQuery } from './telegram-webapp-url.util';
 import {
   CALLBACK_HISTORY_LIMIT,
   ELLIPSIS_LENGTH,
@@ -469,21 +470,20 @@ export class TelegramUiService {
 
   private buildWalletAppUrl(walletId: number): string | null {
     const baseUrl: string | null = this.resolveTmaBaseUrl();
-
     if (baseUrl === null) {
       return null;
     }
-
-    return `${baseUrl}/wallets/${String(walletId)}`;
+    return appendVersionQuery(
+      `${baseUrl}/wallets/${String(walletId)}`,
+      this.appConfigService.appVersion,
+    );
   }
 
   private resolveTmaBaseUrl(): string | null {
     const configuredUrlRaw: string | null | undefined = this.appConfigService.tmaBaseUrl;
-
     if (typeof configuredUrlRaw !== 'string' || configuredUrlRaw.trim().length === 0) {
       return null;
     }
-
     return configuredUrlRaw.replace(/\/+$/, '');
   }
 
@@ -494,6 +494,6 @@ export class TelegramUiService {
       return null;
     }
 
-    return `${baseUrl}/`;
+    return appendVersionQuery(`${baseUrl}/`, this.appConfigService.appVersion);
   }
 }

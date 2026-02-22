@@ -64,10 +64,11 @@ fi
 
 # Сборка и запуск
 echo "==> Сборка TMA (React SPA)..."
-docker run --rm -v "${DEPLOY_DIR}/tma:/app" -w /app node:22-alpine sh -lc "npm ci --no-audit --no-fund && npm run build"
+docker run --rm -v "${DEPLOY_DIR}/tma:/app" -w /app node:22-alpine sh -lc "rm -rf dist && npm ci --no-audit --no-fund && npm run build"
 
 echo "==> Сборка и запуск контейнеров..."
-docker compose -f "${COMPOSE_FILE}" up --build -d
+docker compose -f "${COMPOSE_FILE}" up -d postgres prometheus grafana
+docker compose -f "${COMPOSE_FILE}" up --build -d --force-recreate app
 
 echo "==> Ожидание запуска (15 сек)..."
 sleep 15
