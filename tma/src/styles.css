@@ -1,4 +1,5 @@
 :root {
+  color-scheme: dark;
   --tg-theme-bg-color: #0f1116;
   --tg-theme-text-color: #f2f4f7;
   --tg-theme-hint-color: #9aa4b2;
@@ -82,6 +83,44 @@ a {
   align-items: center;
 }
 
+.tma-chain-badge {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  width: fit-content;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.tma-chain-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.tma-chain-icon--eth {
+  background: #627eea;
+}
+
+.tma-chain-icon--sol {
+  background: linear-gradient(135deg, #14f195 0%, #9945ff 100%);
+}
+
+.tma-chain-icon--tron {
+  background: #ef0027;
+}
+
+.tma-chain-icon--default {
+  background: #6b7280;
+}
+
 .tma-chain-avatar {
   display: inline-flex;
   align-items: center;
@@ -89,7 +128,7 @@ a {
   width: 28px;
   height: 28px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .tma-card {

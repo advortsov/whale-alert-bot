@@ -16,6 +16,7 @@ import {
 import { Link, useParams } from 'react-router-dom';
 
 import { loadWalletById, loadWalletHistory, muteWallet, unmuteWallet } from '../api/wallets';
+import { ChainBadge } from '../components/ChainBadge';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { useAuth } from '../hooks/useAuth';
 import type { IWalletDetailDto, IWalletHistoryResult } from '../types/api.types';
@@ -118,6 +119,7 @@ export const WalletDetailPage = (): React.JSX.Element => {
         <Title level="2" weight="2">
           Кошелёк #{walletQuery.data.walletId}
         </Title>
+        <ChainBadge chainKey={walletQuery.data.chainKey} />
         <Text>{walletQuery.data.label ?? 'Без label'}</Text>
       </Section>
 
