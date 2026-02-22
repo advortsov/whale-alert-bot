@@ -11,6 +11,10 @@ Telegram-бот на `NestJS + TypeScript` для отслеживания ак�
 - SQL миграции: Postgrator (`checksum` включен)
 - Тесты: `vitest`
 
+## Roadmap
+
+- План внедрения Telegram Mini App (TMA): `docs/roadmaps/tma-implementation-plan.md`
+
 ## Команды бота
 
 - `/track <eth|sol|tron> <address> [label]` - добавить кошелек в отслеживание.
