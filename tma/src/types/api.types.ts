@@ -75,6 +75,16 @@ export interface ITrackWalletResult {
   readonly isNewSubscription: boolean;
 }
 
+export interface IMuteWalletResult {
+  readonly walletId: number;
+  readonly mutedUntil: string;
+}
+
+export interface IUnmuteWalletResult {
+  readonly walletId: number;
+  readonly mutedUntil: null;
+}
+
 export interface ITrackWalletRequest {
   readonly chainKey: string;
   readonly address: string;

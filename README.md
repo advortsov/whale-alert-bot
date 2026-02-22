@@ -16,6 +16,17 @@ Telegram-бот на `NestJS + TypeScript` для отслеживания ак�
 - План внедрения Telegram Mini App (TMA): `docs/roadmaps/tma-implementation-plan.md`
 - Runbook деплоя и эксплуатации TMA: `docs/tma-runbook.md`
 
+## TMA (текущее состояние)
+
+- Списки кошельков и карточка кошелька используют backend `walletId` без промежуточных alias.
+- Из карточки кошелька в TMA доступен рабочий toggle:
+  - `🔕 Mute 24h` -> `POST /api/wallets/:id/mute`
+  - `🔔 Unmute` -> `DELETE /api/wallets/:id/mute`
+- После mute/unmute TMA обновляет:
+  - `['wallet', walletId]`
+  - `['wallets']`
+  - `['tma-init']`
+
 ## Команды бота
 
 - `/track <eth|sol|tron> <address> [label]` - добавить кошелек в отслеживание.

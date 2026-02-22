@@ -1,7 +1,9 @@
 import type { ApiClient } from './client';
 import type {
+  IMuteWalletResult,
   ITrackWalletRequest,
   ITrackWalletResult,
+  IUnmuteWalletResult,
   IWalletDetailDto,
   IWalletHistoryResult,
   IWalletListResult,
@@ -44,4 +46,21 @@ export const addWallet = async (
   request: ITrackWalletRequest,
 ): Promise<ITrackWalletResult> => {
   return apiClient.request<ITrackWalletResult>('POST', '/api/wallets', request);
+};
+
+export const muteWallet = async (
+  apiClient: ApiClient,
+  walletId: number,
+  minutes: number,
+): Promise<IMuteWalletResult> => {
+  return apiClient.request<IMuteWalletResult>('POST', `/api/wallets/${walletId}/mute`, {
+    minutes,
+  });
+};
+
+export const unmuteWallet = async (
+  apiClient: ApiClient,
+  walletId: number,
+): Promise<IUnmuteWalletResult> => {
+  return apiClient.request<IUnmuteWalletResult>('DELETE', `/api/wallets/${walletId}/mute`);
 };
