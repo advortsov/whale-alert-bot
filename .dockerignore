@@ -16,3 +16,5 @@ dist-test
 graph.png
 madge-report.json
 plan.txt
+tma/node_modules
+tma/dist

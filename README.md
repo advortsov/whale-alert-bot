@@ -455,6 +455,26 @@ npm run test:telegram:harness
 - Не дергать `getUpdates` вручную (через `curl`), пока бот запущен в polling.
 - Иначе Telegram вернет `409 Conflict`, и polling-процесс бота остановится.
 
+## Telegram Mini App (TMA, phase 2)
+
+В репозитории добавлен отдельный SPA-проект в `/Users/advortsov/pet/whale-alert-bot/tma`:
+
+1. Стек: `React 19`, `Vite 6`, `@telegram-apps/sdk-react`, `@tanstack/react-query`, `react-router-dom`.
+2. Базовые страницы: `Dashboard`, `Wallets`, `WalletDetail`, `Settings`, `AddWallet`.
+3. Реализован TMA auth flow:
+   `initDataRaw -> POST /api/auth/tma -> JWT -> запросы к API`.
+4. Реализован deep-link парсинг `startapp=wallet_<id>` с переходом на карточку кошелька.
+5. Базовый build фронтенда:
+
+```bash
+cd tma
+npm install
+npm run build
+```
+
+По умолчанию backend-side флаг остается выключенным:
+`TMA_ENABLED=false`.
+
 ## CI
 
 В `.github/workflows/ci.yml` настроены шаги:
