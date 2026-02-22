@@ -88,7 +88,8 @@ location /tma/ {
 
 1. Включить Mini App URL на `https://1303118-cr22992.tw1.ru/tma/`.
 2. Добавить Menu Button для бота (при необходимости).
-3. Проверить `startapp` deep-link:
+3. Бот также автоматически пытается синхронизировать default menu button на старте (если `TMA_BASE_URL` задан).
+4. Проверить `startapp` deep-link:
    `https://t.me/<bot_username>?startapp=wallet_42`.
 
 ## 7. Production smoke checklist

@@ -16,6 +16,7 @@ import {
   TelegramFilterCommandsService,
   TelegramFilterCommandsServiceDependencies,
 } from './bot/telegram-filter-commands.service';
+import { TelegramMenuButtonSyncService } from './bot/telegram-menu-button-sync.service';
 import { TelegramParserService } from './bot/telegram-parser.service';
 import { TelegramSenderService } from './bot/telegram-sender.service';
 import { TelegramUiService } from './bot/telegram-ui.service';
@@ -59,6 +60,7 @@ const createTelegrafOptions = (appConfigService: AppConfigService): TelegrafModu
     TelegramCallbackCommandsService,
     TelegramCommandOrchestratorService,
     TelegramUpdate,
+    TelegramMenuButtonSyncService,
     TelegramSenderService,
   ],
   exports: [TelegramSenderService],
