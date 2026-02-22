@@ -25,6 +25,10 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-whale}:${POSTGRES_PASSWORD}@postgres:5432/whale_alert_bot
+      TMA_ENABLED: ${TMA_ENABLED:-false}
+      TMA_BASE_URL: ${TMA_BASE_URL:-}
+      TMA_BOT_USERNAME: ${TMA_BOT_USERNAME:-}
+      TMA_ALLOWED_ORIGINS: ${TMA_ALLOWED_ORIGINS:-}
     ports:
       - '3000:3000'
     restart: unless-stopped

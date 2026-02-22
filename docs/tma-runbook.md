@@ -1,0 +1,106 @@
+# TMA Runbook
+
+## 1. Цель
+
+Документ описывает rollout Telegram Mini App (TMA) для Whale Alert Bot:
+
+1. backend API (`/api/auth/tma`, `/api/tma/init`),
+2. frontend SPA (`/tma/`),
+3. интеграцию кнопок в Telegram-боте,
+4. эксплуатационные проверки и откат.
+
+## 2. Обязательные env
+
+Минимальные переменные:
+
+```env
+TMA_ENABLED=true
+TMA_BASE_URL=https://1303118-cr22992.tw1.ru/tma
+TMA_BOT_USERNAME=whale_alert_test_bot
+TMA_ALLOWED_ORIGINS=https://1303118-cr22992.tw1.ru
+```
+
+Примечания:
+
+1. `TMA_ENABLED=false` по умолчанию, чтобы не ломать текущий runtime.
+2. `TMA_BASE_URL` используется для `web_app` кнопок (`/app`, `/wallet #id`).
+3. `TMA_BOT_USERNAME` используется для deep-link кнопки `📱 TMA` в live-alert.
+4. `TMA_ALLOWED_ORIGINS` дополняет CORS allow-list.
+
+## 3. Локальная проверка
+
+Backend:
+
+```bash
+npm run precommit
+npm run start:test
+```
+
+Frontend:
+
+```bash
+cd tma
+npm install
+npm run build
+```
+
+Smoke-check:
+
+1. `POST /api/auth/tma` (валидный и невалидный `initData`),
+2. `GET /api/tma/init` с `Authorization: Bearer <accessToken>`,
+3. в Telegram: `/app`, `/wallet #id`, live-alert кнопка `📱 TMA`.
+
+## 4. Деплой фронтенда TMA
+
+Сборка:
+
+```bash
+cd /opt/whale-alert-bot/tma
+npm ci
+npm run build
+```
+
+После сборки должен существовать каталог:
+
+```text
+/opt/whale-alert-bot/tma/dist
+```
+
+## 5. Nginx subpath `/tma/`
+
+Пример блока:
+
+```nginx
+location /tma/ {
+    alias /opt/whale-alert-bot/tma/dist/;
+    try_files $uri $uri/ /tma/index.html;
+}
+```
+
+Проверка:
+
+1. `https://1303118-cr22992.tw1.ru/tma/` открывается,
+2. `https://1303118-cr22992.tw1.ru/tma/wallets/42` отдает SPA (а не 404 nginx).
+
+## 6. BotFather setup
+
+1. Включить Mini App URL на `https://1303118-cr22992.tw1.ru/tma/`.
+2. Добавить Menu Button для бота (при необходимости).
+3. Проверить `startapp` deep-link:
+   `https://t.me/<bot_username>?startapp=wallet_42`.
+
+## 7. Production smoke checklist
+
+1. `/health` -> `ok`.
+2. `/api/auth/tma` выдает JWT-пару.
+3. `/api/tma/init` возвращает `wallets + settings + todayAlertCount`.
+4. Команда `/app` присылает `web_app` кнопку.
+5. Кнопка `📱 Открыть в TMA` в `/wallet #id` открывает нужный экран.
+6. Кнопка `📱 TMA` в alert открывает `wallet_<id>` deep-link.
+
+## 8. Откат
+
+1. Поставить `TMA_ENABLED=false`.
+2. Перезапустить backend.
+3. Оставить статическую раздачу `/tma/` (безопасно), либо откатить `tma/dist` на прошлую версию.
+4. Проверить, что legacy Telegram flow (`/track`, `/list`, `/wallet`, `/history`) продолжает работать.
