@@ -1,12 +1,13 @@
 import React from 'react';
 import { Button, Card, Placeholder, Section, Text, Title } from '@telegram-apps/telegram-ui';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 import { WalletCard } from '../components/WalletCard';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { useTmaInit } from '../hooks/useTmaInit';
 
 export const DashboardPage = (): React.JSX.Element => {
+  const navigate = useNavigate();
   const initQuery = useTmaInit();
   const errorMessage: string | null =
     initQuery.error instanceof Error ? initQuery.error.message : null;
@@ -63,21 +64,36 @@ export const DashboardPage = (): React.JSX.Element => {
 
       <Section>
         <div className="tma-actions">
-          <Link to="/wallets" className="tma-link-reset">
-            <Button mode="filled" size="m" stretched>
-              Все кошельки
-            </Button>
-          </Link>
-          <Link to="/wallets/add" className="tma-link-reset">
-            <Button mode="bezeled" size="m" stretched>
-              Добавить
-            </Button>
-          </Link>
-          <Link to="/settings" className="tma-link-reset">
-            <Button mode="gray" size="m" stretched>
-              Настройки
-            </Button>
-          </Link>
+          <Button
+            mode="filled"
+            size="m"
+            stretched
+            onClick={(): void => {
+              void navigate('/wallets');
+            }}
+          >
+            Все кошельки
+          </Button>
+          <Button
+            mode="bezeled"
+            size="m"
+            stretched
+            onClick={(): void => {
+              void navigate('/wallets/add');
+            }}
+          >
+            Добавить
+          </Button>
+          <Button
+            mode="gray"
+            size="m"
+            stretched
+            onClick={(): void => {
+              void navigate('/settings');
+            }}
+          >
+            Настройки
+          </Button>
         </div>
       </Section>
     </section>

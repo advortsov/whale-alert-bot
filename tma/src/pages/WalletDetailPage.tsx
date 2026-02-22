@@ -13,7 +13,7 @@ import {
   useQueryClient,
   type UseQueryResult,
 } from '@tanstack/react-query';
-import { Link, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
 import { loadWalletById, loadWalletHistory, muteWallet, unmuteWallet } from '../api/wallets';
 import { ChainBadge } from '../components/ChainBadge';
@@ -28,6 +28,7 @@ export const WalletDetailPage = (): React.JSX.Element => {
   const params = useParams();
   const walletId: number = Number.parseInt(params.id ?? '', 10);
   const { apiClient, isReady } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [actionStatus, setActionStatus] = React.useState<string | null>(null);
 
@@ -131,17 +132,19 @@ export const WalletDetailPage = (): React.JSX.Element => {
         <Cell subhead="Mute">{walletQuery.data.activeMute === null ? 'off' : walletQuery.data.activeMute}</Cell>
       </Section>
 
-      <Section header="Последние события">
-        {historyQuery.data.items.length === 0 ? (
-          <Placeholder header="Пока нет событий" />
-        ) : (
-          historyQuery.data.items.map((item) => (
-            <Cell key={item.txHash} subtitle={item.occurredAt}>
-              {item.eventType} • {item.direction} • {item.amountText}
-            </Cell>
-          ))
-        )}
-      </Section>
+      <section id="history">
+        <Section header={`История транзакций (${historyQuery.data.items.length})`}>
+          {historyQuery.data.items.length === 0 ? (
+            <Placeholder header="Пока нет событий" />
+          ) : (
+            historyQuery.data.items.map((item) => (
+              <Cell key={item.txHash} subtitle={item.occurredAt}>
+                {item.eventType} • {item.direction} • {item.amountText}
+              </Cell>
+            ))
+          )}
+        </Section>
+      </section>
 
       {actionStatus === null ? null : (
         <Section>
@@ -168,11 +171,26 @@ export const WalletDetailPage = (): React.JSX.Element => {
           >
             {isMuted ? '🔔 Unmute' : '🔕 Mute 24h'}
           </Button>
-          <Link to="/wallets" className="tma-link-reset">
-            <Button mode="outline" size="m" stretched>
-              Назад к списку
-            </Button>
-          </Link>
+          <Button
+            mode="bezeled"
+            size="m"
+            stretched
+            onClick={(): void => {
+              void historyQuery.refetch();
+            }}
+          >
+            Обновить историю
+          </Button>
+          <Button
+            mode="outline"
+            size="m"
+            stretched
+            onClick={(): void => {
+              void navigate('/wallets');
+            }}
+          >
+            Назад к списку
+          </Button>
         </div>
       </Section>
     </section>

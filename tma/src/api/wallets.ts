@@ -16,6 +16,144 @@ interface IRawWalletHistoryResult {
   readonly nextOffset?: unknown;
 }
 
+interface IRawWalletListResult {
+  readonly wallets?: unknown;
+  readonly totalCount?: unknown;
+}
+
+interface IRawWalletSummary {
+  readonly walletId?: unknown;
+  readonly id?: unknown;
+  readonly chainKey?: unknown;
+  readonly address?: unknown;
+  readonly label?: unknown;
+  readonly createdAt?: unknown;
+}
+
+interface IRawWalletDetail {
+  readonly walletId?: unknown;
+  readonly id?: unknown;
+  readonly chainKey?: unknown;
+  readonly address?: unknown;
+  readonly label?: unknown;
+  readonly activeMute?: unknown;
+}
+
+interface IRawTrackWalletResult {
+  readonly walletId?: unknown;
+  readonly id?: unknown;
+  readonly address?: unknown;
+  readonly label?: unknown;
+  readonly chainKey?: unknown;
+  readonly isNewSubscription?: unknown;
+}
+
+const EMPTY_ADDRESS_PLACEHOLDER = '—';
+const UNKNOWN_CHAIN_KEY = 'unknown_chain';
+
+const normalizeWalletId = (rawWalletId: unknown, rawLegacyId: unknown): number => {
+  const directWalletId: unknown = rawWalletId;
+  const legacyWalletId: unknown = rawLegacyId;
+
+  if (typeof directWalletId === 'number' && Number.isInteger(directWalletId) && directWalletId > 0) {
+    return directWalletId;
+  }
+
+  if (typeof legacyWalletId === 'number' && Number.isInteger(legacyWalletId) && legacyWalletId > 0) {
+    return legacyWalletId;
+  }
+
+  return 0;
+};
+
+const normalizeString = (
+  rawValue: unknown,
+  fallbackValue: string,
+): string => {
+  if (typeof rawValue !== 'string') {
+    return fallbackValue;
+  }
+
+  const normalizedValue: string = rawValue.trim();
+  return normalizedValue.length > 0 ? normalizedValue : fallbackValue;
+};
+
+const normalizeNullableString = (rawValue: unknown): string | null => {
+  if (typeof rawValue !== 'string') {
+    return null;
+  }
+
+  const normalizedValue: string = rawValue.trim();
+  return normalizedValue.length > 0 ? normalizedValue : null;
+};
+
+const normalizeWalletSummary = (rawValue: unknown): IWalletSummaryDto | null => {
+  if (typeof rawValue !== 'object' || rawValue === null) {
+    return null;
+  }
+
+  const candidate = rawValue as IRawWalletSummary;
+  const walletId: number = normalizeWalletId(candidate.walletId, candidate.id);
+
+  if (walletId === 0) {
+    return null;
+  }
+
+  const chainKey: string = normalizeString(candidate.chainKey, UNKNOWN_CHAIN_KEY);
+  const address: string = normalizeString(candidate.address, EMPTY_ADDRESS_PLACEHOLDER);
+  const createdAt: string = normalizeString(candidate.createdAt, '');
+
+  return {
+    walletId,
+    chainKey,
+    address,
+    label: normalizeNullableString(candidate.label),
+    createdAt,
+  };
+};
+
+export const normalizeWalletDetail = (rawValue: unknown): IWalletDetailDto => {
+  if (typeof rawValue !== 'object' || rawValue === null) {
+    throw new Error('Wallet detail payload is malformed.');
+  }
+
+  const candidate = rawValue as IRawWalletDetail;
+  const walletId: number = normalizeWalletId(candidate.walletId, candidate.id);
+
+  if (walletId === 0) {
+    throw new Error('Wallet detail payload does not contain valid walletId.');
+  }
+
+  return {
+    walletId,
+    chainKey: normalizeString(candidate.chainKey, UNKNOWN_CHAIN_KEY),
+    address: normalizeString(candidate.address, EMPTY_ADDRESS_PLACEHOLDER),
+    label: normalizeNullableString(candidate.label),
+    activeMute: normalizeNullableString(candidate.activeMute),
+  };
+};
+
+const normalizeTrackWalletResult = (rawValue: unknown): ITrackWalletResult => {
+  if (typeof rawValue !== 'object' || rawValue === null) {
+    throw new Error('Track wallet payload is malformed.');
+  }
+
+  const candidate = rawValue as IRawTrackWalletResult;
+  const walletId: number = normalizeWalletId(candidate.walletId, candidate.id);
+
+  if (walletId === 0) {
+    throw new Error('Track wallet payload does not contain valid walletId.');
+  }
+
+  return {
+    walletId,
+    address: normalizeString(candidate.address, EMPTY_ADDRESS_PLACEHOLDER),
+    label: normalizeNullableString(candidate.label),
+    chainKey: normalizeString(candidate.chainKey, UNKNOWN_CHAIN_KEY),
+    isNewSubscription: candidate.isNewSubscription !== false,
+  };
+};
+
 const isHistoryItem = (value: unknown): value is IWalletHistoryItem => {
   if (typeof value !== 'object' || value === null) {
     return false;
@@ -55,15 +193,32 @@ export const normalizeWalletHistoryResult = (raw: unknown): IWalletHistoryResult
 export const loadWallets = async (
   apiClient: ApiClient,
 ): Promise<readonly IWalletSummaryDto[]> => {
-  const result: IWalletListResult = await apiClient.request<IWalletListResult>('GET', '/api/wallets');
-  return result.wallets;
+  const rawResult: unknown = await apiClient.request<unknown>('GET', '/api/wallets');
+
+  if (typeof rawResult !== 'object' || rawResult === null) {
+    return [];
+  }
+
+  const candidate = rawResult as IRawWalletListResult;
+  const walletsRaw: unknown = candidate.wallets;
+
+  if (!Array.isArray(walletsRaw)) {
+    return [];
+  }
+
+  const wallets: IWalletSummaryDto[] = walletsRaw
+    .map((item: unknown): IWalletSummaryDto | null => normalizeWalletSummary(item))
+    .filter((item: IWalletSummaryDto | null): item is IWalletSummaryDto => item !== null);
+
+  return wallets;
 };
 
 export const loadWalletById = async (
   apiClient: ApiClient,
   walletId: number,
 ): Promise<IWalletDetailDto> => {
-  return apiClient.request<IWalletDetailDto>('GET', `/api/wallets/${walletId}`);
+  const rawResult: unknown = await apiClient.request<unknown>('GET', `/api/wallets/${walletId}`);
+  return normalizeWalletDetail(rawResult);
 };
 
 export const loadWalletHistory = async (
@@ -89,7 +244,8 @@ export const addWallet = async (
   apiClient: ApiClient,
   request: ITrackWalletRequest,
 ): Promise<ITrackWalletResult> => {
-  return apiClient.request<ITrackWalletResult>('POST', '/api/wallets', request);
+  const rawResult: unknown = await apiClient.request<unknown>('POST', '/api/wallets', request);
+  return normalizeTrackWalletResult(rawResult);
 };
 
 export const muteWallet = async (

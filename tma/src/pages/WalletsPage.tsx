@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button, Placeholder, Section, Title } from '@telegram-apps/telegram-ui';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 import { loadWallets } from '../api/wallets';
 import { LoadingSpinner } from '../components/LoadingSpinner';
@@ -10,6 +10,7 @@ import { useAuth } from '../hooks/useAuth';
 import type { IWalletSummaryDto } from '../types/api.types';
 
 export const WalletsPage = (): React.JSX.Element => {
+  const navigate = useNavigate();
   const { apiClient, isReady } = useAuth();
   const walletsQuery: UseQueryResult<readonly IWalletSummaryDto[]> = useQuery<
     readonly IWalletSummaryDto[]
@@ -51,11 +52,16 @@ export const WalletsPage = (): React.JSX.Element => {
         </div>
       </Section>
       <Section>
-        <Link to="/wallets/add" className="tma-link-reset">
-          <Button mode="filled" size="m" stretched>
-            + Добавить кошелёк
-          </Button>
-        </Link>
+        <Button
+          mode="filled"
+          size="m"
+          stretched
+          onClick={(): void => {
+            void navigate('/wallets/add');
+          }}
+        >
+          + Добавить кошелёк
+        </Button>
       </Section>
     </section>
   );

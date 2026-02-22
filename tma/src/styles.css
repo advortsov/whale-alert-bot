@@ -60,10 +60,6 @@ a {
   gap: 12px;
 }
 
-.tma-link-reset {
-  text-decoration: none;
-}
-
 .tma-form {
   display: grid;
   gap: 12px;
@@ -71,6 +67,16 @@ a {
 
 .tma-wallet-card {
   margin: 0;
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+}
+
+.tma-wallet-card-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 0 4px 4px;
 }
 
 .tma-setting-label {

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Badge, Button, Card, Cell } from '@telegram-apps/telegram-ui';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 import { formatShortAddress } from '../utils/format';
 import { ChainBadge } from './ChainBadge';
@@ -12,6 +12,8 @@ interface IWalletCardProps {
 }
 
 export const WalletCard = ({ wallet }: IWalletCardProps): React.JSX.Element => {
+  const navigate = useNavigate();
+
   return (
     <Card className="tma-wallet-card">
       <Cell
@@ -27,16 +29,30 @@ export const WalletCard = ({ wallet }: IWalletCardProps): React.JSX.Element => {
             <ChainIcon chainKey={wallet.chainKey} />
           </span>
         }
-        after={
-          <Link to={`/wallets/${wallet.walletId}`} className="tma-link-reset">
-            <Button mode="outline" size="s">
-              Открыть
-            </Button>
-          </Link>
-        }
+        after={null}
       >
         {wallet.label ?? `Кошелёк #${wallet.walletId}`}
       </Cell>
+      <div className="tma-wallet-card-actions">
+        <Button
+          mode="outline"
+          size="s"
+          onClick={(): void => {
+            void navigate(`/wallets/${wallet.walletId}`);
+          }}
+        >
+          Открыть
+        </Button>
+        <Button
+          mode="bezeled"
+          size="s"
+          onClick={(): void => {
+            void navigate(`/wallets/${wallet.walletId}#history`);
+          }}
+        >
+          История
+        </Button>
+      </div>
     </Card>
   );
 };

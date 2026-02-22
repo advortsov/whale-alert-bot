@@ -2,8 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   addWallet,
+  loadWalletById,
+  loadWallets,
   loadWalletHistory,
   muteWallet,
+  normalizeWalletDetail,
   normalizeWalletHistoryResult,
   unmuteWallet,
 } from './wallets';
@@ -62,6 +65,24 @@ describe('tma wallets api', (): void => {
     });
   });
 
+  it('normalizes legacy id field from track response into walletId', async (): Promise<void> => {
+    const apiClientStub: ApiClientStub = {
+      request: vi.fn().mockResolvedValue({
+        id: 42,
+        address: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
+        chainKey: 'ethereum_mainnet',
+      }),
+    };
+
+    const result = await addWallet(apiClientStub as unknown as ApiClient, {
+      chainKey: 'ethereum_mainnet',
+      address: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
+      label: 'legacy',
+    });
+
+    expect(result.walletId).toBe(42);
+  });
+
   it('normalizes malformed history payload to empty items', async (): Promise<void> => {
     const apiClientStub: ApiClientStub = {
       request: vi.fn().mockResolvedValue({
@@ -108,5 +129,63 @@ describe('tma wallets api', (): void => {
       ],
       nextOffset: 20,
     });
+  });
+
+  it('normalizes malformed wallet detail payload with safe string fallbacks', (): void => {
+    const result = normalizeWalletDetail({
+      walletId: 16,
+      chainKey: '',
+      address: '   ',
+      label: '  ',
+      activeMute: 123,
+    });
+
+    expect(result).toEqual({
+      walletId: 16,
+      chainKey: 'unknown_chain',
+      address: '—',
+      label: null,
+      activeMute: null,
+    });
+  });
+
+  it('supports legacy id field in wallet detail payload', async (): Promise<void> => {
+    const apiClientStub: ApiClientStub = {
+      request: vi.fn().mockResolvedValue({
+        id: 18,
+        chainKey: 'tron_mainnet',
+        address: 'TEDVku9LrQDLdbg1ik6HrRtK6Uimg8epSV',
+        label: 'tron',
+        activeMute: null,
+      }),
+    };
+
+    const result = await loadWalletById(apiClientStub as unknown as ApiClient, 18);
+
+    expect(result.walletId).toBe(18);
+  });
+
+  it('filters malformed wallets from list response and keeps valid ones', async (): Promise<void> => {
+    const apiClientStub: ApiClientStub = {
+      request: vi.fn().mockResolvedValue({
+        wallets: [
+          {
+            walletId: 7,
+            chainKey: 'ethereum_mainnet',
+            address: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
+            label: 'vitalik',
+            createdAt: '2026-02-23T00:00:00.000Z',
+          },
+          {
+            walletId: 'broken',
+          },
+        ],
+      }),
+    };
+
+    const result = await loadWallets(apiClientStub as unknown as ApiClient);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.walletId).toBe(7);
   });
 });
