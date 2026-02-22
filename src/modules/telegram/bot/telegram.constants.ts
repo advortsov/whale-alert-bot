@@ -18,6 +18,7 @@ export const CALLBACK_HISTORY_LIMIT: number = 10;
 
 export const SUPPORTED_COMMAND_MAP: Readonly<Record<string, SupportedTelegramCommand>> = {
   start: SupportedTelegramCommand.START,
+  app: SupportedTelegramCommand.APP,
   help: SupportedTelegramCommand.HELP,
   track: SupportedTelegramCommand.TRACK,
   list: SupportedTelegramCommand.LIST,
@@ -37,6 +38,7 @@ export const SUPPORTED_COMMAND_MAP: Readonly<Record<string, SupportedTelegramCom
 
 export const MENU_BUTTON_COMMAND_MAP: Readonly<Record<string, SupportedTelegramCommand>> = {
   '🏠 Главное меню': SupportedTelegramCommand.START,
+  '📱 Приложение': SupportedTelegramCommand.APP,
   '➕ Добавить адрес': SupportedTelegramCommand.TRACK_HINT,
   '📋 Мой список': SupportedTelegramCommand.LIST,
   '📈 Статус': SupportedTelegramCommand.STATUS,

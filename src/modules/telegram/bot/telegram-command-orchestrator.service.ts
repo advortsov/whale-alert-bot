@@ -61,6 +61,7 @@ export class TelegramCommandOrchestratorService {
   private resolveCommandHandler(command: SupportedTelegramCommand): ITelegramCommandHandler | null {
     const handlers: Partial<Record<SupportedTelegramCommand, ITelegramCommandHandler>> = {
       [SupportedTelegramCommand.START]: this.executeStartCommand.bind(this),
+      [SupportedTelegramCommand.APP]: this.executeAppCommand.bind(this),
       [SupportedTelegramCommand.HELP]: this.executeHelpCommand.bind(this),
       [SupportedTelegramCommand.TRACK]: this.executeTrackCommand.bind(this),
       [SupportedTelegramCommand.LIST]: this.basicCommandsService.executeListCommand.bind(
@@ -114,6 +115,14 @@ export class TelegramCommandOrchestratorService {
       message: this.basicCommandsService.buildHelpMessage(),
       replyOptions: null,
     };
+  }
+
+  private async executeAppCommand(
+    _userRef: TelegramUserRef | null,
+    commandEntry: ParsedMessageCommand,
+    _updateMeta: UpdateMeta,
+  ): Promise<CommandExecutionResult> {
+    return this.basicCommandsService.executeAppCommand(commandEntry);
   }
 
   private async executeTrackCommand(

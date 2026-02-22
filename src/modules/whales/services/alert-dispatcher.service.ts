@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import type { InlineKeyboardButton } from 'telegraf/types';
 
 import { AlertEnrichmentService } from './alert-enrichment.service';
 import { AlertMessageFormatter } from './alert-message.formatter';
@@ -186,37 +187,48 @@ export class AlertDispatcherService implements IAlertDispatcher {
     const txButtonLabel: string = this.getTxButtonLabel(chainKey);
     const chartUrl: string = this.buildChartUrl(event);
     const portfolioUrl: string = this.buildPortfolioUrl(chainKey, event.trackedAddress);
+    const tmaUrl: string | null = this.buildTmaStartAppUrl(walletId);
+    const inlineKeyboardRows: InlineKeyboardButton[][] = [
+      [
+        {
+          text: '📊 Chart',
+          url: chartUrl,
+        },
+        {
+          text: txButtonLabel,
+          url: txUrl,
+        },
+      ],
+      [
+        {
+          text: '💼 Wallet',
+          callback_data: `wallet_menu:${String(walletId)}`,
+        },
+        {
+          text: '🚫 Ignore 24h',
+          callback_data: `alert_ignore_24h:${String(walletId)}`,
+        },
+      ],
+      [
+        {
+          text: '🧾 Portfolio',
+          url: portfolioUrl,
+        },
+      ],
+    ];
+
+    if (tmaUrl !== null) {
+      inlineKeyboardRows.push([
+        {
+          text: '📱 TMA',
+          url: tmaUrl,
+        },
+      ]);
+    }
 
     return {
       reply_markup: {
-        inline_keyboard: [
-          [
-            {
-              text: '📊 Chart',
-              url: chartUrl,
-            },
-            {
-              text: txButtonLabel,
-              url: txUrl,
-            },
-          ],
-          [
-            {
-              text: '💼 Wallet',
-              callback_data: `wallet_menu:${String(walletId)}`,
-            },
-            {
-              text: '🚫 Ignore 24h',
-              callback_data: `alert_ignore_24h:${String(walletId)}`,
-            },
-          ],
-          [
-            {
-              text: '🧾 Portfolio',
-              url: portfolioUrl,
-            },
-          ],
-        ],
+        inline_keyboard: inlineKeyboardRows,
       },
       link_preview_options: {
         is_disabled: true,
@@ -284,6 +296,16 @@ export class AlertDispatcherService implements IAlertDispatcher {
     }
 
     return '🔍 Etherscan';
+  }
+
+  private buildTmaStartAppUrl(walletId: number): string | null {
+    const botUsernameRaw: string | null | undefined = this.appConfigService.tmaBotUsername;
+
+    if (typeof botUsernameRaw !== 'string' || botUsernameRaw.trim().length === 0) {
+      return null;
+    }
+
+    return `https://t.me/${botUsernameRaw.trim()}?startapp=wallet_${String(walletId)}`;
   }
 
   private resolveChainKey(chainId: ChainId): ChainKey {

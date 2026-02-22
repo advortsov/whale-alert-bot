@@ -84,6 +84,7 @@ type TelegramSenderServiceStub = {
 
 type AppConfigServiceStub = {
   readonly etherscanTxBaseUrl: string;
+  readonly tmaBotUsername: string;
 };
 
 const buildEvent = (valueFormatted: string): ClassifiedEvent => {
@@ -166,6 +167,7 @@ const createService = (): {
   };
   const appConfigServiceStub: AppConfigServiceStub = {
     etherscanTxBaseUrl: 'https://etherscan.io/tx/',
+    tmaBotUsername: 'whale_alert_test_bot',
   };
 
   subscriptionsRepositoryStub.listSubscriberWalletRecipientsByAddress.mockResolvedValue([
@@ -328,10 +330,19 @@ describe('AlertDispatcherService', (): void => {
     const sendTextCall = context.telegramSenderServiceStub.sendText.mock.calls[0];
     const sendOptions =
       sendTextCall && sendTextCall.length > 2
-        ? (sendTextCall[2] as { readonly reply_markup?: unknown })
+        ? (sendTextCall[2] as {
+            readonly reply_markup?: {
+              readonly inline_keyboard?: readonly (readonly { readonly url?: string }[])[];
+            };
+          })
         : null;
 
     expect(sendOptions?.reply_markup).toBeDefined();
+    const hasTmaButton: boolean =
+      sendOptions?.reply_markup?.inline_keyboard?.some((row) =>
+        row.some((button) => button.url === 'https://t.me/whale_alert_test_bot?startapp=wallet_3'),
+      ) ?? false;
+    expect(hasTmaButton).toBe(true);
   });
 
   it('skips alert when wallet has active 24h mute', async (): Promise<void> => {

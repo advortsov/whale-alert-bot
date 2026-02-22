@@ -475,6 +475,20 @@ npm run build
 По умолчанию backend-side флаг остается выключенным:
 `TMA_ENABLED=false`.
 
+## Telegram Mini App (TMA, phase 3 bot integration)
+
+В Telegram-бот добавлены точки входа в Mini App:
+
+1. Команда `/app` отправляет `web_app` кнопку `📱 Открыть приложение`.
+2. В карточке кошелька (`/wallet #id`) добавлена `web_app` кнопка `📱 Открыть в TMA`.
+3. В live-alert добавлена deep-link кнопка `📱 TMA`:
+   `https://t.me/<bot_username>?startapp=wallet_<walletId>`.
+
+Для корректной работы нужны:
+
+1. `TMA_BASE_URL` — публичный URL Mini App (например `https://domain/tma`).
+2. `TMA_BOT_USERNAME` — username бота для deep-link из алертов.
+
 ## CI
 
 В `.github/workflows/ci.yml` настроены шаги:

@@ -36,6 +36,8 @@ const createUpdate = (trackingServiceStub: TrackingService): TelegramUpdate => {
   } as unknown as RuntimeStatusService;
   const appConfigServiceStub: AppConfigService = {
     appVersion: '0.1.0-test',
+    tmaBaseUrl: 'https://1303118-cr22992.tw1.ru/tma',
+    tmaBotUsername: 'whale_alert_test_bot',
   } as unknown as AppConfigService;
 
   return TelegramUpdate.createForTesting(
@@ -153,6 +155,52 @@ describe('TelegramUpdate', (): void => {
     expect(parsed[7]).toMatchObject({ command: 'tz', args: ['Europe/Moscow'] });
   });
 
+  it('handles /app command and returns web_app button', async (): Promise<void> => {
+    const trackingServiceStub: TrackingService = {} as TrackingService;
+    const update: TelegramUpdate = createUpdate(trackingServiceStub);
+    const replyMock: ReturnType<typeof vi.fn> = vi.fn().mockResolvedValue({
+      message_id: 404,
+      text: 'ok',
+    });
+    const textContext = {
+      message: {
+        text: '/app',
+        message_id: 200,
+      },
+      from: {
+        id: 42,
+        username: 'tester',
+      },
+      chat: {
+        id: 42,
+      },
+      update: {
+        update_id: 201,
+      },
+      reply: replyMock,
+    };
+
+    await update.onText(textContext as unknown as Context);
+
+    expect(replyMock).toHaveBeenCalledTimes(1);
+    const replyCall = replyMock.mock.calls[0];
+    expect(replyCall?.[0]).toContain('Mini App');
+    expect(replyCall?.[1]).toMatchObject({
+      reply_markup: {
+        inline_keyboard: [
+          [
+            {
+              text: '📱 Открыть приложение',
+              web_app: {
+                url: 'https://1303118-cr22992.tw1.ru/tma',
+              },
+            },
+          ],
+        ],
+      },
+    });
+  });
+
   it('parses alert ignore callback payload', (): void => {
     const trackingServiceStub: TrackingService = {} as TrackingService;
     const update: TelegramUpdate = createUpdate(trackingServiceStub);
@@ -254,7 +302,30 @@ describe('TelegramUpdate', (): void => {
       '#16',
     );
     expect(answerCbQueryMock).toHaveBeenCalledWith('Выполняю действие...');
-    expect(replyMock).toHaveBeenCalledWith('Кошелек #16\nAddress: 0x96b0...', expect.anything());
+    expect(replyMock).toHaveBeenCalledTimes(1);
+    const replyCall = replyMock.mock.calls[0] as
+      | readonly [
+          string,
+          {
+            readonly reply_markup?: {
+              readonly inline_keyboard?: readonly (readonly {
+                readonly text?: string;
+                readonly web_app?: { readonly url: string };
+              }[])[];
+            };
+          },
+        ]
+      | undefined;
+    expect(replyCall?.[0]).toBe('Кошелек #16\nAddress: 0x96b0...');
+    const hasTmaWalletButton: boolean =
+      replyCall?.[1].reply_markup?.inline_keyboard?.some((row) =>
+        row.some(
+          (button) =>
+            button.text === '📱 Открыть в TMA' &&
+            button.web_app?.url === 'https://1303118-cr22992.tw1.ru/tma/wallets/16',
+        ),
+      ) ?? false;
+    expect(hasTmaWalletButton).toBe(true);
   });
 
   it('handles wallet filters callback and returns inline toggle keyboard', async (): Promise<void> => {

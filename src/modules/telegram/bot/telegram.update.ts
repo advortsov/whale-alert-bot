@@ -61,7 +61,7 @@ export class TelegramUpdate {
     const parserService: TelegramParserService = new TelegramParserService();
     const callbackParserService: TelegramCallbackParserService =
       new TelegramCallbackParserService();
-    const uiService: TelegramUiService = new TelegramUiService();
+    const uiService: TelegramUiService = new TelegramUiService(appConfigService);
 
     const basicDeps = new TelegramBasicCommandsServiceDependencies();
     (basicDeps as { trackingService: TrackingService }).trackingService = trackingService;

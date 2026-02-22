@@ -41,6 +41,32 @@ type AppConfigServiceStub = {
   readonly appVersion: string;
 };
 
+type CallbackKeyboard = readonly (readonly { readonly callback_data?: string }[])[];
+
+const readCallbackKeyboard = (options: unknown): CallbackKeyboard => {
+  if (typeof options !== 'object' || options === null || !('reply_markup' in options)) {
+    return [];
+  }
+
+  const replyMarkup: unknown = options.reply_markup;
+
+  if (
+    typeof replyMarkup !== 'object' ||
+    replyMarkup === null ||
+    !('inline_keyboard' in replyMarkup)
+  ) {
+    return [];
+  }
+
+  const inlineKeyboard: unknown = replyMarkup.inline_keyboard;
+
+  if (!Array.isArray(inlineKeyboard)) {
+    return [];
+  }
+
+  return inlineKeyboard as CallbackKeyboard;
+};
+
 const createTrackingServiceStub = (): TrackingServiceStub => ({
   trackAddress: vi
     .fn()
@@ -336,16 +362,11 @@ describe('LocalBotHarness', (): void => {
       text: '/wallet #16',
     });
 
-    const replyOptions = result.replies[0]?.options as
-      | {
-          readonly reply_markup?: {
-            readonly inline_keyboard?: readonly (readonly { readonly callback_data?: string }[])[];
-          };
-        }
-      | null
-      | undefined;
-    const inlineKeyboard: readonly (readonly { readonly callback_data?: string }[])[] =
-      replyOptions?.reply_markup?.inline_keyboard ?? [];
+    const replyWithInlineKeyboard = result.replies.find((reply): boolean => {
+      const inlineKeyboard: CallbackKeyboard = readCallbackKeyboard(reply.options);
+      return inlineKeyboard.length > 0;
+    });
+    const inlineKeyboard: CallbackKeyboard = readCallbackKeyboard(replyWithInlineKeyboard?.options);
     const callbackDataList: string[] = [];
 
     for (const row of inlineKeyboard) {

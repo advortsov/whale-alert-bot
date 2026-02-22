@@ -21,6 +21,7 @@ import {
   type CommandExecutionResult,
   type ReplyOptions,
 } from './telegram.interfaces';
+import { AppConfigService } from '../../../config/app-config.service';
 import type { HistoryPageResult } from '../../whales/entities/history-page.interfaces';
 import { HistoryDirectionFilter, HistoryKind } from '../../whales/entities/history-request.dto';
 import type {
@@ -30,6 +31,8 @@ import type {
 
 @Injectable()
 export class TelegramUiService {
+  public constructor(private readonly appConfigService: AppConfigService) {}
+
   public buildStartMessage(): string {
     return [
       'Whale Alert Bot готов к работе.',
@@ -45,6 +48,7 @@ export class TelegramUiService {
       '/list',
       '/wallet #id',
       '/history <address|#id> [limit]',
+      '/app',
       '/status',
       '/threshold <amount|off>',
       '/filter min_amount_usd <amount|off> (legacy alias -> /threshold)',
@@ -70,6 +74,7 @@ export class TelegramUiService {
       '/track <eth|sol|tron> <address> [label] - добавить адрес',
       '/list - показать список адресов и их id',
       '/wallet <#id> - карточка кошелька и действия кнопками',
+      '/app - открыть Telegram Mini App',
       '/untrack <address|id> - удалить адрес',
       '/history <address|#id> [limit] - последние транзакции',
       '/status - runtime статус watcher и quota',
@@ -291,10 +296,9 @@ export class TelegramUiService {
 
   public buildReplyOptions(): ReplyOptions {
     return Markup.keyboard([
-      ['🏠 Главное меню', '📋 Мой список', '📈 Статус'],
-      ['➕ Добавить адрес', '📜 История', '⚙️ Фильтры'],
-      ['🗑 Удалить адрес'],
-      ['❓ Помощь'],
+      ['🏠 Главное меню', '📱 Приложение', '📋 Мой список'],
+      ['➕ Добавить адрес', '📜 История', '📈 Статус'],
+      ['⚙️ Фильтры', '🗑 Удалить адрес', '❓ Помощь'],
     ])
       .resize()
       .persistent();
@@ -313,20 +317,46 @@ export class TelegramUiService {
   public buildWalletMenuInlineKeyboard(
     walletOptions: readonly TrackedWalletOption[],
   ): ReplyOptions {
-    const rows: InlineKeyboardButton.CallbackButton[][] = walletOptions.map(
-      (wallet): InlineKeyboardButton.CallbackButton[] => [
-        {
-          text: this.buildWalletMenuButtonText(wallet),
-          callback_data: `${WALLET_MENU_CALLBACK_PREFIX}${String(wallet.walletId)}`,
-        },
-      ],
-    );
+    const rows: InlineKeyboardButton[][] = walletOptions.map((wallet): InlineKeyboardButton[] => [
+      {
+        text: this.buildWalletMenuButtonText(wallet),
+        callback_data: `${WALLET_MENU_CALLBACK_PREFIX}${String(wallet.walletId)}`,
+      },
+    ]);
 
     return Markup.inlineKeyboard(rows);
   }
 
+  public buildAppEntryResult(): CommandExecutionResult {
+    const appUrl: string | null = this.resolveTmaBaseUrl();
+
+    if (appUrl === null) {
+      return {
+        lineNumber: 1,
+        message:
+          'Mini App пока не настроен. Нужен TMA_BASE_URL (например https://your-domain/tma).',
+        replyOptions: null,
+      };
+    }
+
+    return {
+      lineNumber: 1,
+      message: 'Открой Mini App кнопкой ниже.',
+      replyOptions: Markup.inlineKeyboard([
+        [
+          {
+            text: '📱 Открыть приложение',
+            web_app: {
+              url: appUrl,
+            },
+          },
+        ],
+      ]),
+    };
+  }
+
   public buildWalletActionInlineKeyboard(walletId: number): ReplyOptions {
-    const rows: InlineKeyboardButton.CallbackButton[][] = [
+    const rows: InlineKeyboardButton[][] = [
       [
         {
           text: '📜 История',
@@ -365,6 +395,19 @@ export class TelegramUiService {
       ],
     ];
 
+    const walletAppUrl: string | null = this.buildWalletAppUrl(walletId);
+
+    if (walletAppUrl !== null) {
+      rows.splice(2, 0, [
+        {
+          text: '📱 Открыть в TMA',
+          web_app: {
+            url: walletAppUrl,
+          },
+        },
+      ]);
+    }
+
     return Markup.inlineKeyboard(rows);
   }
 
@@ -392,5 +435,35 @@ export class TelegramUiService {
     const prefix: string = address.slice(0, SHORT_ADDRESS_PREFIX_LENGTH);
     const suffix: string = address.slice(SHORT_ADDRESS_SUFFIX_OFFSET);
     return `${prefix}...${suffix}`;
+  }
+
+  public buildAlertTmaDeeplink(walletId: number): string | null {
+    const botUsernameRaw: string | null | undefined = this.appConfigService.tmaBotUsername;
+
+    if (typeof botUsernameRaw !== 'string' || botUsernameRaw.trim().length === 0) {
+      return null;
+    }
+
+    return `https://t.me/${botUsernameRaw.trim()}?startapp=wallet_${String(walletId)}`;
+  }
+
+  private buildWalletAppUrl(walletId: number): string | null {
+    const baseUrl: string | null = this.resolveTmaBaseUrl();
+
+    if (baseUrl === null) {
+      return null;
+    }
+
+    return `${baseUrl}/wallets/${String(walletId)}`;
+  }
+
+  private resolveTmaBaseUrl(): string | null {
+    const configuredUrlRaw: string | null | undefined = this.appConfigService.tmaBaseUrl;
+
+    if (typeof configuredUrlRaw !== 'string' || configuredUrlRaw.trim().length === 0) {
+      return null;
+    }
+
+    return configuredUrlRaw.replace(/\/+$/, '');
   }
 }

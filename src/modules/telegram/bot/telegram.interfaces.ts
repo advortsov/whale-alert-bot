@@ -7,6 +7,7 @@ import type {
 
 export enum SupportedTelegramCommand {
   START = 'start',
+  APP = 'app',
   HELP = 'help',
   TRACK = 'track',
   LIST = 'list',

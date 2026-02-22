@@ -47,6 +47,16 @@ export class TelegramBasicCommandsService {
     return this.deps.uiService.buildHelpMessage();
   }
 
+  public executeAppCommand(commandEntry: ParsedMessageCommand): CommandExecutionResult {
+    const appEntryResult: CommandExecutionResult = this.deps.uiService.buildAppEntryResult();
+
+    return {
+      lineNumber: commandEntry.lineNumber,
+      message: appEntryResult.message,
+      replyOptions: appEntryResult.replyOptions,
+    };
+  }
+
   public buildTrackHintMessage(): string {
     return this.deps.uiService.buildTrackHintMessage();
   }
