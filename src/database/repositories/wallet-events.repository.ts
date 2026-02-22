@@ -13,6 +13,35 @@ import type { NewWalletEventRow } from '../types/database.types';
 export class WalletEventsRepository {
   public constructor(private readonly databaseService: DatabaseService) {}
 
+  public async countTodayEventsByUser(userId: number): Promise<number> {
+    const utcDayStart: Date = new Date();
+    utcDayStart.setUTCHours(0, 0, 0, 0);
+
+    const row:
+      | {
+          total: number | string | bigint;
+        }
+      | undefined = await this.databaseService
+      .getDb()
+      .selectFrom('wallet_events')
+      .innerJoin('tracked_wallets', (join) =>
+        join
+          .onRef('tracked_wallets.address', '=', 'wallet_events.tracked_address')
+          .onRef('tracked_wallets.chain_key', '=', 'wallet_events.chain_key'),
+      )
+      .innerJoin(
+        'user_wallet_subscriptions',
+        'user_wallet_subscriptions.wallet_id',
+        'tracked_wallets.id',
+      )
+      .select((expressionBuilder) => expressionBuilder.fn.count('wallet_events.id').as('total'))
+      .where('user_wallet_subscriptions.user_id', '=', userId)
+      .where('wallet_events.occurred_at', '>=', utcDayStart)
+      .executeTakeFirst();
+
+    return Number(row?.total ?? 0);
+  }
+
   public async saveEvent(input: SaveWalletEventInput): Promise<void> {
     const { event, occurredAt } = input;
     const insertRow: NewWalletEventRow = {

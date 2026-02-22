@@ -28,6 +28,20 @@ const bootstrap = async (): Promise<void> => {
   });
   const appConfigService: AppConfigService = app.get(AppConfigService);
   const logger: Logger = new Logger('Bootstrap');
+  const corsOrigins: (string | RegExp)[] = [
+    /^https:\/\/.*\.telegram\.org$/,
+    'https://1303118-cr22992.tw1.ru',
+    ...appConfigService.tmaAllowedOrigins,
+  ];
+
+  if (appConfigService.nodeEnv !== 'production') {
+    corsOrigins.push('http://localhost:5173');
+  }
+
+  app.enableCors({
+    origin: corsOrigins,
+    credentials: true,
+  });
 
   logger.log(`Resolved log level: ${appConfigService.logLevel}`);
   logger.log(

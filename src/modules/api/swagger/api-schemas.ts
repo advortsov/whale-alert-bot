@@ -33,6 +33,18 @@ export const REFRESH_TOKEN_BODY_SCHEMA: SchemaObject = {
   required: ['refreshToken'],
 };
 
+export const TMA_LOGIN_BODY_SCHEMA: SchemaObject = {
+  type: 'object',
+  properties: {
+    initData: {
+      type: 'string',
+      example:
+        'query_id=AAEAAAE&user=%7B%22id%22%3A123456789%2C%22username%22%3A%22user%22%7D&auth_date=1771529725&hash=abcdef',
+    },
+  },
+  required: ['initData'],
+};
+
 // -- Wallets --
 
 export const TRACK_WALLET_BODY_SCHEMA: SchemaObject = {
@@ -258,4 +270,14 @@ export const USER_STATUS_RESULT_SCHEMA: SchemaObject = {
     },
   },
   required: ['preferences', 'settings', 'historyQuota'],
+};
+
+export const TMA_INIT_RESULT_SCHEMA: SchemaObject = {
+  type: 'object',
+  properties: {
+    wallets: WALLET_LIST_RESULT_SCHEMA,
+    settings: USER_SETTINGS_RESULT_SCHEMA,
+    todayAlertCount: { type: 'integer', minimum: 0 },
+  },
+  required: ['wallets', 'settings', 'todayAlertCount'],
 };

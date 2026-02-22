@@ -12,3 +12,7 @@ prometheus.yml
 .github
 .husky
 .vscode
+dist-test
+graph.png
+madge-report.json
+plan.txt

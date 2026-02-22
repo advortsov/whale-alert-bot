@@ -26,6 +26,7 @@ services:
       PORT: ${PORT:-3000}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       TELEGRAM_ENABLED: ${TELEGRAM_ENABLED:-false}
+      TMA_ENABLED: ${TMA_ENABLED:-false}
       CHAIN_WATCHER_ENABLED: ${CHAIN_WATCHER_ENABLED:-false}
       SOLANA_WATCHER_ENABLED: ${SOLANA_WATCHER_ENABLED:-false}
       TRON_WATCHER_ENABLED: ${TRON_WATCHER_ENABLED:-false}
@@ -44,6 +45,9 @@ services:
       CHAIN_HEARTBEAT_INTERVAL_SEC: ${CHAIN_HEARTBEAT_INTERVAL_SEC:-60}
       DATABASE_URL: ${DATABASE_URL:-postgres://postgres:postgres@postgres:5432/whale_alert_bot}
       BOT_TOKEN: ${BOT_TOKEN:-0000000000:TEST_TOKEN_FOR_DOCKER}
+      TMA_BASE_URL: ${TMA_BASE_URL:-}
+      TMA_BOT_USERNAME: ${TMA_BOT_USERNAME:-}
+      TMA_ALLOWED_ORIGINS: ${TMA_ALLOWED_ORIGINS:-}
       ETH_ALCHEMY_WSS_URL: ${ETH_ALCHEMY_WSS_URL:-wss://example.invalid/alchemy}
       ETH_INFURA_WSS_URL: ${ETH_INFURA_WSS_URL:-wss://example.invalid/infura}
       SOLANA_HELIUS_HTTP_URL: ${SOLANA_HELIUS_HTTP_URL:-https://api.mainnet-beta.solana.com}

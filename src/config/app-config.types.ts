@@ -8,6 +8,7 @@ export type AppConfig = {
   readonly port: number;
   readonly logLevel: LogLevel;
   readonly telegramEnabled: boolean;
+  readonly tmaEnabled: boolean;
   readonly chainWatcherEnabled: boolean;
   readonly solanaWatcherEnabled: boolean;
   readonly tronWatcherEnabled: boolean;
@@ -26,6 +27,9 @@ export type AppConfig = {
   readonly chainHeartbeatIntervalSec: number;
   readonly chainReorgConfirmations: number;
   readonly botToken: string | null;
+  readonly tmaBaseUrl: string | null;
+  readonly tmaBotUsername: string | null;
+  readonly tmaAllowedOrigins: readonly string[];
   readonly databaseUrl: string;
   readonly ethAlchemyWssUrl: string | null;
   readonly ethInfuraWssUrl: string | null;
