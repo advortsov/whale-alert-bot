@@ -481,7 +481,7 @@ npm run test:telegram:harness
 
 В репозитории добавлен отдельный SPA-проект в `/Users/advortsov/pet/whale-alert-bot/tma`:
 
-1. Стек: `React 19`, `Vite 6`, `@telegram-apps/sdk-react`, `@tanstack/react-query`, `react-router-dom`.
+1. Стек: `React 18` (совместимо с `@telegram-apps/telegram-ui`), `Vite 6`, `@telegram-apps/sdk-react`, `@tanstack/react-query`, `react-router-dom`.
 2. Базовые страницы: `Dashboard`, `Wallets`, `WalletDetail`, `Settings`, `AddWallet`.
 3. Реализован TMA auth flow:
    `initDataRaw -> POST /api/auth/tma -> JWT -> запросы к API`.
