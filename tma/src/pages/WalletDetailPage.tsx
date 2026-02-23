@@ -2,12 +2,14 @@ import React from 'react';
 import {
   Button,
   Cell,
+  List,
   Placeholder,
   Section,
   Text,
   Title,
 } from '@telegram-apps/telegram-ui';
 import {
+  useInfiniteQuery,
   useMutation,
   useQuery,
   useQueryClient,
@@ -40,10 +42,14 @@ export const WalletDetailPage = (): React.JSX.Element => {
     enabled: isReady && Number.isInteger(walletId),
   });
 
-  const historyQuery: UseQueryResult<IWalletHistoryResult> = useQuery<IWalletHistoryResult>({
+  const historyQuery = useInfiniteQuery({
     queryKey: ['wallet-history', walletId],
-    queryFn: async (): Promise<IWalletHistoryResult> => {
-      return loadWalletHistory(apiClient, walletId, DEFAULT_HISTORY_OFFSET, DEFAULT_HISTORY_LIMIT);
+    queryFn: async ({ pageParam }): Promise<IWalletHistoryResult> => {
+      return loadWalletHistory(apiClient, walletId, pageParam, DEFAULT_HISTORY_LIMIT);
+    },
+    initialPageParam: DEFAULT_HISTORY_OFFSET,
+    getNextPageParam: (lastPage: IWalletHistoryResult): number | null => {
+      return lastPage.nextOffset;
     },
     enabled: isReady && Number.isInteger(walletId),
   });
@@ -111,88 +117,117 @@ export const WalletDetailPage = (): React.JSX.Element => {
     );
   }
 
+  const historyPages: readonly IWalletHistoryResult[] = historyQuery.data?.pages ?? [];
+  const historyItems = historyPages.flatMap((page: IWalletHistoryResult) => page.items);
   const isMuted: boolean = walletQuery.data.activeMute !== null;
   const isActionPending: boolean = muteMutation.isPending || unmuteMutation.isPending;
+  const hasNextHistoryPage: boolean = historyQuery.hasNextPage;
+  const isHistoryFetching: boolean = historyQuery.isFetchingNextPage;
 
   return (
     <section className="tma-screen">
-      <Section>
-        <Title level="2" weight="2">
-          Кошелёк #{walletQuery.data.walletId}
-        </Title>
-        <ChainBadge chainKey={walletQuery.data.chainKey} />
-        <Text>{walletQuery.data.label ?? 'Без label'}</Text>
-      </Section>
-
-      <Section header="Детали">
-        <Cell subhead="Сеть">{walletQuery.data.chainKey}</Cell>
-        <Cell subhead="Адрес" multiline>
-          {walletQuery.data.address}
-        </Cell>
-        <Cell subhead="Mute">{walletQuery.data.activeMute === null ? 'off' : walletQuery.data.activeMute}</Cell>
-      </Section>
-
-      <section id="history">
-        <Section header={`История транзакций (${historyQuery.data.items.length})`}>
-          {historyQuery.data.items.length === 0 ? (
-            <Placeholder header="Пока нет событий" />
-          ) : (
-            historyQuery.data.items.map((item) => (
-              <Cell key={item.txHash} subtitle={item.occurredAt}>
-                {item.eventType} • {item.direction} • {item.amountText}
-              </Cell>
-            ))
-          )}
-        </Section>
-      </section>
-
-      {actionStatus === null ? null : (
+      <List>
         <Section>
-          <Text>{actionStatus}</Text>
+          <Title level="2" weight="2">
+            Кошелёк #{walletQuery.data.walletId}
+          </Title>
+          <ChainBadge chainKey={walletQuery.data.chainKey} />
+          <Text>{walletQuery.data.label ?? 'Без label'}</Text>
         </Section>
-      )}
 
-      <Section>
-        <div className="tma-actions">
-          <Button
-            type="button"
-            mode={isMuted ? 'gray' : 'filled'}
-            size="m"
-            stretched
-            disabled={isActionPending}
-            onClick={(): void => {
-              if (isMuted) {
-                unmuteMutation.mutate();
-                return;
-              }
+        <Section header="Детали">
+          <Cell subhead="Сеть">{walletQuery.data.chainKey}</Cell>
+          <Cell subhead="Адрес" multiline>
+            {walletQuery.data.address}
+          </Cell>
+          <Cell subhead="Mute">
+            {walletQuery.data.activeMute === null ? 'off' : walletQuery.data.activeMute}
+          </Cell>
+        </Section>
 
-              muteMutation.mutate();
-            }}
-          >
-            {isMuted ? '🔔 Unmute' : '🔕 Mute 24h'}
-          </Button>
-          <Button
-            mode="bezeled"
-            size="m"
-            stretched
-            onClick={(): void => {
-              void historyQuery.refetch();
-            }}
-          >
-            Обновить историю
-          </Button>
-          <Button
-            mode="outline"
-            size="m"
-            stretched
-            onClick={(): void => {
-              void navigate('/wallets');
-            }}
-          >
-            Назад к списку
-          </Button>
-        </div>
-      </Section>
+        <section id="history">
+          <Section header={`История транзакций (${historyItems.length})`}>
+            {historyItems.length === 0 ? (
+              <Placeholder header="Пока нет событий" />
+            ) : (
+              historyItems.map((item) => (
+                <Cell
+                  key={`${item.txHash}-${item.occurredAt}`}
+                  subtitle={new Date(item.occurredAt).toLocaleString('ru-RU', { hour12: false })}
+                  after={
+                    <a href={item.txUrl} target="_blank" rel="noreferrer" className="tma-tx-link">
+                      Tx
+                    </a>
+                  }
+                >
+                  {item.eventType} • {item.direction} • {item.amountText}
+                </Cell>
+              ))
+            )}
+            {hasNextHistoryPage ? (
+              <Button
+                mode="bezeled"
+                size="m"
+                stretched
+                disabled={isHistoryFetching}
+                onClick={(): void => {
+                  void historyQuery.fetchNextPage();
+                }}
+              >
+                {isHistoryFetching ? 'Загрузка…' : 'Показать ещё'}
+              </Button>
+            ) : null}
+          </Section>
+        </section>
+
+        {actionStatus === null ? null : (
+          <Section>
+            <Text>{actionStatus}</Text>
+          </Section>
+        )}
+
+        <Section>
+          <div className="tma-actions">
+            <Button
+              type="button"
+              mode={isMuted ? 'gray' : 'filled'}
+              size="m"
+              stretched
+              disabled={isActionPending}
+              onClick={(): void => {
+                if (isMuted) {
+                  unmuteMutation.mutate();
+                  return;
+                }
+
+                muteMutation.mutate();
+              }}
+            >
+              {isMuted ? 'Unmute' : 'Mute 24h'}
+            </Button>
+            <Button
+              mode="bezeled"
+              size="m"
+              stretched
+              onClick={(): void => {
+                void historyQuery.refetch();
+              }}
+            >
+              Обновить историю
+            </Button>
+            <Button
+              mode="outline"
+              size="m"
+              stretched
+              onClick={(): void => {
+                void navigate('/wallets');
+              }}
+            >
+              Назад к списку
+            </Button>
+          </div>
+        </Section>
+      </List>
     </section>
   );
 };

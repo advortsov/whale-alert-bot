@@ -4,6 +4,7 @@ import type {
   ITrackingHistoryPageRequestDto,
 } from './tracking-history-request.dto';
 import type { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
+import type { WalletEventHistoryView } from '../../../database/repositories/wallet-events.repository.interfaces';
 
 export interface IHistoryUserRef {
   readonly telegramId: string;
@@ -36,4 +37,16 @@ export interface ILoadHistoryWithFallbackContext {
   readonly chainKey: ChainKey;
   readonly normalizedAddress: string;
   readonly historyParams: IParsedHistoryQueryParams;
+}
+
+export interface ILocalHistoryPageContext {
+  readonly chainKey: ChainKey;
+  readonly normalizedAddress: string;
+  readonly historyParams: IParsedHistoryQueryParams;
+}
+
+export interface ILocalHistoryPageData {
+  readonly pageEvents: readonly WalletEventHistoryView[];
+  readonly hasNextPage: boolean;
+  readonly nextOffset: number | null;
 }

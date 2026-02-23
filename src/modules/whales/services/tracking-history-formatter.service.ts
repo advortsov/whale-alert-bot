@@ -112,6 +112,19 @@ export class TrackingHistoryFormatterService {
     ].join('\n\n');
   }
 
+  public buildTxUrlByChain(txHash: string, chainKey: ChainKey): string {
+    return this.buildTxUrl(txHash, chainKey);
+  }
+
+  public buildWalletEventAmountText(event: WalletEventHistoryView): string {
+    return this.resolveEventValue(event);
+  }
+
+  public buildExplorerHistoryAmountText(item: IHistoryItemDto): string {
+    const formattedValue: string = this.formatAssetValue(item.valueRaw, item.assetDecimals);
+    return `${formattedValue} ${item.assetSymbol}`;
+  }
+
   public formatTimestamp(date: Date): string {
     return date.toISOString().replace('T', ' ').replace('.000Z', ' UTC');
   }

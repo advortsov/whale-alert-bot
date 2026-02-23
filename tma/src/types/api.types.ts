@@ -60,6 +60,9 @@ export interface IWalletHistoryItem {
   readonly eventType: string;
   readonly direction: string;
   readonly amountText: string;
+  readonly txUrl: string;
+  readonly assetSymbol: string | null;
+  readonly chainKey: string;
 }
 
 export interface IWalletHistoryResult {

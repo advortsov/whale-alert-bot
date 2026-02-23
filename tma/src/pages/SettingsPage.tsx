@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Input, Placeholder, Section, Title } from '@telegram-apps/telegram-ui';
+import { Button, Input, List, Placeholder, Section, Title } from '@telegram-apps/telegram-ui';
 import { useMutation, useQuery } from '@tanstack/react-query';
 
 import { loadSettings, updateSettings } from '../api/settings';
@@ -59,59 +59,61 @@ export const SettingsPage = (): React.JSX.Element => {
 
   return (
     <section className="tma-screen">
-      <Section>
-        <Title level="2" weight="2">
-          Настройки
-        </Title>
-      </Section>
+      <List>
+        <Section>
+          <Title level="2" weight="2">
+            Настройки
+          </Title>
+        </Section>
 
-      <Section>
-        <Input
-          type="number"
-          header="Threshold USD"
-          value={String(formState.thresholdUsd ?? 0)}
-          onChange={(event: React.ChangeEvent<HTMLInputElement>): void => {
-            const parsed: number = Number.parseFloat(event.target.value);
-            setFormState({
-              ...formState,
-              thresholdUsd: Number.isFinite(parsed) ? parsed : 0,
-            });
-          }}
-        />
-        <FilterToggle
-          label="Transfer alerts"
-          value={formState.allowTransfer}
-          onChange={(nextValue: boolean): void => {
-            setFormState({ ...formState, allowTransfer: nextValue });
-          }}
-        />
-        <FilterToggle
-          label="Swap alerts"
-          value={formState.allowSwap}
-          onChange={(nextValue: boolean): void => {
-            setFormState({ ...formState, allowSwap: nextValue });
-          }}
-        />
-      </Section>
+        <Section>
+          <Input
+            type="number"
+            header="Threshold USD"
+            value={String(formState.thresholdUsd ?? 0)}
+            onChange={(event: React.ChangeEvent<HTMLInputElement>): void => {
+              const parsed: number = Number.parseFloat(event.target.value);
+              setFormState({
+                ...formState,
+                thresholdUsd: Number.isFinite(parsed) ? parsed : 0,
+              });
+            }}
+          />
+          <FilterToggle
+            label="Transfer alerts"
+            value={formState.allowTransfer}
+            onChange={(nextValue: boolean): void => {
+              setFormState({ ...formState, allowTransfer: nextValue });
+            }}
+          />
+          <FilterToggle
+            label="Swap alerts"
+            value={formState.allowSwap}
+            onChange={(nextValue: boolean): void => {
+              setFormState({ ...formState, allowSwap: nextValue });
+            }}
+          />
+        </Section>
 
-      <Section>
-        <Button
-          type="button"
-          mode="filled"
-          size="m"
-          stretched
-          disabled={updateMutation.isPending}
-          onClick={(): void => {
-            void updateMutation.mutateAsync(formState);
-          }}
-        >
-          Сохранить
-        </Button>
-        {updateMutation.isError ? (
-          <Placeholder header="Ошибка" description="Не удалось сохранить настройки." />
-        ) : null}
-        {updateMutation.isSuccess ? <Placeholder header="Готово" description="Сохранено." /> : null}
-      </Section>
+        <Section>
+          <Button
+            type="button"
+            mode="filled"
+            size="m"
+            stretched
+            disabled={updateMutation.isPending}
+            onClick={(): void => {
+              void updateMutation.mutateAsync(formState);
+            }}
+          >
+            {updateMutation.isPending ? 'Сохраняю…' : 'Сохранить'}
+          </Button>
+          {updateMutation.isError ? (
+            <Placeholder header="Ошибка" description="Не удалось сохранить настройки." />
+          ) : null}
+          {updateMutation.isSuccess ? <Placeholder header="Готово" description="Сохранено." /> : null}
+        </Section>
+      </List>
     </section>
   );
 };

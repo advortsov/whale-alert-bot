@@ -15,6 +15,7 @@ Telegram-бот на `NestJS + TypeScript` для отслеживания ак�
 
 - План внедрения Telegram Mini App (TMA): `docs/roadmaps/tma-implementation-plan.md`
 - Runbook деплоя и эксплуатации TMA: `docs/tma-runbook.md`
+- Ассеты иконок TMA: `docs/third-party-assets.md`
 
 ## TMA (текущее состояние)
 
@@ -22,6 +23,8 @@ Telegram-бот на `NestJS + TypeScript` для отслеживания ак�
 - Основные экраны TMA (`Dashboard`, `Wallets`, `WalletDetail`, `Settings`, `AddWallet`) переведены на TelegramUI компоненты.
 - TMA работает в `dark-first` режиме: светлая тема Telegram больше не перезаписывает базовые цвета приложения.
 - В списках кошельков и карточках добавлены заметные chain-бейджи (`ETH/SOL/TRON`).
+- В TMA используются локальные SVG-иконки сетей (`ETH/SOL/TRON`) вместо текстовых символов.
+- `GET /api/wallets/:id/history` теперь возвращает структурированные `items[]` и `nextOffset` (при этом `message` сохранен для обратной совместимости с Telegram-flow).
 - `web_app` ссылки TMA теперь включают cache-busting параметр `?v=<APP_VERSION>`, чтобы Telegram/WebView не залипал на старом JS-бандле после деплоя.
 - Из карточки кошелька в TMA доступен рабочий toggle:
   - `🔕 Mute 24h` -> `POST /api/wallets/:id/mute`
@@ -134,7 +137,7 @@ curl -X POST http://localhost:3000/api/auth/refresh \
 | DELETE | `/api/wallets/:id/mute` | Снять mute с кошелька |
 | GET | `/api/wallets/:id/filters` | Фильтры кошелька |
 | PATCH | `/api/wallets/:id/filters` | Обновить фильтр (`{ target, enabled }`) |
-| GET | `/api/wallets/:id/history` | История транзакций (`?limit&offset&kind&direction`) |
+| GET | `/api/wallets/:id/history` | История транзакций (`?limit&offset&kind&direction`) + структурированные `items[]`, `nextOffset` |
 | GET | `/api/settings` | Настройки пользователя |
 | PATCH | `/api/settings` | Обновить настройки (partial) |
 | GET | `/api/status` | Статус, настройки и квота history |

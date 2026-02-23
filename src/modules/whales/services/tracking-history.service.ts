@@ -4,13 +4,11 @@ import { HistoryCacheService } from './history-cache.service';
 import { HistoryRateLimiterService } from './history-rate-limiter.service';
 import { TrackingAddressService } from './tracking-address.service';
 import { TrackingHistoryFormatterService } from './tracking-history-formatter.service';
+import { TrackingHistoryPageService } from './tracking-history-page.service';
 import { TrackingHistoryQueryParserService } from './tracking-history-query-parser.service';
-import { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
 import { HISTORY_EXPLORER_ADAPTER } from '../../../common/interfaces/explorers/explorer-port.tokens';
 import type { IHistoryExplorerAdapter } from '../../../common/interfaces/explorers/history-explorer.interfaces';
 import { UsersRepository } from '../../../database/repositories/users.repository';
-import { WalletEventsRepository } from '../../../database/repositories/wallet-events.repository';
-import type { WalletEventHistoryView } from '../../../database/repositories/wallet-events.repository.interfaces';
 import type { HistoryCacheEntry } from '../entities/history-cache.interfaces';
 import type { IHistoryPageDto } from '../entities/history-item.dto';
 import type { HistoryPageResult } from '../entities/history-page.interfaces';
@@ -19,7 +17,6 @@ import {
   HistoryRateLimitReason,
   HistoryRequestSource,
 } from '../entities/history-rate-limiter.interfaces';
-import { HistoryDirectionFilter, HistoryKind } from '../entities/history-request.dto';
 import type {
   IParsedHistoryQueryParams,
   ITrackingHistoryPageRequestDto,
@@ -27,14 +24,13 @@ import type {
 } from '../entities/tracking-history-request.dto';
 import type {
   IFirstHistoryPageContext,
-  IHistoryUserRef,
   IHistoryTargetSnapshot,
+  IHistoryUserRef,
   ILoadHistoryWithFallbackContext,
+  ILocalHistoryPageData,
   IRateLimitedHistoryContext,
 } from '../entities/tracking-history.interfaces';
-
-const LOCAL_EVENTS_BUFFER = 50;
-const LOCAL_EVENTS_MAX_FETCH = 200;
+import type { IWalletHistoryListItem } from '../entities/wallet-history-list-item.dto';
 
 @Injectable()
 export class TrackingHistoryServiceDependencies {
@@ -53,8 +49,8 @@ export class TrackingHistoryServiceDependencies {
   @Inject(HistoryRateLimiterService)
   public readonly historyRateLimiterService!: HistoryRateLimiterService;
 
-  @Inject(WalletEventsRepository)
-  public readonly walletEventsRepository!: WalletEventsRepository;
+  @Inject(TrackingHistoryPageService)
+  public readonly trackingHistoryPageService!: TrackingHistoryPageService;
 
   @Inject(TrackingHistoryFormatterService)
   public readonly historyFormatter!: TrackingHistoryFormatterService;
@@ -90,7 +86,9 @@ export class TrackingHistoryService {
     );
     const historyParams: IParsedHistoryQueryParams =
       this.deps.historyQueryParserService.parseHistoryParams(request);
+
     this.deps.trackingAddressService.assertHistoryChainIsSupported(historyTarget.chainKey);
+
     const target: IHistoryTargetSnapshot = {
       address: historyTarget.address,
       walletId: historyTarget.walletId,
@@ -107,21 +105,22 @@ export class TrackingHistoryService {
     }
 
     this.assertHistoryRequestAllowed(userRef.telegramId, request.source);
-    const localEventsWithProbe: readonly WalletEventHistoryView[] =
-      await this.loadLocalEventsForHistory(
-        historyTarget.chainKey,
-        historyTarget.address,
-        historyParams,
-      );
 
-    if (localEventsWithProbe.length === 0) {
+    const localHistoryPage: ILocalHistoryPageData =
+      await this.deps.trackingHistoryPageService.loadLocalHistoryPage({
+        chainKey: historyTarget.chainKey,
+        normalizedAddress: historyTarget.address,
+        historyParams,
+      });
+
+    if (localHistoryPage.pageEvents.length === 0) {
       throw new Error('Нет дополнительных локальных событий. Нажми «Обновить».');
     }
 
     return this.buildOffsetHistoryPage({
       target,
       historyParams,
-      localEventsWithProbe,
+      localHistoryPage,
     });
   }
 
@@ -132,6 +131,7 @@ export class TrackingHistoryService {
     this.logger.debug(
       `getAddressHistoryWithPolicy start telegramId=${userRef.telegramId} source=${request.source} rawAddress=${request.rawAddress} rawLimit=${request.rawLimit ?? 'n/a'}`,
     );
+
     const user = await this.deps.usersRepository.findOrCreate(userRef.telegramId, userRef.username);
     const historyTarget = await this.deps.trackingAddressService.resolveHistoryTarget(
       user.id,
@@ -142,9 +142,10 @@ export class TrackingHistoryService {
         ...request,
         rawOffset: null,
       });
-    this.deps.trackingAddressService.assertHistoryChainIsSupported(historyTarget.chainKey);
-    const normalizedAddress: string = historyTarget.address;
 
+    this.deps.trackingAddressService.assertHistoryChainIsSupported(historyTarget.chainKey);
+
+    const normalizedAddress: string = historyTarget.address;
     const decision: HistoryRateLimitDecision = this.deps.historyRateLimiterService.evaluate(
       userRef.telegramId,
       request.source,
@@ -169,7 +170,7 @@ export class TrackingHistoryService {
       },
     );
 
-    if (freshEntry !== null) {
+    if (freshEntry != null) {
       this.logger.debug(
         `history_cache_hit telegramId=${userRef.telegramId} source=${request.source} address=${normalizedAddress} limit=${String(historyParams.limit)}`,
       );
@@ -195,11 +196,61 @@ export class TrackingHistoryService {
       rawKind: context.request.rawKind,
       rawDirection: context.request.rawDirection,
     });
-    const localEventsWithFilters: readonly WalletEventHistoryView[] =
-      await this.loadLocalEventsForHistory(
+
+    const localHistoryPage: ILocalHistoryPageData =
+      await this.deps.trackingHistoryPageService.loadLocalHistoryPage({
+        chainKey: context.target.chainKey,
+        normalizedAddress: context.target.address,
+        historyParams: context.historyParams,
+      });
+
+    const localItems: readonly IWalletHistoryListItem[] =
+      this.deps.trackingHistoryPageService.mapWalletEventsToListItems(
+        localHistoryPage.pageEvents,
         context.target.chainKey,
-        context.target.address,
-        context.historyParams,
+      );
+
+    if (localItems.length > 0) {
+      return {
+        message,
+        resolvedAddress: context.target.address,
+        walletId: context.target.walletId,
+        limit: context.historyParams.limit,
+        offset: 0,
+        kind: context.historyParams.kind,
+        direction: context.historyParams.direction,
+        hasNextPage: localHistoryPage.hasNextPage,
+        items: localItems,
+        nextOffset: localHistoryPage.nextOffset,
+      };
+    }
+
+    let explorerPage: IHistoryPageDto = {
+      items: [],
+      nextOffset: null,
+    };
+
+    try {
+      explorerPage = await this.deps.historyExplorerAdapter.loadRecentTransactions({
+        chainKey: context.target.chainKey,
+        address: context.target.address,
+        limit: context.historyParams.limit,
+        offset: 0,
+        kind: context.historyParams.kind,
+        direction: context.historyParams.direction,
+        minAmountUsd: null,
+      });
+    } catch (error: unknown) {
+      const errorMessage: string = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `history_page_items_fallback_failed address=${context.target.address} chain=${context.target.chainKey} reason=${errorMessage}`,
+      );
+    }
+
+    const explorerItems: readonly IWalletHistoryListItem[] =
+      this.deps.trackingHistoryPageService.mapExplorerItemsToListItems(
+        explorerPage.items,
+        context.target.chainKey,
       );
 
     return {
@@ -210,22 +261,20 @@ export class TrackingHistoryService {
       offset: 0,
       kind: context.historyParams.kind,
       direction: context.historyParams.direction,
-      hasNextPage: localEventsWithFilters.length > context.historyParams.limit,
+      hasNextPage: explorerPage.nextOffset !== null,
+      items: explorerItems,
+      nextOffset: explorerPage.nextOffset,
     };
   }
 
   private buildOffsetHistoryPage(context: {
     readonly target: IHistoryTargetSnapshot;
     readonly historyParams: IParsedHistoryQueryParams;
-    readonly localEventsWithProbe: readonly WalletEventHistoryView[];
+    readonly localHistoryPage: ILocalHistoryPageData;
   }): HistoryPageResult {
-    const pageEvents: readonly WalletEventHistoryView[] = context.localEventsWithProbe.slice(
-      0,
-      context.historyParams.limit,
-    );
     const message: string = this.deps.historyFormatter.formatWalletEventsHistoryMessage(
       context.target.address,
-      pageEvents,
+      context.localHistoryPage.pageEvents,
       {
         offset: context.historyParams.offset,
         kind: context.historyParams.kind,
@@ -233,6 +282,12 @@ export class TrackingHistoryService {
         chainKey: context.target.chainKey,
       },
     );
+
+    const items: readonly IWalletHistoryListItem[] =
+      this.deps.trackingHistoryPageService.mapWalletEventsToListItems(
+        context.localHistoryPage.pageEvents,
+        context.target.chainKey,
+      );
 
     return {
       message,
@@ -242,7 +297,9 @@ export class TrackingHistoryService {
       offset: context.historyParams.offset,
       kind: context.historyParams.kind,
       direction: context.historyParams.direction,
-      hasNextPage: context.localEventsWithProbe.length > context.historyParams.limit,
+      hasNextPage: context.localHistoryPage.hasNextPage,
+      items,
+      nextOffset: context.localHistoryPage.nextOffset,
     };
   }
 
@@ -275,7 +332,7 @@ export class TrackingHistoryService {
       },
     );
 
-    if (staleEntry !== null) {
+    if (staleEntry != null) {
       this.logger.warn(
         `history_stale_served telegramId=${context.telegramId} source=${context.source} address=${context.normalizedAddress} limit=${String(context.historyParams.limit)} reason=local_rate_limit`,
       );
@@ -287,19 +344,20 @@ export class TrackingHistoryService {
 
   private async loadHistoryWithFallback(context: ILoadHistoryWithFallbackContext): Promise<string> {
     try {
-      const localEvents: readonly WalletEventHistoryView[] = await this.loadLocalEventsForHistory(
-        context.chainKey,
-        context.normalizedAddress,
-        {
-          ...context.historyParams,
-          offset: 0,
-        },
-      );
+      const localHistoryPage: ILocalHistoryPageData =
+        await this.deps.trackingHistoryPageService.loadLocalHistoryPage({
+          chainKey: context.chainKey,
+          normalizedAddress: context.normalizedAddress,
+          historyParams: {
+            ...context.historyParams,
+            offset: 0,
+          },
+        });
 
-      if (localEvents.length > 0) {
+      if (localHistoryPage.pageEvents.length > 0) {
         const message: string = this.deps.historyFormatter.formatWalletEventsHistoryMessage(
           context.normalizedAddress,
-          localEvents,
+          localHistoryPage.pageEvents,
           {
             offset: 0,
             kind: context.historyParams.kind,
@@ -321,6 +379,7 @@ export class TrackingHistoryService {
           direction: context.historyParams.direction,
           minAmountUsd: null,
         });
+
       const historyMessage: string = this.deps.historyFormatter.formatHistoryMessage(
         context.normalizedAddress,
         historyPage.items,
@@ -346,7 +405,7 @@ export class TrackingHistoryService {
         },
       );
 
-      if (staleEntry !== null) {
+      if (staleEntry != null) {
         this.logger.warn(
           `history_stale_served telegramId=${context.telegramId} source=${context.source} address=${context.normalizedAddress} limit=${String(context.historyParams.limit)} reason=external_rate_limit`,
         );
@@ -370,58 +429,6 @@ export class TrackingHistoryService {
     });
   }
 
-  private async loadLocalEventsForHistory(
-    chainKey: ChainKey,
-    normalizedAddress: string,
-    historyParams: IParsedHistoryQueryParams,
-  ): Promise<readonly WalletEventHistoryView[]> {
-    const rawFetchLimit: number = Math.min(
-      Math.max(
-        historyParams.offset + historyParams.limit + LOCAL_EVENTS_BUFFER,
-        historyParams.limit,
-      ),
-      LOCAL_EVENTS_MAX_FETCH,
-    );
-    const rawEvents: readonly WalletEventHistoryView[] =
-      await this.deps.walletEventsRepository.listRecentByTrackedAddress(
-        chainKey,
-        normalizedAddress,
-        rawFetchLimit,
-        0,
-      );
-
-    const filteredEvents: readonly WalletEventHistoryView[] = rawEvents.filter(
-      (event: WalletEventHistoryView): boolean => {
-        if (historyParams.direction === HistoryDirectionFilter.IN && event.direction !== 'IN') {
-          return false;
-        }
-
-        if (historyParams.direction === HistoryDirectionFilter.OUT && event.direction !== 'OUT') {
-          return false;
-        }
-
-        if (historyParams.kind === HistoryKind.ETH) {
-          return event.tokenAddress === null || event.tokenSymbol === 'ETH';
-        }
-
-        if (historyParams.kind === HistoryKind.ERC20) {
-          return event.tokenAddress !== null && event.tokenSymbol !== 'ETH';
-        }
-
-        return true;
-      },
-    );
-
-    if (historyParams.offset <= 0) {
-      return filteredEvents.slice(0, historyParams.limit);
-    }
-
-    return filteredEvents.slice(
-      historyParams.offset,
-      historyParams.offset + historyParams.limit + 1,
-    );
-  }
-
   private buildHistoryRetryMessage(decision: HistoryRateLimitDecision): string {
     const retryAfterSec: number = decision.retryAfterSec ?? 1;
 
@@ -434,6 +441,7 @@ export class TrackingHistoryService {
 
   private isRateLimitOrTimeout(errorMessage: string): boolean {
     const normalizedMessage: string = errorMessage.toLowerCase();
+
     return (
       normalizedMessage.includes('rate limit') ||
       normalizedMessage.includes('http 429') ||

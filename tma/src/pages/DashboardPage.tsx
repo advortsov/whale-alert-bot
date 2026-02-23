@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button, Card, Placeholder, Section, Text, Title } from '@telegram-apps/telegram-ui';
+import { Button, Card, List, Placeholder, Section, Text, Title } from '@telegram-apps/telegram-ui';
 import { useNavigate } from 'react-router-dom';
 
 import { WalletCard } from '../components/WalletCard';
@@ -42,60 +42,62 @@ export const DashboardPage = (): React.JSX.Element => {
 
   return (
     <section className="tma-screen">
-      <Section>
-        <Title level="1" weight="2">
-          Whale Alert
-        </Title>
-        <Card className="tma-card">
-          <Text>Алертов сегодня: {initQuery.data.todayAlertCount}</Text>
-        </Card>
-      </Section>
+      <List>
+        <Section>
+          <Title level="1" weight="2">
+            Whale Alert
+          </Title>
+          <Card className="tma-card">
+            <Text>Алертов сегодня: {initQuery.data.todayAlertCount}</Text>
+          </Card>
+        </Section>
 
-      <Section header="Кошельки">
-        <div className="tma-grid">
-          {wallets.length === 0 ? (
-            <Placeholder header="Список пуст" description="Добавь первый кошелёк для отслеживания." />
-          ) : null}
-        {wallets.slice(0, 5).map((wallet) => (
-          <WalletCard key={wallet.walletId} wallet={wallet} />
-        ))}
-        </div>
-      </Section>
+        <Section header="Кошельки">
+          <div className="tma-grid">
+            {wallets.length === 0 ? (
+              <Placeholder header="Список пуст" description="Добавь первый кошелёк для отслеживания." />
+            ) : null}
+            {wallets.slice(0, 5).map((wallet) => (
+              <WalletCard key={wallet.walletId} wallet={wallet} />
+            ))}
+          </div>
+        </Section>
 
-      <Section>
-        <div className="tma-actions">
-          <Button
-            mode="filled"
-            size="m"
-            stretched
-            onClick={(): void => {
-              void navigate('/wallets');
-            }}
-          >
-            Все кошельки
-          </Button>
-          <Button
-            mode="bezeled"
-            size="m"
-            stretched
-            onClick={(): void => {
-              void navigate('/wallets/add');
-            }}
-          >
-            Добавить
-          </Button>
-          <Button
-            mode="gray"
-            size="m"
-            stretched
-            onClick={(): void => {
-              void navigate('/settings');
-            }}
-          >
-            Настройки
-          </Button>
-        </div>
-      </Section>
+        <Section>
+          <div className="tma-actions">
+            <Button
+              mode="filled"
+              size="m"
+              stretched
+              onClick={(): void => {
+                void navigate('/wallets');
+              }}
+            >
+              Все кошельки
+            </Button>
+            <Button
+              mode="bezeled"
+              size="m"
+              stretched
+              onClick={(): void => {
+                void navigate('/wallets/add');
+              }}
+            >
+              Добавить
+            </Button>
+            <Button
+              mode="gray"
+              size="m"
+              stretched
+              onClick={(): void => {
+                void navigate('/settings');
+              }}
+            >
+              Настройки
+            </Button>
+          </div>
+        </Section>
+      </List>
     </section>
   );
 };

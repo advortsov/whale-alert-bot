@@ -4,6 +4,7 @@ import type { HistoryCacheService } from './history-cache.service';
 import type { HistoryRateLimiterService } from './history-rate-limiter.service';
 import { TrackingAddressService } from './tracking-address.service';
 import { TrackingHistoryFormatterService } from './tracking-history-formatter.service';
+import { TrackingHistoryPageService } from './tracking-history-page.service';
 import { TrackingHistoryQueryParserService } from './tracking-history-query-parser.service';
 import {
   TrackingHistoryService,
@@ -152,6 +153,8 @@ const createTestContext = (): TestContext => {
     getStale: vi.fn(),
     set: vi.fn(),
   };
+  historyCacheServiceStub.getFresh.mockReturnValue(null);
+  historyCacheServiceStub.getStale.mockReturnValue(null);
   const historyRateLimiterServiceStub: HistoryRateLimiterServiceStub = {
     evaluate: vi.fn(),
     getSnapshot: vi.fn(),
@@ -311,6 +314,10 @@ const createTestContext = (): TestContext => {
   );
   const historyQueryParserService: TrackingHistoryQueryParserService =
     new TrackingHistoryQueryParserService();
+  const trackingHistoryPageService: TrackingHistoryPageService = new TrackingHistoryPageService(
+    walletEventsRepositoryStub as unknown as WalletEventsRepository,
+    historyFormatter,
+  );
 
   const walletsDeps = new TrackingWalletsServiceDependencies();
   (walletsDeps as { usersRepository: UsersRepository }).usersRepository =
@@ -377,8 +384,9 @@ const createTestContext = (): TestContext => {
     historyDeps as { historyRateLimiterService: HistoryRateLimiterService }
   ).historyRateLimiterService =
     historyRateLimiterServiceStub as unknown as HistoryRateLimiterService;
-  (historyDeps as { walletEventsRepository: WalletEventsRepository }).walletEventsRepository =
-    walletEventsRepositoryStub as unknown as WalletEventsRepository;
+  (
+    historyDeps as { trackingHistoryPageService: TrackingHistoryPageService }
+  ).trackingHistoryPageService = trackingHistoryPageService;
   (historyDeps as { historyFormatter: TrackingHistoryFormatterService }).historyFormatter =
     historyFormatter;
   (
@@ -535,6 +543,108 @@ describe('TrackingService', (): void => {
     expect(context.historyExplorerAdapterStub.loadRecentTransactions).toHaveBeenCalledTimes(1);
     expect(context.historyCacheServiceStub.set).toHaveBeenCalledTimes(1);
     expect(message).toContain('<a href="https://etherscan.io/tx/0xabc">Tx #1</a>');
+  });
+
+  it('returns structured history page items from local wallet events', async (): Promise<void> => {
+    const context: TestContext = createTestContext();
+    context.subscriptionsRepositoryStub.listByUserId.mockResolvedValue([
+      {
+        subscriptionId: 1,
+        walletId: 3,
+        chainKey: ChainKey.ETHEREUM_MAINNET,
+        walletAddress: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
+        walletLabel: 'vitalik',
+        createdAt: new Date('2026-02-01T00:00:00.000Z'),
+      },
+    ]);
+    context.walletEventsRepositoryStub.listRecentByTrackedAddress.mockResolvedValue([
+      {
+        chainId: 1,
+        chainKey: ChainKey.ETHEREUM_MAINNET,
+        txHash: '0xlocal1',
+        logIndex: 0,
+        trackedAddress: '0xd8da6bf26964af9d7eed9e03e53415d37aa96045',
+        eventType: 'TRANSFER',
+        direction: 'OUT',
+        assetStandard: 'ERC20',
+        contractAddress: '0xdac17f958d2ee523a2206206994597c13d831ec7',
+        tokenAddress: '0xdac17f958d2ee523a2206206994597c13d831ec7',
+        tokenSymbol: 'USDT',
+        tokenDecimals: 6,
+        tokenAmountRaw: '99000000',
+        valueFormatted: '99.000000',
+        dex: null,
+        pair: null,
+        occurredAt: new Date('2026-02-23T00:00:00.000Z'),
+      },
+    ]);
+
+    const page = await context.service.getAddressHistoryPageWithPolicy(context.userRef, {
+      rawAddress: '#3',
+      rawLimit: '10',
+      rawOffset: '0',
+      source: HistoryRequestSource.COMMAND,
+      rawKind: null,
+      rawDirection: null,
+    });
+
+    expect(page.items).toHaveLength(1);
+    expect(page.items[0]).toMatchObject({
+      txHash: '0xlocal1',
+      amountText: '99.000000 USDT',
+      chainKey: ChainKey.ETHEREUM_MAINNET,
+    });
+    expect(page.nextOffset).toBeNull();
+  });
+
+  it('returns structured history page items from explorer fallback when local is empty', async (): Promise<void> => {
+    const context: TestContext = createTestContext();
+    context.subscriptionsRepositoryStub.listByUserId.mockResolvedValue([
+      {
+        subscriptionId: 1,
+        walletId: 3,
+        chainKey: ChainKey.ETHEREUM_MAINNET,
+        walletAddress: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
+        walletLabel: 'vitalik',
+        createdAt: new Date('2026-02-01T00:00:00.000Z'),
+      },
+    ]);
+    context.walletEventsRepositoryStub.listRecentByTrackedAddress.mockResolvedValue([]);
+    context.historyExplorerAdapterStub.loadRecentTransactions.mockResolvedValue({
+      items: [
+        {
+          txHash: '0xfallback1',
+          from: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
+          to: '0x0000000000000000000000000000000000000001',
+          valueRaw: '1000000000000000000',
+          isError: false,
+          timestampSec: 1739160000,
+          assetSymbol: 'ETH',
+          assetDecimals: 18,
+          eventType: HistoryItemType.TRANSFER,
+          direction: HistoryDirection.OUT,
+          txLink: 'https://etherscan.io/tx/0xfallback1',
+        },
+      ],
+      nextOffset: 10,
+    });
+
+    const page = await context.service.getAddressHistoryPageWithPolicy(context.userRef, {
+      rawAddress: '#3',
+      rawLimit: '10',
+      rawOffset: '0',
+      source: HistoryRequestSource.COMMAND,
+      rawKind: null,
+      rawDirection: null,
+    });
+
+    expect(page.items).toHaveLength(1);
+    expect(page.items[0]).toMatchObject({
+      txHash: '0xfallback1',
+      amountText: '1.000000 ETH',
+      chainKey: ChainKey.ETHEREUM_MAINNET,
+    });
+    expect(page.nextOffset).toBe(10);
   });
 
   it('builds Solscan links for local Solana history entries', async (): Promise<void> => {

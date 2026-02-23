@@ -89,6 +89,7 @@ describe('tma wallets api', (): void => {
         message: 'history text only',
         limit: 10,
         offset: 0,
+        hasNextPage: false,
       }),
     };
 
@@ -109,6 +110,9 @@ describe('tma wallets api', (): void => {
           eventType: 'TRANSFER',
           direction: 'IN',
           amountText: '1 ETH',
+          txUrl: 'https://etherscan.io/tx/0xabc',
+          assetSymbol: 'ETH',
+          chainKey: 'ethereum_mainnet',
         },
         {
           txHash: 123,
@@ -125,8 +129,25 @@ describe('tma wallets api', (): void => {
           eventType: 'TRANSFER',
           direction: 'IN',
           amountText: '1 ETH',
+          txUrl: 'https://etherscan.io/tx/0xabc',
+          assetSymbol: 'ETH',
+          chainKey: 'ethereum_mainnet',
         },
       ],
+      nextOffset: 20,
+    });
+  });
+
+  it('derives nextOffset from paging fallback fields when explicit nextOffset is absent', (): void => {
+    const result = normalizeWalletHistoryResult({
+      items: [],
+      hasNextPage: true,
+      offset: 0,
+      limit: 20,
+    });
+
+    expect(result).toEqual({
+      items: [],
       nextOffset: 20,
     });
   });

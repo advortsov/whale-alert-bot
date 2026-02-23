@@ -1,5 +1,4 @@
 import React from 'react';
-import { Text } from '@telegram-apps/telegram-ui';
 
 import { ChainIcon } from './ChainIcon';
 
@@ -19,7 +18,7 @@ export const ChainBadge = ({ chainKey }: IChainBadgeProps): React.JSX.Element =>
   return (
     <span className="tma-chain-badge">
       <ChainIcon chainKey={chainKey} />
-      <Text>{label}</Text>
+      <span className="tma-chain-badge-label">{label}</span>
     </span>
   );
 };

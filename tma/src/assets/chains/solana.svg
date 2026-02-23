@@ -1,0 +1,12 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="32" cy="32" r="32" fill="#0E1018"/>
+  <defs>
+    <linearGradient id="solana-gradient" x1="14" y1="10" x2="50" y2="54" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#00FFA3"/>
+      <stop offset="1" stop-color="#DC1FFF"/>
+    </linearGradient>
+  </defs>
+  <path d="M18 18C18 16.9 18.9 16 20 16H49L42 23H18V18Z" fill="url(#solana-gradient)"/>
+  <path d="M15 29C15 27.9 15.9 27 17 27H46L39 34H15V29Z" fill="url(#solana-gradient)"/>
+  <path d="M18 40C18 38.9 18.9 38 20 38H49L42 45H18V40Z" fill="url(#solana-gradient)"/>
+</svg>

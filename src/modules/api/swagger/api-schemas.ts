@@ -230,6 +230,33 @@ export const HISTORY_PAGE_RESULT_SCHEMA: SchemaObject = {
     kind: { type: 'string', enum: ['all', 'eth', 'erc20'] },
     direction: { type: 'string', enum: ['all', 'in', 'out'] },
     hasNextPage: { type: 'boolean' },
+    nextOffset: { type: 'integer', nullable: true },
+    items: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          txHash: { type: 'string' },
+          occurredAt: { type: 'string', format: 'date-time' },
+          eventType: { type: 'string' },
+          direction: { type: 'string' },
+          amountText: { type: 'string' },
+          txUrl: { type: 'string' },
+          assetSymbol: { type: 'string', nullable: true },
+          chainKey: { type: 'string' },
+        },
+        required: [
+          'txHash',
+          'occurredAt',
+          'eventType',
+          'direction',
+          'amountText',
+          'txUrl',
+          'assetSymbol',
+          'chainKey',
+        ],
+      },
+    },
   },
 };
 

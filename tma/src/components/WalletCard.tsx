@@ -1,5 +1,5 @@
 import React from 'react';
-import { Badge, Button, Card, Cell } from '@telegram-apps/telegram-ui';
+import { Badge, Button, Cell } from '@telegram-apps/telegram-ui';
 import { useNavigate } from 'react-router-dom';
 
 import { formatShortAddress } from '../utils/format';
@@ -15,7 +15,7 @@ export const WalletCard = ({ wallet }: IWalletCardProps): React.JSX.Element => {
   const navigate = useNavigate();
 
   return (
-    <Card className="tma-wallet-card">
+    <article className="tma-wallet-card">
       <Cell
         subhead={<ChainBadge chainKey={wallet.chainKey} />}
         titleBadge={
@@ -30,6 +30,9 @@ export const WalletCard = ({ wallet }: IWalletCardProps): React.JSX.Element => {
           </span>
         }
         after={null}
+        onClick={(): void => {
+          void navigate(`/wallets/${wallet.walletId}`);
+        }}
       >
         {wallet.label ?? `Кошелёк #${wallet.walletId}`}
       </Cell>
@@ -41,7 +44,7 @@ export const WalletCard = ({ wallet }: IWalletCardProps): React.JSX.Element => {
             void navigate(`/wallets/${wallet.walletId}`);
           }}
         >
-          Открыть
+          Детали
         </Button>
         <Button
           mode="bezeled"
@@ -53,6 +56,6 @@ export const WalletCard = ({ wallet }: IWalletCardProps): React.JSX.Element => {
           История
         </Button>
       </div>
-    </Card>
+    </article>
   );
 };

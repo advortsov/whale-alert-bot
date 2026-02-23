@@ -1,5 +1,14 @@
 import React, { useState } from 'react';
-import { Button, Input, Placeholder, Section, Select, Title } from '@telegram-apps/telegram-ui';
+import {
+  Button,
+  FixedLayout,
+  Input,
+  List,
+  Placeholder,
+  Section,
+  Select,
+  Title,
+} from '@telegram-apps/telegram-ui';
 import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 
@@ -39,53 +48,63 @@ export const AddWalletPage = (): React.JSX.Element => {
 
   return (
     <section className="tma-screen">
-      <Section>
-        <Title level="2" weight="2">
-          Добавить кошелёк
-        </Title>
-      </Section>
-      <Section>
-        <form onSubmit={onSubmit} className="tma-form">
-          <Select
-            header="Сеть"
-            value={chainKey}
-            onChange={(event: React.ChangeEvent<HTMLSelectElement>): void => {
-              setChainKey(event.target.value);
-            }}
+      <form onSubmit={onSubmit} className="tma-add-wallet-form">
+        <List>
+          <Section>
+            <Title level="2" weight="2">
+              Добавить кошелёк
+            </Title>
+          </Section>
+          <Section>
+            <Select
+              header="Сеть"
+              value={chainKey}
+              onChange={(event: React.ChangeEvent<HTMLSelectElement>): void => {
+                setChainKey(event.target.value);
+              }}
+            >
+              <option value="ethereum_mainnet">ETH</option>
+              <option value="solana_mainnet">SOL</option>
+              <option value="tron_mainnet">TRON</option>
+            </Select>
+            <Input
+              header="Адрес"
+              value={address}
+              onChange={(event: React.ChangeEvent<HTMLInputElement>): void => {
+                setAddress(event.target.value);
+              }}
+              placeholder="Вставь адрес кошелька"
+            />
+            <Input
+              header="Label"
+              value={label}
+              onChange={(event: React.ChangeEvent<HTMLInputElement>): void => {
+                setLabel(event.target.value);
+              }}
+              placeholder="Необязательно"
+            />
+          </Section>
+          {addWalletMutation.isError ? (
+            <Section>
+              <Placeholder
+                header="Не удалось добавить кошелёк"
+                description="Проверь адрес и попробуй снова."
+              />
+            </Section>
+          ) : null}
+        </List>
+        <FixedLayout vertical="bottom" className="tma-fixed-action">
+          <Button
+            mode="filled"
+            size="m"
+            stretched
+            type="submit"
+            disabled={addWalletMutation.isPending}
           >
-            <option value="ethereum_mainnet">ETH</option>
-            <option value="solana_mainnet">SOL</option>
-            <option value="tron_mainnet">TRON</option>
-          </Select>
-          <Input
-            header="Адрес"
-            value={address}
-            onChange={(event: React.ChangeEvent<HTMLInputElement>): void => {
-              setAddress(event.target.value);
-            }}
-            placeholder="Вставь адрес кошелька"
-          />
-          <Input
-            header="Label"
-            value={label}
-            onChange={(event: React.ChangeEvent<HTMLInputElement>): void => {
-              setLabel(event.target.value);
-            }}
-            placeholder="Необязательно"
-          />
-          <Button mode="filled" size="m" stretched type="submit" disabled={addWalletMutation.isPending}>
-            Добавить
+            {addWalletMutation.isPending ? 'Добавляю…' : 'Добавить'}
           </Button>
-        </form>
-      </Section>
-      {addWalletMutation.isError ? (
-        <Section>
-          <Placeholder
-            header="Не удалось добавить кошелёк"
-            description="Проверь адрес и попробуй снова."
-          />
-        </Section>
-      ) : null}
+        </FixedLayout>
+      </form>
     </section>
   );
 };

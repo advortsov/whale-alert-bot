@@ -20,6 +20,7 @@ import { QuietHoursService } from './services/quiet-hours.service';
 import { TokenMetadataService } from './services/token-metadata.service';
 import { TrackingAddressService } from './services/tracking-address.service';
 import { TrackingHistoryFormatterService } from './services/tracking-history-formatter.service';
+import { TrackingHistoryPageService } from './services/tracking-history-page.service';
 import { TrackingHistoryQueryParserService } from './services/tracking-history-query-parser.service';
 import {
   TrackingHistoryService,
@@ -83,6 +84,7 @@ import { TronGridHistoryAdapter } from '../integrations/trongrid/tron-grid-histo
     HistoryRateLimiterService,
     TrackingAddressService,
     TrackingHistoryFormatterService,
+    TrackingHistoryPageService,
     TrackingHistoryQueryParserService,
     TrackingSettingsParserService,
     TrackingWalletsServiceDependencies,

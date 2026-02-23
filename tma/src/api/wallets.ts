@@ -7,13 +7,15 @@ import type {
   IWalletHistoryItem,
   IWalletDetailDto,
   IWalletHistoryResult,
-  IWalletListResult,
   IWalletSummaryDto,
 } from '../types/api.types';
 
 interface IRawWalletHistoryResult {
   readonly items?: unknown;
   readonly nextOffset?: unknown;
+  readonly hasNextPage?: unknown;
+  readonly offset?: unknown;
+  readonly limit?: unknown;
 }
 
 interface IRawWalletListResult {
@@ -165,7 +167,10 @@ const isHistoryItem = (value: unknown): value is IWalletHistoryItem => {
     typeof item['occurredAt'] === 'string' &&
     typeof item['eventType'] === 'string' &&
     typeof item['direction'] === 'string' &&
-    typeof item['amountText'] === 'string'
+    typeof item['amountText'] === 'string' &&
+    typeof item['txUrl'] === 'string' &&
+    (typeof item['assetSymbol'] === 'string' || item['assetSymbol'] === null) &&
+    typeof item['chainKey'] === 'string'
   );
 };
 
@@ -181,8 +186,23 @@ export const normalizeWalletHistoryResult = (raw: unknown): IWalletHistoryResult
     : [];
 
   const nextOffsetRaw: unknown = candidate.nextOffset;
-  const nextOffset: number | null =
+  let nextOffset: number | null =
     typeof nextOffsetRaw === 'number' && Number.isInteger(nextOffsetRaw) ? nextOffsetRaw : null;
+
+  if (nextOffset === null) {
+    const hasNextPageRaw: unknown = candidate.hasNextPage;
+    const offsetRaw: unknown = candidate.offset;
+    const limitRaw: unknown = candidate.limit;
+    if (
+      hasNextPageRaw === true &&
+      typeof offsetRaw === 'number' &&
+      Number.isInteger(offsetRaw) &&
+      typeof limitRaw === 'number' &&
+      Number.isInteger(limitRaw)
+    ) {
+      nextOffset = offsetRaw + limitRaw;
+    }
+  }
 
   return {
     items,

@@ -1,9 +1,13 @@
 import React from 'react';
 
-const CHAIN_ICON_BY_KEY: Record<string, string> = {
-  ethereum_mainnet: 'Ξ',
-  solana_mainnet: '◎',
-  tron_mainnet: '◉',
+import ethereumIcon from '../assets/chains/ethereum.svg';
+import solanaIcon from '../assets/chains/solana.svg';
+import tronIcon from '../assets/chains/tron.svg';
+
+const CHAIN_ICON_SRC_BY_KEY: Record<string, string> = {
+  ethereum_mainnet: ethereumIcon,
+  solana_mainnet: solanaIcon,
+  tron_mainnet: tronIcon,
 };
 
 const CHAIN_CLASS_BY_KEY: Record<string, string> = {
@@ -17,11 +21,24 @@ interface IChainIconProps {
 }
 
 export const ChainIcon = ({ chainKey }: IChainIconProps): React.JSX.Element => {
-  const icon: string = CHAIN_ICON_BY_KEY[chainKey] ?? '◌';
+  const iconSrc: string | undefined = CHAIN_ICON_SRC_BY_KEY[chainKey];
   const chainClassName: string = CHAIN_CLASS_BY_KEY[chainKey] ?? 'tma-chain-icon--default';
+
+  if (iconSrc !== undefined) {
+    return (
+      <img
+        alt={chainKey}
+        aria-label={chainKey}
+        className={`tma-chain-icon ${chainClassName}`}
+        src={iconSrc}
+        loading="lazy"
+      />
+    );
+  }
+
   return (
     <span aria-label={chainKey} className={`tma-chain-icon ${chainClassName}`}>
-      {icon}
+      ?
     </span>
   );
 };
