@@ -186,6 +186,27 @@ describe('tma wallets api', (): void => {
     expect(result.walletId).toBe(18);
   });
 
+  it('normalizes wallet ids provided as strings', async (): Promise<void> => {
+    const apiClientStub: ApiClientStub = {
+      request: vi.fn().mockResolvedValue({
+        wallets: [
+          {
+            walletId: '21',
+            chainKey: 'tron_mainnet',
+            address: 'TEDVku9LrQDLdbg1ik6HrRtK6Uimg8epSV',
+            label: 'tron',
+            createdAt: '2026-02-23T00:00:00.000Z',
+          },
+        ],
+      }),
+    };
+
+    const result = await loadWallets(apiClientStub as unknown as ApiClient);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.walletId).toBe(21);
+  });
+
   it('filters malformed wallets from list response and keeps valid ones', async (): Promise<void> => {
     const apiClientStub: ApiClientStub = {
       request: vi.fn().mockResolvedValue({
@@ -208,5 +229,19 @@ describe('tma wallets api', (): void => {
 
     expect(result).toHaveLength(1);
     expect(result[0]?.walletId).toBe(7);
+  });
+
+  it('derives nextOffset when paging fields are numeric strings', (): void => {
+    const result = normalizeWalletHistoryResult({
+      items: [],
+      hasNextPage: true,
+      offset: '10',
+      limit: '5',
+    });
+
+    expect(result).toEqual({
+      items: [],
+      nextOffset: 15,
+    });
   });
 });

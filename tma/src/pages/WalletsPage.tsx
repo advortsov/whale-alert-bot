@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Button, List, Placeholder, Section, Title } from '@telegram-apps/telegram-ui';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -12,6 +12,7 @@ import type { IWalletSummaryDto } from '../types/api.types';
 export const WalletsPage = (): React.JSX.Element => {
   const navigate = useNavigate();
   const { apiClient, isReady } = useAuth();
+  const hasBootRefetched = useRef<boolean>(false);
   const walletsQuery: UseQueryResult<readonly IWalletSummaryDto[]> = useQuery<
     readonly IWalletSummaryDto[]
   >({
@@ -21,6 +22,15 @@ export const WalletsPage = (): React.JSX.Element => {
     },
     enabled: isReady,
   });
+
+  useEffect((): void => {
+    if (!isReady || hasBootRefetched.current) {
+      return;
+    }
+
+    hasBootRefetched.current = true;
+    void walletsQuery.refetch();
+  }, [isReady, walletsQuery.refetch]);
 
   if (walletsQuery.isLoading) {
     return <LoadingSpinner />;

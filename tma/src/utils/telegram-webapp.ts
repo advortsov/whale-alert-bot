@@ -1,3 +1,11 @@
+interface ITelegramBackButton {
+  readonly isVisible?: boolean;
+  show(): void;
+  hide(): void;
+  onClick(callback: () => void): void;
+  offClick(callback: () => void): void;
+}
+
 export interface ITelegramWebApp {
   readonly initData: string;
   readonly initDataUnsafe?: {
@@ -5,9 +13,11 @@ export interface ITelegramWebApp {
   };
   readonly themeParams?: Readonly<Record<string, string>>;
   readonly colorScheme?: 'light' | 'dark';
+  readonly BackButton?: ITelegramBackButton;
   ready(): void;
   expand(): void;
   close(): void;
+  openLink(url: string, options?: { try_instant_view?: boolean }): void;
 }
 
 interface ITelegramWindow {
@@ -42,6 +52,23 @@ export const getStartParam = (): string | null => {
   }
 
   return startParam;
+};
+
+export const openExternalLink = (url: string): void => {
+  const normalizedUrl: string = url.trim();
+
+  if (normalizedUrl.length === 0) {
+    return;
+  }
+
+  const webApp: ITelegramWebApp | null = getTelegramWebApp();
+
+  if (webApp !== null) {
+    webApp.openLink(normalizedUrl, { try_instant_view: false });
+    return;
+  }
+
+  window.open(normalizedUrl, '_blank', 'noopener,noreferrer');
 };
 
 const readParamFromLocation = (paramName: string): string | null => {

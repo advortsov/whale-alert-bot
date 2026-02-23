@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { sql } from 'kysely';
 
 import type {
   SaveWalletEventInput,
@@ -8,6 +9,26 @@ import { ChainKey } from '../../common/interfaces/chain-key.interfaces';
 import { ChainId } from '../../common/interfaces/chain.types';
 import { DatabaseService } from '../kysely/database.service';
 import type { NewWalletEventRow } from '../types/database.types';
+
+type WalletEventHistoryRow = {
+  readonly chain_id: number;
+  readonly chain_key: string;
+  readonly tx_hash: string;
+  readonly log_index: number;
+  readonly tracked_address: string;
+  readonly event_type: string;
+  readonly direction: string;
+  readonly asset_standard: string;
+  readonly contract_address: string | null;
+  readonly token_address: string | null;
+  readonly token_symbol: string | null;
+  readonly token_decimals: number | null;
+  readonly token_amount_raw: string | null;
+  readonly value_formatted: string | null;
+  readonly dex: string | null;
+  readonly pair: string | null;
+  readonly occurred_at: Date;
+};
 
 @Injectable()
 export class WalletEventsRepository {
@@ -23,20 +44,13 @@ export class WalletEventsRepository {
         }
       | undefined = await this.databaseService
       .getDb()
-      .selectFrom('wallet_events')
-      .innerJoin('tracked_wallets', (join) =>
-        join
-          .onRef('tracked_wallets.address', '=', 'wallet_events.tracked_address')
-          .onRef('tracked_wallets.chain_key', '=', 'wallet_events.chain_key'),
-      )
-      .innerJoin(
-        'user_wallet_subscriptions',
-        'user_wallet_subscriptions.wallet_id',
-        'tracked_wallets.id',
-      )
+      .selectFrom('user_wallet_subscriptions')
+      .innerJoin('tracked_wallets', 'tracked_wallets.id', 'user_wallet_subscriptions.wallet_id')
+      .innerJoin('wallet_events', 'wallet_events.chain_key', 'tracked_wallets.chain_key')
       .select((expressionBuilder) => expressionBuilder.fn.count('wallet_events.id').as('total'))
       .where('user_wallet_subscriptions.user_id', '=', userId)
       .where('wallet_events.occurred_at', '>=', utcDayStart)
+      .where(sql<boolean>`lower(wallet_events.tracked_address) = lower(tracked_wallets.address)`)
       .executeTakeFirst();
 
     return Number(row?.total ?? 0);
@@ -44,12 +58,13 @@ export class WalletEventsRepository {
 
   public async saveEvent(input: SaveWalletEventInput): Promise<void> {
     const { event, occurredAt } = input;
+    const chainKey: ChainKey = this.mapChainIdToChainKey(event.chainId);
     const insertRow: NewWalletEventRow = {
       chain_id: event.chainId,
-      chain_key: this.mapChainIdToChainKey(event.chainId),
+      chain_key: chainKey,
       tx_hash: event.txHash,
       log_index: event.logIndex,
-      tracked_address: event.trackedAddress.toLowerCase(),
+      tracked_address: this.normalizeTrackedAddressForStorage(chainKey, event.trackedAddress),
       event_type: event.eventType,
       direction: event.direction,
       asset_standard: event.assetStandard,
@@ -80,25 +95,73 @@ export class WalletEventsRepository {
     limit: number,
     offset: number = 0,
   ): Promise<readonly WalletEventHistoryView[]> {
-    const rows: readonly {
-      chain_id: number;
-      chain_key: string;
-      tx_hash: string;
-      log_index: number;
-      tracked_address: string;
-      event_type: string;
-      direction: string;
-      asset_standard: string;
-      contract_address: string | null;
-      token_address: string | null;
-      token_symbol: string | null;
-      token_decimals: number | null;
-      token_amount_raw: string | null;
-      value_formatted: string | null;
-      dex: string | null;
-      pair: string | null;
-      occurred_at: Date;
-    }[] = await this.databaseService
+    const trackedAddressCandidates: readonly string[] = this.resolveTrackedAddressCandidates(
+      chainKey,
+      trackedAddress,
+    );
+    const rows: readonly WalletEventHistoryRow[] = await this.loadHistoryRows(
+      chainKey,
+      trackedAddressCandidates,
+      limit,
+      offset,
+    );
+
+    return rows.map(
+      (row: WalletEventHistoryRow): WalletEventHistoryView => this.mapRowToHistoryView(row),
+    );
+  }
+
+  private mapChainIdToChainKey(chainId: ChainId): ChainKey {
+    if (chainId === ChainId.ETHEREUM_MAINNET) {
+      return ChainKey.ETHEREUM_MAINNET;
+    }
+
+    if (chainId === ChainId.SOLANA_MAINNET) {
+      return ChainKey.SOLANA_MAINNET;
+    }
+
+    return ChainKey.TRON_MAINNET;
+  }
+
+  private normalizeTrackedAddressForStorage(chainKey: ChainKey, trackedAddress: string): string {
+    const normalizedAddress: string = trackedAddress.trim();
+
+    if (chainKey === ChainKey.ETHEREUM_MAINNET) {
+      return normalizedAddress.toLowerCase();
+    }
+
+    return normalizedAddress;
+  }
+
+  private resolveTrackedAddressCandidates(
+    chainKey: ChainKey,
+    trackedAddress: string,
+  ): readonly string[] {
+    const normalizedAddress: string = this.normalizeTrackedAddressForStorage(
+      chainKey,
+      trackedAddress,
+    );
+
+    if (chainKey === ChainKey.ETHEREUM_MAINNET) {
+      return [normalizedAddress];
+    }
+
+    const legacyLowercaseAddress: string = trackedAddress.trim().toLowerCase();
+
+    if (legacyLowercaseAddress === normalizedAddress) {
+      return [normalizedAddress];
+    }
+
+    return [normalizedAddress, legacyLowercaseAddress];
+  }
+
+  private async loadHistoryRows(
+    chainKey: ChainKey,
+    trackedAddressCandidates: readonly string[],
+    limit: number,
+    offset: number,
+  ): Promise<readonly WalletEventHistoryRow[]> {
+    let query = this.databaseService
       .getDb()
       .selectFrom('wallet_events')
       .select([
@@ -120,45 +183,36 @@ export class WalletEventsRepository {
         'pair',
         'occurred_at',
       ])
-      .where('chain_key', '=', chainKey)
-      .where('tracked_address', '=', trackedAddress.toLowerCase())
-      .orderBy('occurred_at', 'desc')
-      .limit(limit)
-      .offset(offset)
-      .execute();
+      .where('chain_key', '=', chainKey);
 
-    return rows.map(
-      (row): WalletEventHistoryView => ({
-        chainId: row.chain_id,
-        chainKey: row.chain_key,
-        txHash: row.tx_hash,
-        logIndex: row.log_index,
-        trackedAddress: row.tracked_address,
-        eventType: row.event_type,
-        direction: row.direction,
-        assetStandard: row.asset_standard,
-        contractAddress: row.contract_address,
-        tokenAddress: row.token_address,
-        tokenSymbol: row.token_symbol,
-        tokenDecimals: row.token_decimals,
-        tokenAmountRaw: row.token_amount_raw,
-        valueFormatted: row.value_formatted,
-        dex: row.dex,
-        pair: row.pair,
-        occurredAt: row.occurred_at,
-      }),
-    );
+    if (trackedAddressCandidates.length === 1) {
+      query = query.where('tracked_address', '=', trackedAddressCandidates[0] ?? '');
+    } else {
+      query = query.where('tracked_address', 'in', trackedAddressCandidates);
+    }
+
+    return query.orderBy('occurred_at', 'desc').limit(limit).offset(offset).execute();
   }
 
-  private mapChainIdToChainKey(chainId: ChainId): ChainKey {
-    if (chainId === ChainId.ETHEREUM_MAINNET) {
-      return ChainKey.ETHEREUM_MAINNET;
-    }
-
-    if (chainId === ChainId.SOLANA_MAINNET) {
-      return ChainKey.SOLANA_MAINNET;
-    }
-
-    return ChainKey.TRON_MAINNET;
+  private mapRowToHistoryView(row: WalletEventHistoryRow): WalletEventHistoryView {
+    return {
+      chainId: row.chain_id,
+      chainKey: row.chain_key,
+      txHash: row.tx_hash,
+      logIndex: row.log_index,
+      trackedAddress: row.tracked_address,
+      eventType: row.event_type,
+      direction: row.direction,
+      assetStandard: row.asset_standard,
+      contractAddress: row.contract_address,
+      tokenAddress: row.token_address,
+      tokenSymbol: row.token_symbol,
+      tokenDecimals: row.token_decimals,
+      tokenAmountRaw: row.token_amount_raw,
+      valueFormatted: row.value_formatted,
+      dex: row.dex,
+      pair: row.pair,
+      occurredAt: row.occurred_at,
+    };
   }
 }

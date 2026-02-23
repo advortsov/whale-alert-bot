@@ -647,6 +647,64 @@ describe('TrackingService', (): void => {
     expect(page.nextOffset).toBe(10);
   });
 
+  it('returns explorer fallback page for offset request when local offset page is empty', async (): Promise<void> => {
+    const context: TestContext = createTestContext();
+    context.subscriptionsRepositoryStub.listByUserId.mockResolvedValue([
+      {
+        subscriptionId: 1,
+        walletId: 6,
+        chainKey: ChainKey.TRON_MAINNET,
+        walletAddress: 'TEDVku9LrQDLdbg1ik6HrRtK6Uimg8epSV',
+        walletLabel: 'tron-main',
+        createdAt: new Date('2026-02-01T00:00:00.000Z'),
+      },
+    ]);
+    context.walletEventsRepositoryStub.listRecentByTrackedAddress.mockResolvedValue([]);
+    context.historyExplorerAdapterStub.loadRecentTransactions.mockResolvedValue({
+      items: [
+        {
+          txHash: '0xoffsetfallback',
+          from: 'TEDVku9LrQDLdbg1ik6HrRtK6Uimg8epSV',
+          to: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
+          valueRaw: '1000000',
+          isError: false,
+          timestampSec: 1739160000,
+          assetSymbol: 'TRX',
+          assetDecimals: 6,
+          eventType: HistoryItemType.TRANSFER,
+          direction: HistoryDirection.OUT,
+          txLink: 'https://tronscan.org/#/transaction/0xoffsetfallback',
+        },
+      ],
+      nextOffset: 20,
+    });
+
+    const page = await context.service.getAddressHistoryPageWithPolicy(context.userRef, {
+      rawAddress: '#6',
+      rawLimit: '10',
+      rawOffset: '10',
+      source: HistoryRequestSource.COMMAND,
+      rawKind: null,
+      rawDirection: null,
+    });
+
+    expect(context.historyExplorerAdapterStub.loadRecentTransactions).toHaveBeenCalledWith({
+      chainKey: ChainKey.TRON_MAINNET,
+      address: 'TEDVku9LrQDLdbg1ik6HrRtK6Uimg8epSV',
+      limit: 10,
+      offset: 10,
+      kind: HistoryKind.ALL,
+      direction: HistoryDirectionFilter.ALL,
+      minAmountUsd: null,
+    });
+    expect(page.items).toHaveLength(1);
+    expect(page.items[0]).toMatchObject({
+      txHash: '0xoffsetfallback',
+      chainKey: ChainKey.TRON_MAINNET,
+    });
+    expect(page.nextOffset).toBe(20);
+  });
+
   it('builds Solscan links for local Solana history entries', async (): Promise<void> => {
     const context: TestContext = createTestContext();
     context.historyCacheServiceStub.getFresh.mockReturnValue(null);

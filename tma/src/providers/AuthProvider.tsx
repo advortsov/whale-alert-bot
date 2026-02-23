@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { loginWithInitData } from '../api/auth';
 import { ApiClient, type IApiClientContext } from '../api/client';
@@ -52,6 +52,7 @@ export const AuthProvider = ({ children }: IAuthProviderProps): React.JSX.Elemen
   const [accessToken, setAccessToken] = useState<string | null>(readStoredToken(ACCESS_TOKEN_KEY));
   const [isReady, setIsReady] = useState<boolean>(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const bootstrappedRef = useRef<boolean>(false);
 
   const clearTokens = useCallback((): void => {
     sessionStorage.removeItem(ACCESS_TOKEN_KEY);
@@ -79,6 +80,11 @@ export const AuthProvider = ({ children }: IAuthProviderProps): React.JSX.Elemen
   }, [applyTokens]);
 
   useEffect((): void => {
+    if (bootstrappedRef.current) {
+      return;
+    }
+
+    bootstrappedRef.current = true;
     const webApp = getTelegramWebApp();
     if (webApp !== null) {
       webApp.ready();
@@ -108,7 +114,7 @@ export const AuthProvider = ({ children }: IAuthProviderProps): React.JSX.Elemen
     };
 
     void bootstrap();
-  }, [accessToken, clearTokens, login]);
+  }, [clearTokens, login]);
 
   const apiClient = useMemo((): ApiClient => {
     const context: IApiClientContext = {

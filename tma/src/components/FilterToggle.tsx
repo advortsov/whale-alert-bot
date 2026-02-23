@@ -10,7 +10,7 @@ interface IFilterToggleProps {
 export const FilterToggle = ({ label, value, onChange }: IFilterToggleProps): React.JSX.Element => {
   return (
     <Cell
-      before={<span className="tma-setting-label">{label}</span>}
+      multiline
       after={
         <Switch
           checked={value}
@@ -19,6 +19,8 @@ export const FilterToggle = ({ label, value, onChange }: IFilterToggleProps): Re
           }}
         />
       }
-    />
+    >
+      {label}
+    </Cell>
   );
 };

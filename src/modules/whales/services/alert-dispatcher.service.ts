@@ -68,10 +68,11 @@ export class AlertDispatcherService implements IAlertDispatcher {
   }
 
   public async dispatch(event: ClassifiedEvent): Promise<void> {
-    this.logger.debug(
-      `dispatch start eventType=${event.eventType} trackedAddress=${event.trackedAddress} txHash=${event.txHash}`,
-    );
     const chainKey: ChainKey = this.resolveChainKey(event.chainId);
+
+    this.logger.debug(
+      `dispatch start chain=${chainKey} eventType=${event.eventType} trackedAddress=${event.trackedAddress} txHash=${event.txHash}`,
+    );
     const subscribers: readonly SubscriberWalletRecipient[] =
       await this.subscriptionsRepository.listSubscriberWalletRecipientsByAddress(
         chainKey,
@@ -80,7 +81,7 @@ export class AlertDispatcherService implements IAlertDispatcher {
 
     if (subscribers.length === 0) {
       this.logger.debug(
-        `dispatch skipped no subscribers trackedAddress=${event.trackedAddress} txHash=${event.txHash}`,
+        `dispatch skipped no subscribers chain=${chainKey} trackedAddress=${event.trackedAddress} txHash=${event.txHash}`,
       );
       return;
     }
@@ -89,7 +90,7 @@ export class AlertDispatcherService implements IAlertDispatcher {
 
     if (suppressionDecision.suppressed) {
       this.logger.debug(
-        `dispatch suppressed eventType=${event.eventType} trackedAddress=${event.trackedAddress} txHash=${event.txHash} reason=${suppressionDecision.reason ?? 'n/a'}`,
+        `dispatch suppressed chain=${chainKey} eventType=${event.eventType} trackedAddress=${event.trackedAddress} txHash=${event.txHash} reason=${suppressionDecision.reason ?? 'n/a'}`,
       );
       return;
     }
@@ -98,7 +99,7 @@ export class AlertDispatcherService implements IAlertDispatcher {
     const eventUsdContext: IEventUsdContext = await this.resolveUsdContext(enrichedEvent, chainKey);
 
     this.logger.log(
-      `dispatch sending eventType=${event.eventType} recipients=${subscribers.length} txHash=${event.txHash}`,
+      `dispatch sending chain=${chainKey} eventType=${event.eventType} recipients=${subscribers.length} txHash=${event.txHash}`,
     );
 
     let successfulDeliveries: number = 0;
@@ -113,7 +114,7 @@ export class AlertDispatcherService implements IAlertDispatcher {
 
       if (decision.skip) {
         this.logger.debug(
-          `dispatch skipped by user policy telegramId=${subscriber.telegramId} walletId=${String(subscriber.walletId)} txHash=${event.txHash} reason=${decision.reason ?? 'n/a'}`,
+          `dispatch skipped by user policy chain=${chainKey} telegramId=${subscriber.telegramId} walletId=${String(subscriber.walletId)} txHash=${event.txHash} reason=${decision.reason ?? 'n/a'}`,
         );
         continue;
       }
@@ -134,13 +135,13 @@ export class AlertDispatcherService implements IAlertDispatcher {
       } catch (error: unknown) {
         const errorMessage: string = error instanceof Error ? error.message : String(error);
         this.logger.warn(
-          `dispatch delivery failed telegramId=${subscriber.telegramId} walletId=${String(subscriber.walletId)} txHash=${event.txHash} reason=${errorMessage}`,
+          `dispatch delivery failed chain=${chainKey} telegramId=${subscriber.telegramId} walletId=${String(subscriber.walletId)} txHash=${event.txHash} reason=${errorMessage}`,
         );
       }
     }
 
     this.logger.debug(
-      `dispatch complete txHash=${event.txHash} successful=${successfulDeliveries} failed=${subscribers.length - successfulDeliveries}`,
+      `dispatch complete chain=${chainKey} txHash=${event.txHash} successful=${successfulDeliveries} failed=${subscribers.length - successfulDeliveries}`,
     );
   }
 

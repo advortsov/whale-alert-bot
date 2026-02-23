@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Button,
   FixedLayout,
@@ -15,6 +15,7 @@ import { useNavigate } from 'react-router-dom';
 import { addWallet } from '../api/wallets';
 import { useAuth } from '../hooks/useAuth';
 import type { ITrackWalletRequest, ITrackWalletResult } from '../types/api.types';
+import { getTelegramWebApp } from '../utils/telegram-webapp';
 
 const DEFAULT_CHAIN_KEY: string = 'ethereum_mainnet';
 
@@ -24,6 +25,27 @@ export const AddWalletPage = (): React.JSX.Element => {
   const [chainKey, setChainKey] = useState<string>(DEFAULT_CHAIN_KEY);
   const [address, setAddress] = useState<string>('');
   const [label, setLabel] = useState<string>('');
+
+  useEffect((): (() => void) => {
+    const webApp = getTelegramWebApp();
+    const backButton = webApp?.BackButton;
+
+    if (backButton === undefined) {
+      return (): void => undefined;
+    }
+
+    const handleBackClick = (): void => {
+      void navigate('/wallets');
+    };
+
+    backButton.show();
+    backButton.onClick(handleBackClick);
+
+    return (): void => {
+      backButton.offClick(handleBackClick);
+      backButton.hide();
+    };
+  }, [navigate]);
 
   const addWalletMutation = useMutation({
     mutationFn: async (payload: ITrackWalletRequest): Promise<ITrackWalletResult> => {
@@ -54,6 +76,16 @@ export const AddWalletPage = (): React.JSX.Element => {
             <Title level="2" weight="2">
               Добавить кошелёк
             </Title>
+            <Button
+              mode="plain"
+              size="s"
+              className="tma-back-link-button"
+              onClick={(): void => {
+                void navigate('/wallets');
+              }}
+            >
+              ← Назад
+            </Button>
           </Section>
           <Section>
             <Select

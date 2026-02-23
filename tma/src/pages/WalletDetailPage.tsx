@@ -22,6 +22,7 @@ import { ChainBadge } from '../components/ChainBadge';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { useAuth } from '../hooks/useAuth';
 import type { IWalletDetailDto, IWalletHistoryResult } from '../types/api.types';
+import { openExternalLink } from '../utils/telegram-webapp';
 
 const DEFAULT_HISTORY_OFFSET: number = 0;
 const DEFAULT_HISTORY_LIMIT: number = 20;
@@ -51,7 +52,7 @@ export const WalletDetailPage = (): React.JSX.Element => {
     getNextPageParam: (lastPage: IWalletHistoryResult): number | null => {
       return lastPage.nextOffset;
     },
-    enabled: isReady && Number.isInteger(walletId),
+    enabled: isReady && Number.isInteger(walletId) && walletQuery.isSuccess,
   });
 
   const muteMutation = useMutation({
@@ -100,16 +101,11 @@ export const WalletDetailPage = (): React.JSX.Element => {
     );
   }
 
-  if (walletQuery.isLoading || historyQuery.isLoading) {
+  if (walletQuery.isLoading) {
     return <LoadingSpinner />;
   }
 
-  if (
-    walletQuery.isError ||
-    historyQuery.isError ||
-    walletQuery.data === undefined ||
-    historyQuery.data === undefined
-  ) {
+  if (walletQuery.isError || walletQuery.data === undefined) {
     return (
       <section className="tma-screen tma-screen-centered">
         <Placeholder header="Не удалось загрузить карточку кошелька" />
@@ -121,15 +117,17 @@ export const WalletDetailPage = (): React.JSX.Element => {
   const historyItems = historyPages.flatMap((page: IWalletHistoryResult) => page.items);
   const isMuted: boolean = walletQuery.data.activeMute !== null;
   const isActionPending: boolean = muteMutation.isPending || unmuteMutation.isPending;
-  const hasNextHistoryPage: boolean = historyQuery.hasNextPage;
+  const hasNextHistoryPage: boolean = historyQuery.hasNextPage === true;
   const isHistoryFetching: boolean = historyQuery.isFetchingNextPage;
+  const historyErrorMessage: string | null =
+    historyQuery.error instanceof Error ? historyQuery.error.message : null;
 
   return (
     <section className="tma-screen">
       <List>
         <Section>
           <Title level="2" weight="2">
-            Кошелёк #{walletQuery.data.walletId}
+            Кошелёк {walletQuery.data.walletId}
           </Title>
           <ChainBadge chainKey={walletQuery.data.chainKey} />
           <Text>{walletQuery.data.label ?? 'Без label'}</Text>
@@ -147,7 +145,24 @@ export const WalletDetailPage = (): React.JSX.Element => {
 
         <section id="history">
           <Section header={`История транзакций (${historyItems.length})`}>
-            {historyItems.length === 0 ? (
+            {historyQuery.isLoading ? <Text>Загрузка истории…</Text> : null}
+            {historyQuery.isError ? (
+              <Placeholder
+                header="Не удалось загрузить историю"
+                description={historyErrorMessage ?? 'Повтори запрос.'}
+              >
+                <Button
+                  mode="bezeled"
+                  size="s"
+                  onClick={(): void => {
+                    void historyQuery.refetch();
+                  }}
+                >
+                  Повторить
+                </Button>
+              </Placeholder>
+            ) : null}
+            {historyItems.length === 0 && !historyQuery.isError && !historyQuery.isLoading ? (
               <Placeholder header="Пока нет событий" />
             ) : (
               historyItems.map((item) => (
@@ -155,9 +170,16 @@ export const WalletDetailPage = (): React.JSX.Element => {
                   key={`${item.txHash}-${item.occurredAt}`}
                   subtitle={new Date(item.occurredAt).toLocaleString('ru-RU', { hour12: false })}
                   after={
-                    <a href={item.txUrl} target="_blank" rel="noreferrer" className="tma-tx-link">
+                    <Button
+                      mode="plain"
+                      size="s"
+                      className="tma-tx-link-button"
+                      onClick={(): void => {
+                        openExternalLink(item.txUrl);
+                      }}
+                    >
                       Tx
-                    </a>
+                    </Button>
                   }
                 >
                   {item.eventType} • {item.direction} • {item.amountText}

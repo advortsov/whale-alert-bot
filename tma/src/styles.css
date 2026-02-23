@@ -46,12 +46,16 @@ a {
 
 .tma-grid {
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
 .tma-actions {
   display: grid;
   gap: 10px;
+}
+
+.tma-actions > button {
+  min-height: 44px;
 }
 
 .tma-add-wallet-form {
@@ -60,13 +64,12 @@ a {
 
 .tma-wallet-card {
   border-radius: 14px;
-  overflow: hidden;
-  background: var(--tg-theme-secondary-bg-color, rgba(255, 255, 255, 0.04));
+  background: var(--tg-theme-secondary-bg-color, rgba(255, 255, 255, 0.03));
 }
 
 .tma-wallet-card-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   padding: 0 10px 10px;
 }
@@ -79,6 +82,11 @@ a {
 
 .tma-card {
   padding: 12px;
+}
+
+.tma-back-link-button {
+  margin-top: 8px;
+  padding-left: 0;
 }
 
 .tma-chain-badge {
@@ -124,8 +132,9 @@ a {
   background: var(--tg-theme-secondary-bg-color, rgba(255, 255, 255, 0.12));
 }
 
-.tma-tx-link {
+.tma-tx-link-button {
+  min-height: 28px;
   font-size: 12px;
-  text-decoration: none;
   font-weight: 600;
+  padding: 0;
 }

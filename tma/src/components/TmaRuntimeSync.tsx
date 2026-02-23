@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 import { parseDeepLink } from '../utils/deep-link';
 import { getStartParam, getTelegramWebApp } from '../utils/telegram-webapp';
@@ -16,6 +16,7 @@ const ALLOWED_THEME_KEYS: ReadonlySet<string> = new Set([
 
 export const TmaRuntimeSync = (): React.JSX.Element => {
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect((): void => {
     const webApp = getTelegramWebApp();
@@ -33,9 +34,13 @@ export const TmaRuntimeSync = (): React.JSX.Element => {
     const parsedDeepLink = parseDeepLink(startParam);
 
     if (parsedDeepLink !== null && parsedDeepLink.type === 'wallet') {
-      void navigate(`/wallets/${parsedDeepLink.id}`, { replace: true });
+      const targetPath: string = `/wallets/${parsedDeepLink.id}`;
+
+      if (location.pathname !== targetPath) {
+        void navigate(targetPath, { replace: true });
+      }
     }
-  }, [navigate]);
+  }, [location.pathname, navigate]);
 
   return <Outlet />;
 };

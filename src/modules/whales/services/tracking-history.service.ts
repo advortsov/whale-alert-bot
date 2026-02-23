@@ -114,7 +114,10 @@ export class TrackingHistoryService {
       });
 
     if (localHistoryPage.pageEvents.length === 0) {
-      throw new Error('Нет дополнительных локальных событий. Нажми «Обновить».');
+      return this.buildOffsetHistoryPageFromExplorer({
+        target,
+        historyParams,
+      });
     }
 
     return this.buildOffsetHistoryPage({
@@ -300,6 +303,44 @@ export class TrackingHistoryService {
       hasNextPage: context.localHistoryPage.hasNextPage,
       items,
       nextOffset: context.localHistoryPage.nextOffset,
+    };
+  }
+
+  private async buildOffsetHistoryPageFromExplorer(context: {
+    readonly target: IHistoryTargetSnapshot;
+    readonly historyParams: IParsedHistoryQueryParams;
+  }): Promise<HistoryPageResult> {
+    const explorerPage: IHistoryPageDto =
+      await this.deps.historyExplorerAdapter.loadRecentTransactions({
+        chainKey: context.target.chainKey,
+        address: context.target.address,
+        limit: context.historyParams.limit,
+        offset: context.historyParams.offset,
+        kind: context.historyParams.kind,
+        direction: context.historyParams.direction,
+        minAmountUsd: null,
+      });
+    const message: string = this.deps.historyFormatter.formatHistoryMessage(
+      context.target.address,
+      explorerPage.items,
+    );
+    const items: readonly IWalletHistoryListItem[] =
+      this.deps.trackingHistoryPageService.mapExplorerItemsToListItems(
+        explorerPage.items,
+        context.target.chainKey,
+      );
+
+    return {
+      message,
+      resolvedAddress: context.target.address,
+      walletId: context.target.walletId,
+      limit: context.historyParams.limit,
+      offset: context.historyParams.offset,
+      kind: context.historyParams.kind,
+      direction: context.historyParams.direction,
+      hasNextPage: explorerPage.nextOffset !== null,
+      items,
+      nextOffset: explorerPage.nextOffset,
     };
   }
 

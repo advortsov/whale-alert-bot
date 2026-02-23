@@ -53,15 +53,27 @@ interface IRawTrackWalletResult {
 const EMPTY_ADDRESS_PLACEHOLDER = '—';
 const UNKNOWN_CHAIN_KEY = 'unknown_chain';
 
-const normalizeWalletId = (rawWalletId: unknown, rawLegacyId: unknown): number => {
-  const directWalletId: unknown = rawWalletId;
-  const legacyWalletId: unknown = rawLegacyId;
+const parseInteger = (rawValue: unknown): number | null => {
+  if (typeof rawValue === 'number' && Number.isInteger(rawValue)) {
+    return rawValue;
+  }
 
-  if (typeof directWalletId === 'number' && Number.isInteger(directWalletId) && directWalletId > 0) {
+  if (typeof rawValue === 'string' && /^\d+$/.test(rawValue.trim())) {
+    return Number.parseInt(rawValue, 10);
+  }
+
+  return null;
+};
+
+const normalizeWalletId = (rawWalletId: unknown, rawLegacyId: unknown): number => {
+  const directWalletId: number | null = parseInteger(rawWalletId);
+  const legacyWalletId: number | null = parseInteger(rawLegacyId);
+
+  if (directWalletId !== null && directWalletId > 0) {
     return directWalletId;
   }
 
-  if (typeof legacyWalletId === 'number' && Number.isInteger(legacyWalletId) && legacyWalletId > 0) {
+  if (legacyWalletId !== null && legacyWalletId > 0) {
     return legacyWalletId;
   }
 
@@ -185,20 +197,16 @@ export const normalizeWalletHistoryResult = (raw: unknown): IWalletHistoryResult
     ? itemsRaw.filter((item: unknown): item is IWalletHistoryItem => isHistoryItem(item))
     : [];
 
-  const nextOffsetRaw: unknown = candidate.nextOffset;
-  let nextOffset: number | null =
-    typeof nextOffsetRaw === 'number' && Number.isInteger(nextOffsetRaw) ? nextOffsetRaw : null;
+  let nextOffset: number | null = parseInteger(candidate.nextOffset);
 
   if (nextOffset === null) {
     const hasNextPageRaw: unknown = candidate.hasNextPage;
-    const offsetRaw: unknown = candidate.offset;
-    const limitRaw: unknown = candidate.limit;
+    const offsetRaw: number | null = parseInteger(candidate.offset);
+    const limitRaw: number | null = parseInteger(candidate.limit);
     if (
       hasNextPageRaw === true &&
-      typeof offsetRaw === 'number' &&
-      Number.isInteger(offsetRaw) &&
-      typeof limitRaw === 'number' &&
-      Number.isInteger(limitRaw)
+      offsetRaw !== null &&
+      limitRaw !== null
     ) {
       nextOffset = offsetRaw + limitRaw;
     }
