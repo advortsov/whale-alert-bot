@@ -43,7 +43,7 @@ Frontend:
 ```bash
 cd tma
 npm install
-npm run build
+npm run precommit
 ```
 
 Smoke-check:
@@ -57,15 +57,14 @@ Smoke-check:
 
 ## 4. Деплой фронтенда TMA
 
-Сборка:
+TMA деплоится артефактом из CI:
 
-```bash
-cd /opt/whale-alert-bot/tma
-npm ci
-npm run build
-```
+1. В `CI` выполняется `cd tma && npm ci && npm run lint && npm run typecheck && npm run test && npm run build`.
+2. `tma/dist` публикуется как artifact `tma-dist`.
+3. В `CD` artifact скачивается на runner, архивируется и копируется на VPS.
+4. На VPS выполняется atomic swap `dist.new -> dist` без пересборки TMA.
 
-После сборки должен существовать каталог:
+После деплоя должен существовать каталог:
 
 ```text
 /opt/whale-alert-bot/tma/dist
@@ -78,8 +77,22 @@ npm run build
 ```nginx
 location /tma/ {
     alias /opt/whale-alert-bot/tma/dist/;
+    add_header Cache-Control "no-store" always;
     try_files $uri $uri/ /tma/index.html;
 }
+
+location /tma/assets/ {
+    alias /opt/whale-alert-bot/tma/dist/assets/;
+    add_header Cache-Control "public, max-age=31536000, immutable" always;
+    try_files $uri =404;
+}
+```
+
+Глобально для nginx:
+
+```nginx
+gzip on;
+# brotli on; # включить, если модуль brotli установлен в текущем образе nginx
 ```
 
 Проверка:

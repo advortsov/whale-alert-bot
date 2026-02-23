@@ -1,13 +1,5 @@
 import React from 'react';
-import {
-  Button,
-  Cell,
-  List,
-  Placeholder,
-  Section,
-  Text,
-  Title,
-} from '@telegram-apps/telegram-ui';
+import { Button, Cell, List, Placeholder, Section, Text, Title } from '@telegram-apps/telegram-ui';
 import {
   useInfiniteQuery,
   useMutation,
@@ -68,8 +60,7 @@ export const WalletDetailPage = (): React.JSX.Element => {
       ]);
     },
     onError: (error: unknown): void => {
-      const message: string =
-        error instanceof Error ? error.message : 'Не удалось применить mute.';
+      const message: string = error instanceof Error ? error.message : 'Не удалось применить mute.';
       setActionStatus(message);
     },
   });
@@ -87,8 +78,7 @@ export const WalletDetailPage = (): React.JSX.Element => {
       ]);
     },
     onError: (error: unknown): void => {
-      const message: string =
-        error instanceof Error ? error.message : 'Не удалось снять mute.';
+      const message: string = error instanceof Error ? error.message : 'Не удалось снять mute.';
       setActionStatus(message);
     },
   });

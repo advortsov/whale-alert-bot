@@ -1,1 +1,2 @@
 npm run precommit
+npm --prefix tma run precommit

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import type { ApiClient } from './client';
 import {
   addWallet,
   loadWalletById,
@@ -10,7 +11,6 @@ import {
   normalizeWalletHistoryResult,
   unmuteWallet,
 } from './wallets';
-import type { ApiClient } from './client';
 
 type ApiClientStub = {
   readonly request: ReturnType<typeof vi.fn>;

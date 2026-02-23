@@ -7,7 +7,12 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "format": "../node_modules/.bin/prettier --check \"src/**/*.{ts,tsx,css}\"",
+    "format:write": "../node_modules/.bin/prettier --write \"src/**/*.{ts,tsx,css}\"",
+    "lint": "../node_modules/.bin/eslint \"src/**/*.ts\" --max-warnings 0",
+    "test": "../node_modules/.bin/vitest run --config vitest.config.ts",
+    "precommit": "npm run format:write && npm run lint && npm run typecheck && npm run test && npm run build"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.67.2",

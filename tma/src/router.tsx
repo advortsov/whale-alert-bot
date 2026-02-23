@@ -2,11 +2,40 @@ import React from 'react';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 
 import { TmaRuntimeSync } from './components/TmaRuntimeSync';
-import { AddWalletPage } from './pages/AddWalletPage';
-import { DashboardPage } from './pages/DashboardPage';
-import { SettingsPage } from './pages/SettingsPage';
-import { WalletDetailPage } from './pages/WalletDetailPage';
-import { WalletsPage } from './pages/WalletsPage';
+import { LoadingSpinner } from './components/LoadingSpinner';
+
+interface ILazyRouteModule {
+  readonly default: React.ComponentType;
+}
+
+const DashboardPage = React.lazy(async (): Promise<ILazyRouteModule> => {
+  const module = await import('./pages/DashboardPage');
+  return { default: module.DashboardPage };
+});
+
+const WalletsPage = React.lazy(async (): Promise<ILazyRouteModule> => {
+  const module = await import('./pages/WalletsPage');
+  return { default: module.WalletsPage };
+});
+
+const AddWalletPage = React.lazy(async (): Promise<ILazyRouteModule> => {
+  const module = await import('./pages/AddWalletPage');
+  return { default: module.AddWalletPage };
+});
+
+const WalletDetailPage = React.lazy(async (): Promise<ILazyRouteModule> => {
+  const module = await import('./pages/WalletDetailPage');
+  return { default: module.WalletDetailPage };
+});
+
+const SettingsPage = React.lazy(async (): Promise<ILazyRouteModule> => {
+  const module = await import('./pages/SettingsPage');
+  return { default: module.SettingsPage };
+});
+
+const withSuspense = (element: React.JSX.Element): React.JSX.Element => {
+  return <React.Suspense fallback={<LoadingSpinner />}>{element}</React.Suspense>;
+};
 
 export const router = createBrowserRouter([
   {
@@ -15,23 +44,23 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <DashboardPage />,
+        element: withSuspense(<DashboardPage />),
       },
       {
         path: 'wallets',
-        element: <WalletsPage />,
+        element: withSuspense(<WalletsPage />),
       },
       {
         path: 'wallets/add',
-        element: <AddWalletPage />,
+        element: withSuspense(<AddWalletPage />),
       },
       {
         path: 'wallets/:id',
-        element: <WalletDetailPage />,
+        element: withSuspense(<WalletDetailPage />),
       },
       {
         path: 'settings',
-        element: <SettingsPage />,
+        element: withSuspense(<SettingsPage />),
       },
       {
         path: '*',

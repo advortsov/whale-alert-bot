@@ -80,10 +80,7 @@ const normalizeWalletId = (rawWalletId: unknown, rawLegacyId: unknown): number =
   return 0;
 };
 
-const normalizeString = (
-  rawValue: unknown,
-  fallbackValue: string,
-): string => {
+const normalizeString = (rawValue: unknown, fallbackValue: string): string => {
   if (typeof rawValue !== 'string') {
     return fallbackValue;
   }
@@ -168,21 +165,30 @@ const normalizeTrackWalletResult = (rawValue: unknown): ITrackWalletResult => {
   };
 };
 
+const isStringValue = (rawValue: unknown): rawValue is string => {
+  return typeof rawValue === 'string';
+};
+
+const isNullableStringValue = (rawValue: unknown): rawValue is string | null => {
+  return typeof rawValue === 'string' || rawValue === null;
+};
+
 const isHistoryItem = (value: unknown): value is IWalletHistoryItem => {
   if (typeof value !== 'object' || value === null) {
     return false;
   }
 
-  const item = value as Record<string, unknown>;
+  const item = value as Partial<IWalletHistoryItem>;
+
   return (
-    typeof item['txHash'] === 'string' &&
-    typeof item['occurredAt'] === 'string' &&
-    typeof item['eventType'] === 'string' &&
-    typeof item['direction'] === 'string' &&
-    typeof item['amountText'] === 'string' &&
-    typeof item['txUrl'] === 'string' &&
-    (typeof item['assetSymbol'] === 'string' || item['assetSymbol'] === null) &&
-    typeof item['chainKey'] === 'string'
+    isStringValue(item.txHash) &&
+    isStringValue(item.occurredAt) &&
+    isStringValue(item.eventType) &&
+    isStringValue(item.direction) &&
+    isStringValue(item.amountText) &&
+    isStringValue(item.txUrl) &&
+    isNullableStringValue(item.assetSymbol) &&
+    isStringValue(item.chainKey)
   );
 };
 
@@ -203,11 +209,7 @@ export const normalizeWalletHistoryResult = (raw: unknown): IWalletHistoryResult
     const hasNextPageRaw: unknown = candidate.hasNextPage;
     const offsetRaw: number | null = parseInteger(candidate.offset);
     const limitRaw: number | null = parseInteger(candidate.limit);
-    if (
-      hasNextPageRaw === true &&
-      offsetRaw !== null &&
-      limitRaw !== null
-    ) {
+    if (hasNextPageRaw === true && offsetRaw !== null && limitRaw !== null) {
       nextOffset = offsetRaw + limitRaw;
     }
   }
@@ -218,9 +220,7 @@ export const normalizeWalletHistoryResult = (raw: unknown): IWalletHistoryResult
   };
 };
 
-export const loadWallets = async (
-  apiClient: ApiClient,
-): Promise<readonly IWalletSummaryDto[]> => {
+export const loadWallets = async (apiClient: ApiClient): Promise<readonly IWalletSummaryDto[]> => {
   const rawResult: unknown = await apiClient.request<unknown>('GET', '/api/wallets');
 
   if (typeof rawResult !== 'object' || rawResult === null) {

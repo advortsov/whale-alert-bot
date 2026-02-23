@@ -544,14 +544,27 @@ npm run build
 4. `npm run typecheck`
 5. `npm run test`
 6. `npm run build`
-7. `cd tma && npm ci && npm run typecheck && npm run build`
+7. `cd tma && npm ci && npm run lint && npm run typecheck && npm run test && npm run build`
+8. `actions/upload-artifact` для `tma/dist` (artifact `tma-dist`).
+
+Локально для TMA добавлен собственный `precommit` скрипт (паритет с backend-гейтом):
+
+1. `npm --prefix tma run format:write`
+2. `npm --prefix tma run lint`
+3. `npm --prefix tma run typecheck`
+4. `npm --prefix tma run test`
+5. `npm --prefix tma run build`
 
 ## CD (TMA)
 
-В `.github/workflows/cd.yml` и `scripts/deploy.sh` добавлен обязательный этап сборки фронтенда TMA на сервере (через `node:22-alpine` контейнер), после чего поднимается backend стек.
-`deploy` также очищает `tma/dist` перед сборкой и делает `--force-recreate app`, чтобы гарантировать перезапуск приложения с новой версией.
+В `.github/workflows/cd.yml` и `scripts/deploy.sh` включен artifact-based деплой TMA:
 
-Это гарантирует, что после каждого деплоя актуальный `tma/dist` уже лежит на VPS и сразу доступен по `/tma/`.
+1. TMA собирается в CI один раз.
+2. В CD готовый `tma-dist` копируется на VPS.
+3. На сервере выполняется atomic swap `dist.new -> dist`.
+4. Backend контейнер перезапускается с `--force-recreate app`.
+
+Это убирает повторную сборку TMA на VPS и сокращает время прод-деплоя.
 
 ## TMA UX smoke-check
 

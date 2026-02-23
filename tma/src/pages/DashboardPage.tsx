@@ -55,7 +55,10 @@ export const DashboardPage = (): React.JSX.Element => {
         <Section header="Кошельки">
           <div className="tma-grid">
             {wallets.length === 0 ? (
-              <Placeholder header="Список пуст" description="Добавь первый кошелёк для отслеживания." />
+              <Placeholder
+                header="Список пуст"
+                description="Добавь первый кошелёк для отслеживания."
+              />
             ) : null}
             {wallets.slice(0, 5).map((wallet) => (
               <WalletCard key={wallet.walletId} wallet={wallet} />

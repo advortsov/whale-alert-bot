@@ -52,7 +52,10 @@ export const SettingsPage = (): React.JSX.Element => {
   if (settingsQuery.isError) {
     return (
       <section className="tma-screen tma-screen-centered">
-        <Placeholder header="Не удалось загрузить настройки" description="Повтори попытку чуть позже." />
+        <Placeholder
+          header="Не удалось загрузить настройки"
+          description="Повтори попытку чуть позже."
+        />
       </section>
     );
   }
@@ -111,7 +114,9 @@ export const SettingsPage = (): React.JSX.Element => {
           {updateMutation.isError ? (
             <Placeholder header="Ошибка" description="Не удалось сохранить настройки." />
           ) : null}
-          {updateMutation.isSuccess ? <Placeholder header="Готово" description="Сохранено." /> : null}
+          {updateMutation.isSuccess ? (
+            <Placeholder header="Готово" description="Сохранено." />
+          ) : null}
         </Section>
       </List>
     </section>

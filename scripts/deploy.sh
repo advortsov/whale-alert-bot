@@ -25,6 +25,16 @@ if [[ -z "$SSH_HOST" ]]; then
 fi
 
 SSH_CMD="ssh -o StrictHostKeyChecking=accept-new -p ${SSH_PORT} ${SSH_USER}@${SSH_HOST}"
+SCP_CMD="scp -o StrictHostKeyChecking=accept-new -P ${SSH_PORT}"
+TMA_ARCHIVE_PATH=""
+
+cleanup() {
+  if [[ -n "$TMA_ARCHIVE_PATH" && -f "$TMA_ARCHIVE_PATH" ]]; then
+    rm -f "$TMA_ARCHIVE_PATH"
+  fi
+}
+
+trap cleanup EXIT
 
 echo "==> Деплой на ${SSH_USER}@${SSH_HOST}:${SSH_PORT}"
 
@@ -35,6 +45,21 @@ if [[ "${4:-}" == "--init" ]] || [[ "${1:-}" == "--init" ]]; then
   echo "==> Настройка завершена. Заполни .env на сервере и запусти деплой снова."
   exit 0
 fi
+
+(
+  cd "$(dirname "$0")/.."
+  if [[ ! -d "./tma/dist" ]]; then
+    echo "==> tma/dist не найден. Собираю локально..."
+    cd tma
+    npm ci --no-audit --no-fund
+    npm run build
+  fi
+)
+
+TMA_ARCHIVE_PATH="$(mktemp "${TMPDIR:-/tmp}/tma-dist.XXXXXX.tgz")"
+tar -C "$(dirname "$0")/../tma" -czf "$TMA_ARCHIVE_PATH" dist
+echo "==> Копирование собранного tma/dist на VPS..."
+$SCP_CMD "$TMA_ARCHIVE_PATH" "${SSH_USER}@${SSH_HOST}:/tmp/tma-dist.tgz"
 
 $SSH_CMD bash -s <<REMOTE_SCRIPT
 set -euo pipefail
@@ -62,9 +87,23 @@ if [[ ! -f .env ]]; then
   exit 1
 fi
 
-# Сборка и запуск
-echo "==> Сборка TMA (React SPA)..."
-docker run --rm -v "${DEPLOY_DIR}/tma:/app" -w /app node:22-alpine sh -lc "rm -rf dist && npm ci --no-audit --no-fund && npm run build"
+# Распаковка TMA-артефакта
+echo "==> Распаковка TMA-артефакта..."
+if [[ ! -f /tmp/tma-dist.tgz ]]; then
+  echo "!!! /tmp/tma-dist.tgz не найден на сервере"
+  exit 1
+fi
+
+mkdir -p "${DEPLOY_DIR}/tma/dist.new"
+rm -rf "${DEPLOY_DIR}/tma/dist.new"/*
+tar -xzf /tmp/tma-dist.tgz -C "${DEPLOY_DIR}/tma/dist.new"
+rm -rf "${DEPLOY_DIR}/tma/dist.prev"
+if [[ -d "${DEPLOY_DIR}/tma/dist" ]]; then
+  mv "${DEPLOY_DIR}/tma/dist" "${DEPLOY_DIR}/tma/dist.prev"
+fi
+mv "${DEPLOY_DIR}/tma/dist.new/dist" "${DEPLOY_DIR}/tma/dist"
+rm -rf "${DEPLOY_DIR}/tma/dist.new" "${DEPLOY_DIR}/tma/dist.prev"
+rm -f /tmp/tma-dist.tgz
 
 echo "==> Сборка и запуск контейнеров..."
 docker compose -f "${COMPOSE_FILE}" up -d postgres prometheus grafana

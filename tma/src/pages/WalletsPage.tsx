@@ -39,7 +39,10 @@ export const WalletsPage = (): React.JSX.Element => {
   if (walletsQuery.isError || walletsQuery.data === undefined) {
     return (
       <section className="tma-screen tma-screen-centered">
-        <Placeholder header="Не удалось загрузить кошельки" description="Проверь сеть и попробуй снова." />
+        <Placeholder
+          header="Не удалось загрузить кошельки"
+          description="Проверь сеть и попробуй снова."
+        />
       </section>
     );
   }
@@ -55,7 +58,10 @@ export const WalletsPage = (): React.JSX.Element => {
         <Section>
           <div className="tma-grid">
             {walletsQuery.data.length === 0 ? (
-              <Placeholder header="Нет кошельков" description="Добавь новый адрес для отслеживания." />
+              <Placeholder
+                header="Нет кошельков"
+                description="Добавь новый адрес для отслеживания."
+              />
             ) : null}
             {walletsQuery.data.map((wallet) => (
               <WalletCard key={wallet.walletId} wallet={wallet} />

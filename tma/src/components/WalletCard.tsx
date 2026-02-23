@@ -3,6 +3,7 @@ import { Button, Cell } from '@telegram-apps/telegram-ui';
 import { useNavigate } from 'react-router-dom';
 
 import { formatShortAddress } from '../utils/format';
+import { buildWalletDetailsRoute, buildWalletHistoryRoute } from '../utils/routes';
 import { ChainBadge } from './ChainBadge';
 import { ChainIcon } from './ChainIcon';
 import type { IWalletSummaryDto } from '../types/api.types';
@@ -26,7 +27,7 @@ export const WalletCard = ({ wallet }: IWalletCardProps): React.JSX.Element => {
         }
         after={null}
         onClick={(): void => {
-          void navigate(`/wallets/${wallet.walletId}`);
+          void navigate(buildWalletDetailsRoute(wallet.walletId));
         }}
       >
         {wallet.label ?? 'Без label'}
@@ -36,7 +37,7 @@ export const WalletCard = ({ wallet }: IWalletCardProps): React.JSX.Element => {
           mode="outline"
           size="s"
           onClick={(): void => {
-            void navigate(`/wallets/${wallet.walletId}`);
+            void navigate(buildWalletDetailsRoute(wallet.walletId));
           }}
         >
           Детали
@@ -45,7 +46,7 @@ export const WalletCard = ({ wallet }: IWalletCardProps): React.JSX.Element => {
           mode="bezeled"
           size="s"
           onClick={(): void => {
-            void navigate(`/wallets/${wallet.walletId}#history`);
+            void navigate(buildWalletHistoryRoute(wallet.walletId));
           }}
         >
           История

@@ -1,7 +1,11 @@
 import type { ITokens } from '../types/api.types';
 
+const UNAUTHORIZED_HTTP_STATUS = 401;
+
 const resolveApiBaseUrl = (): string => {
-  const configuredBaseUrl: string | undefined = import.meta.env.VITE_API_BASE_URL;
+  const env = import.meta.env as { readonly VITE_API_BASE_URL?: unknown };
+  const configuredBaseUrl: unknown = env.VITE_API_BASE_URL;
+
   if (typeof configuredBaseUrl === 'string' && configuredBaseUrl.trim().length > 0) {
     return configuredBaseUrl;
   }
@@ -44,7 +48,7 @@ export class ApiClient {
 
     let response: Response = await executeRequest();
 
-    if (response.status === 401 && withAuth) {
+    if (response.status === UNAUTHORIZED_HTTP_STATUS && withAuth) {
       await this.context.relogin();
       response = await executeRequest();
     }
@@ -54,6 +58,7 @@ export class ApiClient {
       throw new Error(`API ${path} failed: ${response.status} ${errorText}`);
     }
 
-    return (await response.json()) as TResponse;
+    const responsePayload: unknown = await response.json();
+    return responsePayload as TResponse;
   }
 }
