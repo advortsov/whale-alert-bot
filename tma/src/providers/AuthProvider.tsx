@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { loginWithInitData } from '../api/auth';
+import { loginWithInitData, refreshWithToken } from '../api/auth';
 import { ApiClient, type IApiClientContext } from '../api/client';
 import type { ITokens } from '../types/api.types';
 import { getInitDataRaw, getTelegramWebApp } from '../utils/telegram-webapp';
@@ -53,6 +53,7 @@ export const AuthProvider = ({ children }: IAuthProviderProps): React.JSX.Elemen
   const [isReady, setIsReady] = useState<boolean>(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const bootstrappedRef = useRef<boolean>(false);
+  const reloginPromiseRef = useRef<Promise<ITokens> | null>(null);
 
   const clearTokens = useCallback((): void => {
     sessionStorage.removeItem(ACCESS_TOKEN_KEY);
@@ -78,6 +79,50 @@ export const AuthProvider = ({ children }: IAuthProviderProps): React.JSX.Elemen
     const tokens: ITokens = await loginWithInitData(initDataRaw);
     applyTokens(tokens);
   }, [applyTokens]);
+
+  const relogin = useCallback(async (): Promise<ITokens> => {
+    if (reloginPromiseRef.current !== null) {
+      return reloginPromiseRef.current;
+    }
+
+    const reloginPromise: Promise<ITokens> = (async (): Promise<ITokens> => {
+      const refreshToken: string | null = readStoredToken(REFRESH_TOKEN_KEY);
+
+      if (refreshToken !== null) {
+        try {
+          const refreshedTokens: ITokens = await refreshWithToken(refreshToken);
+          applyTokens(refreshedTokens);
+          return refreshedTokens;
+        } catch {
+          // Токен обновления мог истечь, пробуем fallback через initData.
+        }
+      }
+
+      const initDataRaw: string = getInitDataRaw();
+      if (initDataRaw.length === 0) {
+        throw new Error(
+          'Сессия истекла, а Telegram initData недоступен. Перезапусти Mini App из /app.',
+        );
+      }
+
+      const fallbackTokens: ITokens = await loginWithInitData(initDataRaw);
+      applyTokens(fallbackTokens);
+      return fallbackTokens;
+    })()
+      .catch((error: unknown): never => {
+        clearTokens();
+        const message: string =
+          error instanceof Error ? error.message : 'Не удалось обновить авторизацию.';
+        setAuthError(message);
+        throw error;
+      })
+      .finally((): void => {
+        reloginPromiseRef.current = null;
+      });
+
+    reloginPromiseRef.current = reloginPromise;
+    return reloginPromise;
+  }, [applyTokens, clearTokens]);
 
   useEffect((): void => {
     if (bootstrappedRef.current) {
@@ -121,31 +166,11 @@ export const AuthProvider = ({ children }: IAuthProviderProps): React.JSX.Elemen
       getAccessToken: (): string | null => {
         return readStoredToken(ACCESS_TOKEN_KEY);
       },
-      relogin: async (): Promise<ITokens> => {
-        try {
-          const initDataRaw: string = getInitDataRaw();
-
-          if (initDataRaw.length === 0) {
-            throw new Error(
-              'Сессия истекла, но Telegram initData недоступен. Перезапусти Mini App из /app.',
-            );
-          }
-
-          const tokens: ITokens = await loginWithInitData(initDataRaw);
-          applyTokens(tokens);
-          return tokens;
-        } catch (error: unknown) {
-          clearTokens();
-          const message: string =
-            error instanceof Error ? error.message : 'Не удалось обновить авторизацию.';
-          setAuthError(message);
-          throw error;
-        }
-      },
+      relogin,
     };
 
     return new ApiClient(context);
-  }, [applyTokens, clearTokens]);
+  }, [relogin]);
 
   const contextValue: IAuthContextValue = {
     isReady,
