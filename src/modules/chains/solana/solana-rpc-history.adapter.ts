@@ -1,5 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common';
 
+import {
+  detectSolanaSplTransfer,
+  extractSolanaAccountKeys,
+  matchSolanaHistoryDirection,
+  matchSolanaHistoryKind,
+  parseSolanaTransactionValue,
+  resolveSolanaDirectionByLamportsDelta,
+  resolveSolanaErrorFlag,
+  resolveSolanaFromTo,
+  resolveSolanaLamportsDelta,
+  resolveSolanaTimestampSec,
+} from './solana-history-mapper.util';
 import type {
   ISolanaSignatureInfo,
   ISolanaTransactionValue,
@@ -18,18 +30,23 @@ import {
   type IHistoryItemDto,
   type IHistoryPageDto,
 } from '../../whales/entities/history-item.dto';
-import {
-  HistoryDirectionFilter,
-  HistoryKind,
-  type IHistoryRequestDto,
-} from '../../whales/entities/history-request.dto';
+import { type IHistoryRequestDto } from '../../whales/entities/history-request.dto';
 
-const SPL_TOKEN_PROGRAM_SUBSTRING = 'tokenkeg';
 const SOLSCAN_TX_BASE_URL = 'https://solscan.io/tx/';
 const SOLANA_HISTORY_REQUEST_TIMEOUT_MS = 10_000;
 const SPL_TOKEN_DECIMALS = 6;
 const SOL_NATIVE_DECIMALS = 9;
 const SOLANA_SIGNATURES_BATCH_MAX = 1_000;
+const SOLANA_SIGNATURES_SCAN_MAX_PER_PAGE = 1_000;
+const SOLANA_SIGNATURES_BATCH_DEFAULT = 200;
+
+interface ISolanaHistoryScanState {
+  readonly signatures: ISolanaSignatureInfo[];
+  reachedSignaturesEnd: boolean;
+  signatureCursor: number;
+  scannedSignaturesCount: number;
+  readonly pageItems: IHistoryItemDto[];
+}
 
 @Injectable()
 export class SolanaRpcHistoryAdapter implements IHistoryExplorerAdapter {
@@ -46,55 +63,13 @@ export class SolanaRpcHistoryAdapter implements IHistoryExplorerAdapter {
     }
 
     const endpointUrls: readonly string[] = this.resolveSolanaRpcEndpoints();
-    const signaturesLimit: number = Math.max(request.offset + request.limit + 1, request.limit + 1);
-    const signatures: readonly ISolanaSignatureInfo[] = await this.callWithFallback(
+    const scanState: ISolanaHistoryScanState = await this.initializeHistoryScanState(
+      request,
       endpointUrls,
-      async (endpointUrl: string): Promise<readonly ISolanaSignatureInfo[]> =>
-        this.getSignaturesPage(endpointUrl, request.address, signaturesLimit),
     );
-
-    const pageSignatures: readonly ISolanaSignatureInfo[] = signatures.slice(
-      request.offset,
-      request.offset + request.limit,
-    );
-
-    if (pageSignatures.length === 0) {
-      return {
-        items: [],
-        nextOffset: null,
-      };
-    }
-
-    const items: IHistoryItemDto[] = [];
-
-    for (const signatureInfo of pageSignatures) {
-      const item: IHistoryItemDto | null = await this.callWithFallback(
-        endpointUrls,
-        async (endpointUrl: string): Promise<IHistoryItemDto | null> =>
-          this.mapSignatureToHistoryItem(endpointUrl, request.address, signatureInfo),
-      );
-
-      if (item === null) {
-        continue;
-      }
-
-      if (!this.matchKindFilter(item, request.kind)) {
-        continue;
-      }
-
-      if (!this.matchDirectionFilter(item, request.direction)) {
-        continue;
-      }
-
-      items.push(item);
-    }
-
-    const hasNextPage: boolean = signatures.length > request.offset + request.limit;
-
-    return {
-      items,
-      nextOffset: hasNextPage ? request.offset + request.limit : null,
-    };
+    await this.collectHistoryItemsForPage(request, endpointUrls, scanState);
+    this.logTruncatedScan(request, scanState.scannedSignaturesCount);
+    return this.buildHistoryPageResult(request.limit, scanState);
   }
 
   private resolveSolanaRpcEndpoints(): readonly string[] {
@@ -151,15 +126,24 @@ export class SolanaRpcHistoryAdapter implements IHistoryExplorerAdapter {
     return payload.map((value: unknown): ISolanaSignatureInfo => this.parseSignatureInfo(value));
   }
 
+  private resolveSignaturesBatchLimit(limit: number): number {
+    const withBuffer: number = Math.max(limit * 2, SOLANA_SIGNATURES_BATCH_DEFAULT);
+    return Math.min(withBuffer, SOLANA_SIGNATURES_BATCH_MAX);
+  }
+
   private async getSignaturesPage(
     endpointUrl: string,
     address: string,
     limit: number,
-  ): Promise<readonly ISolanaSignatureInfo[]> {
+  ): Promise<{
+    readonly signatures: readonly ISolanaSignatureInfo[];
+    readonly reachedEnd: boolean;
+  }> {
     const signatures: ISolanaSignatureInfo[] = [];
     let beforeSignature: string | null = null;
+    let reachedEnd: boolean = false;
 
-    while (signatures.length < limit) {
+    while (signatures.length < limit && !reachedEnd) {
       const remainingCount: number = limit - signatures.length;
       const batchLimit: number = Math.min(remainingCount, SOLANA_SIGNATURES_BATCH_MAX);
       const batch: readonly ISolanaSignatureInfo[] = await this.getSignatures(
@@ -170,18 +154,184 @@ export class SolanaRpcHistoryAdapter implements IHistoryExplorerAdapter {
       );
 
       if (batch.length === 0) {
+        reachedEnd = true;
         break;
       }
 
       signatures.push(...batch);
       beforeSignature = batch[batch.length - 1]?.signature ?? null;
-
-      if (batch.length < batchLimit) {
-        break;
-      }
+      reachedEnd = batch.length < batchLimit;
     }
 
-    return signatures;
+    return {
+      signatures,
+      reachedEnd,
+    };
+  }
+
+  private async initializeHistoryScanState(
+    request: IHistoryRequestDto,
+    endpointUrls: readonly string[],
+  ): Promise<ISolanaHistoryScanState> {
+    const initialSignaturesLimit: number = Math.max(
+      request.offset + request.limit + 1,
+      request.limit + 1,
+    );
+    const initialSignaturesResult: {
+      readonly signatures: readonly ISolanaSignatureInfo[];
+      readonly reachedEnd: boolean;
+    } = await this.callWithFallback(
+      endpointUrls,
+      async (
+        endpointUrl: string,
+      ): Promise<{
+        readonly signatures: readonly ISolanaSignatureInfo[];
+        readonly reachedEnd: boolean;
+      }> => this.getSignaturesPage(endpointUrl, request.address, initialSignaturesLimit),
+    );
+
+    return {
+      signatures: [...initialSignaturesResult.signatures],
+      reachedSignaturesEnd: initialSignaturesResult.reachedEnd,
+      signatureCursor: request.offset,
+      scannedSignaturesCount: 0,
+      pageItems: [],
+    };
+  }
+
+  private async collectHistoryItemsForPage(
+    request: IHistoryRequestDto,
+    endpointUrls: readonly string[],
+    scanState: ISolanaHistoryScanState,
+  ): Promise<void> {
+    while (
+      scanState.pageItems.length < request.limit &&
+      scanState.scannedSignaturesCount < SOLANA_SIGNATURES_SCAN_MAX_PER_PAGE
+    ) {
+      const hasAvailableSignature: boolean = await this.ensureSignatureAvailable(
+        request,
+        endpointUrls,
+        scanState,
+      );
+
+      if (!hasAvailableSignature) {
+        return;
+      }
+
+      await this.scanSingleSignature(request, endpointUrls, scanState);
+    }
+  }
+
+  private async ensureSignatureAvailable(
+    request: IHistoryRequestDto,
+    endpointUrls: readonly string[],
+    scanState: ISolanaHistoryScanState,
+  ): Promise<boolean> {
+    if (scanState.signatureCursor < scanState.signatures.length) {
+      return true;
+    }
+
+    if (scanState.reachedSignaturesEnd) {
+      return false;
+    }
+
+    const beforeSignature: string | null =
+      scanState.signatures[scanState.signatures.length - 1]?.signature ?? null;
+
+    if (beforeSignature === null) {
+      return false;
+    }
+
+    const additionalSignaturesLimit: number = this.resolveSignaturesBatchLimit(request.limit);
+    const additionalSignaturesBatch: readonly ISolanaSignatureInfo[] = await this.callWithFallback(
+      endpointUrls,
+      async (endpointUrl: string): Promise<readonly ISolanaSignatureInfo[]> =>
+        this.getSignatures(
+          endpointUrl,
+          request.address,
+          additionalSignaturesLimit,
+          beforeSignature,
+        ),
+    );
+
+    if (additionalSignaturesBatch.length === 0) {
+      scanState.reachedSignaturesEnd = true;
+      return false;
+    }
+
+    scanState.signatures.push(...additionalSignaturesBatch);
+    scanState.reachedSignaturesEnd = additionalSignaturesBatch.length < additionalSignaturesLimit;
+    return true;
+  }
+
+  private async scanSingleSignature(
+    request: IHistoryRequestDto,
+    endpointUrls: readonly string[],
+    scanState: ISolanaHistoryScanState,
+  ): Promise<void> {
+    const signatureInfo: ISolanaSignatureInfo | undefined =
+      scanState.signatures[scanState.signatureCursor];
+    scanState.signatureCursor += 1;
+    scanState.scannedSignaturesCount += 1;
+
+    if (signatureInfo === undefined) {
+      return;
+    }
+
+    const item: IHistoryItemDto | null = await this.callWithFallback(
+      endpointUrls,
+      async (endpointUrl: string): Promise<IHistoryItemDto | null> =>
+        this.mapSignatureToHistoryItem(endpointUrl, request.address, signatureInfo),
+    );
+
+    if (item === null) {
+      return;
+    }
+
+    if (!matchSolanaHistoryKind(item, request.kind)) {
+      return;
+    }
+
+    if (!matchSolanaHistoryDirection(item, request.direction)) {
+      return;
+    }
+
+    scanState.pageItems.push(item);
+  }
+
+  private logTruncatedScan(request: IHistoryRequestDto, scannedSignaturesCount: number): void {
+    if (scannedSignaturesCount < SOLANA_SIGNATURES_SCAN_MAX_PER_PAGE) {
+      return;
+    }
+
+    this.logger.warn(
+      `solana history scan truncated address=${request.address} scanned=${String(scannedSignaturesCount)} limit=${String(request.limit)} offset=${String(request.offset)}`,
+    );
+  }
+
+  private buildHistoryPageResult(
+    requestLimit: number,
+    scanState: ISolanaHistoryScanState,
+  ): IHistoryPageDto {
+    if (scanState.pageItems.length === 0) {
+      return {
+        items: [],
+        nextOffset: null,
+      };
+    }
+
+    const hasKnownTail: boolean = scanState.signatureCursor < scanState.signatures.length;
+    const hasUnknownTail: boolean =
+      scanState.pageItems.length >= requestLimit &&
+      (!scanState.reachedSignaturesEnd ||
+        scanState.scannedSignaturesCount >= SOLANA_SIGNATURES_SCAN_MAX_PER_PAGE);
+    const hasNextPage: boolean =
+      scanState.pageItems.length >= requestLimit && (hasKnownTail || hasUnknownTail);
+
+    return {
+      items: scanState.pageItems,
+      nextOffset: hasNextPage ? scanState.signatureCursor : null,
+    };
   }
 
   private parseSignatureInfo(value: unknown): ISolanaSignatureInfo {
@@ -225,14 +375,14 @@ export class SolanaRpcHistoryAdapter implements IHistoryExplorerAdapter {
     if (payload === null) {
       return null;
     }
-    const value: ISolanaTransactionValue = this.parseTransactionValue(payload);
-    const accountKeys: readonly string[] = this.extractAccountKeys(value);
-    const [fromAddress, toAddress] = this.resolveFromTo(accountKeys);
-    const deltaLamports: number = this.resolveLamportsDelta(accountKeys, value, address);
-    const direction: HistoryDirection = this.resolveDirectionByLamportsDelta(deltaLamports);
-    const isSplTransfer: boolean = this.detectSplTransfer(value);
-    const timestampSec: number = this.resolveTimestampSec(value, signatureInfo);
-    const hasError: boolean = this.resolveErrorFlag(value, signatureInfo);
+    const value: ISolanaTransactionValue = parseSolanaTransactionValue(payload);
+    const accountKeys: readonly string[] = extractSolanaAccountKeys(value);
+    const [fromAddress, toAddress] = resolveSolanaFromTo(accountKeys);
+    const deltaLamports: number = resolveSolanaLamportsDelta(accountKeys, value, address);
+    const direction: HistoryDirection = resolveSolanaDirectionByLamportsDelta(deltaLamports);
+    const isSplTransfer: boolean = detectSolanaSplTransfer(value);
+    const timestampSec: number = resolveSolanaTimestampSec(value, signatureInfo);
+    const hasError: boolean = resolveSolanaErrorFlag(value, signatureInfo);
 
     return {
       txHash: signatureInfo.signature,
@@ -247,122 +397,6 @@ export class SolanaRpcHistoryAdapter implements IHistoryExplorerAdapter {
       direction,
       txLink: `${SOLSCAN_TX_BASE_URL}${signatureInfo.signature}`,
     };
-  }
-
-  private parseTransactionValue(payload: unknown): ISolanaTransactionValue {
-    if (typeof payload !== 'object') {
-      throw new Error('Solana getTransaction returned invalid payload.');
-    }
-
-    return payload as ISolanaTransactionValue;
-  }
-
-  private resolveLamportsDelta(
-    accountKeys: readonly string[],
-    value: ISolanaTransactionValue,
-    address: string,
-  ): number {
-    const normalizedAddress: string = address.trim();
-    const addressIndex: number = accountKeys.findIndex(
-      (accountKey: string): boolean => accountKey === normalizedAddress,
-    );
-
-    if (addressIndex < 0) {
-      return 0;
-    }
-
-    const preBalance: number = value.meta?.preBalances?.[addressIndex] ?? 0;
-    const postBalance: number = value.meta?.postBalances?.[addressIndex] ?? 0;
-    return postBalance - preBalance;
-  }
-
-  private resolveDirectionByLamportsDelta(deltaLamports: number): HistoryDirection {
-    return deltaLamports >= 0 ? HistoryDirection.IN : HistoryDirection.OUT;
-  }
-
-  private resolveErrorFlag(
-    value: ISolanaTransactionValue,
-    signatureInfo: ISolanaSignatureInfo,
-  ): boolean {
-    const metaError: unknown = value.meta?.err;
-    const hasMetaError: boolean = metaError !== undefined && metaError !== null;
-    const hasSignatureError: boolean =
-      signatureInfo.err !== null && signatureInfo.err !== undefined;
-
-    return hasMetaError || hasSignatureError;
-  }
-
-  private detectSplTransfer(value: ISolanaTransactionValue): boolean {
-    const logMessages: readonly string[] = value.meta?.logMessages ?? [];
-
-    return logMessages.some((message: string): boolean =>
-      message.toLowerCase().includes(SPL_TOKEN_PROGRAM_SUBSTRING),
-    );
-  }
-
-  private extractAccountKeys(value: ISolanaTransactionValue): readonly string[] {
-    const rawAccountKeys: readonly (string | { readonly pubkey?: string })[] =
-      value.transaction?.message?.accountKeys ?? [];
-
-    return rawAccountKeys
-      .map((accountKey): string | null => {
-        if (typeof accountKey === 'string') {
-          return accountKey;
-        }
-
-        if (typeof accountKey.pubkey === 'string') {
-          return accountKey.pubkey;
-        }
-
-        return null;
-      })
-      .filter((accountKey: string | null): accountKey is string => accountKey !== null);
-  }
-
-  private resolveFromTo(accountKeys: readonly string[]): readonly [string, string] {
-    const fromAddress: string = accountKeys[0] ?? 'unknown';
-    const toAddress: string = accountKeys[1] ?? 'unknown';
-
-    return [fromAddress, toAddress];
-  }
-
-  private resolveTimestampSec(
-    value: ISolanaTransactionValue,
-    signatureInfo: ISolanaSignatureInfo,
-  ): number {
-    if (typeof value.blockTime === 'number') {
-      return value.blockTime;
-    }
-
-    if (typeof signatureInfo.blockTime === 'number') {
-      return signatureInfo.blockTime;
-    }
-
-    return Math.floor(Date.now() / 1000);
-  }
-
-  private matchKindFilter(item: IHistoryItemDto, kind: HistoryKind): boolean {
-    if (kind === HistoryKind.ALL) {
-      return true;
-    }
-
-    if (kind === HistoryKind.ETH) {
-      return item.assetSymbol === 'SOL';
-    }
-
-    return item.assetSymbol === 'SPL';
-  }
-
-  private matchDirectionFilter(item: IHistoryItemDto, direction: HistoryDirectionFilter): boolean {
-    if (direction === HistoryDirectionFilter.ALL) {
-      return true;
-    }
-
-    if (direction === HistoryDirectionFilter.IN) {
-      return item.direction === HistoryDirection.IN;
-    }
-
-    return item.direction === HistoryDirection.OUT;
   }
 
   private async callWithFallback<TResult>(
