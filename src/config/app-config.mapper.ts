@@ -146,11 +146,25 @@ const mapHistoryConfig = (
   | 'historyRateLimitPerMinute'
   | 'historyButtonCooldownSec'
   | 'historyStaleOnErrorSec'
+  | 'historyHotCacheEnabled'
+  | 'historyHotCacheTopWallets'
+  | 'historyHotCacheRefreshIntervalSec'
+  | 'historyHotCachePageLimit'
+  | 'historyHotCacheMaxItemsPerWallet'
+  | 'historyHotCacheTtlSec'
+  | 'historyHotCacheStaleSec'
 > => ({
   historyCacheTtlSec: parsedEnv.HISTORY_CACHE_TTL_SEC,
   historyRateLimitPerMinute: parsedEnv.HISTORY_RATE_LIMIT_PER_MINUTE,
   historyButtonCooldownSec: parsedEnv.HISTORY_BUTTON_COOLDOWN_SEC,
   historyStaleOnErrorSec: parsedEnv.HISTORY_STALE_ON_ERROR_SEC,
+  historyHotCacheEnabled: parsedEnv.HISTORY_HOT_CACHE_ENABLED,
+  historyHotCacheTopWallets: parsedEnv.HISTORY_HOT_CACHE_TOP_WALLETS,
+  historyHotCacheRefreshIntervalSec: parsedEnv.HISTORY_HOT_CACHE_REFRESH_INTERVAL_SEC,
+  historyHotCachePageLimit: parsedEnv.HISTORY_HOT_CACHE_PAGE_LIMIT,
+  historyHotCacheMaxItemsPerWallet: parsedEnv.HISTORY_HOT_CACHE_MAX_ITEMS_PER_WALLET,
+  historyHotCacheTtlSec: parsedEnv.HISTORY_HOT_CACHE_TTL_SEC,
+  historyHotCacheStaleSec: parsedEnv.HISTORY_HOT_CACHE_STALE_SEC,
 });
 
 const mapRateLimitConfig = (
@@ -162,8 +176,12 @@ const mapRateLimitConfig = (
   | 'rateLimitEtherscanMaxConcurrent'
   | 'rateLimitSolanaHeliusMinTimeMs'
   | 'rateLimitSolanaHeliusMaxConcurrent'
+  | 'rateLimitSolanaPublicMinTimeMs'
+  | 'rateLimitSolanaPublicMaxConcurrent'
   | 'rateLimitTronGridMinTimeMs'
   | 'rateLimitTronGridMaxConcurrent'
+  | 'rateLimitTronPublicMinTimeMs'
+  | 'rateLimitTronPublicMaxConcurrent'
   | 'rateLimitCoingeckoMinTimeMs'
   | 'rateLimitCoingeckoMaxConcurrent'
   | 'rateLimitEthRpcMinTimeMs'
@@ -177,8 +195,12 @@ const mapRateLimitConfig = (
   rateLimitEtherscanMaxConcurrent: parsedEnv.RATE_LIMIT_ETHERSCAN_MAX_CONCURRENT,
   rateLimitSolanaHeliusMinTimeMs: parsedEnv.RATE_LIMIT_SOLANA_HELIUS_MIN_TIME_MS,
   rateLimitSolanaHeliusMaxConcurrent: parsedEnv.RATE_LIMIT_SOLANA_HELIUS_MAX_CONCURRENT,
+  rateLimitSolanaPublicMinTimeMs: parsedEnv.RATE_LIMIT_SOLANA_PUBLIC_MIN_TIME_MS,
+  rateLimitSolanaPublicMaxConcurrent: parsedEnv.RATE_LIMIT_SOLANA_PUBLIC_MAX_CONCURRENT,
   rateLimitTronGridMinTimeMs: parsedEnv.RATE_LIMIT_TRON_GRID_MIN_TIME_MS,
   rateLimitTronGridMaxConcurrent: parsedEnv.RATE_LIMIT_TRON_GRID_MAX_CONCURRENT,
+  rateLimitTronPublicMinTimeMs: parsedEnv.RATE_LIMIT_TRON_PUBLIC_MIN_TIME_MS,
+  rateLimitTronPublicMaxConcurrent: parsedEnv.RATE_LIMIT_TRON_PUBLIC_MAX_CONCURRENT,
   rateLimitCoingeckoMinTimeMs: parsedEnv.RATE_LIMIT_COINGECKO_MIN_TIME_MS,
   rateLimitCoingeckoMaxConcurrent: parsedEnv.RATE_LIMIT_COINGECKO_MAX_CONCURRENT,
   rateLimitEthRpcMinTimeMs: parsedEnv.RATE_LIMIT_ETH_RPC_MIN_TIME_MS,

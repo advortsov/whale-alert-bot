@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { SolanaRpcHistoryAdapter } from './solana-rpc-history.adapter';
 import { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
 import type { AppConfigService } from '../../../config/app-config.service';
+import { LimiterKey } from '../../blockchain/rate-limiting/bottleneck-rate-limiter.interfaces';
 import type { BottleneckRateLimiterService } from '../../blockchain/rate-limiting/bottleneck-rate-limiter.service';
 import { HistoryDirection, HistoryItemType } from '../../whales/entities/history-item.dto';
 import { HistoryDirectionFilter, HistoryKind } from '../../whales/entities/history-request.dto';
@@ -20,6 +21,46 @@ const createJsonResponse = (payload: unknown): Response =>
   }) as unknown as Response;
 
 describe('SolanaRpcHistoryAdapter', (): void => {
+  it('uses SOLANA_PUBLIC limiter for public endpoint requests', async (): Promise<void> => {
+    const limiterKeys: LimiterKey[] = [];
+    const fetchMock: ReturnType<typeof vi.fn> = vi.fn().mockResolvedValue(
+      createJsonResponse({
+        jsonrpc: '2.0',
+        id: 1,
+        result: [],
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const configStub: SolanaConfigStub = {
+      solanaHeliusHttpUrl: null,
+      solanaPublicHttpUrl: 'https://public.solana.test',
+    };
+    const adapter: SolanaRpcHistoryAdapter = new SolanaRpcHistoryAdapter(
+      configStub as unknown as AppConfigService,
+      {
+        schedule: async (key: LimiterKey, op: () => Promise<unknown>): Promise<unknown> => {
+          limiterKeys.push(key);
+          return op();
+        },
+      } as unknown as BottleneckRateLimiterService,
+    );
+
+    await adapter.loadRecentTransactions({
+      chainKey: ChainKey.SOLANA_MAINNET,
+      address: 'tracked-sol-address',
+      limit: 10,
+      offset: 0,
+      kind: HistoryKind.ALL,
+      direction: HistoryDirectionFilter.ALL,
+      minAmountUsd: null,
+    });
+
+    expect(limiterKeys.every((key: LimiterKey): boolean => key === LimiterKey.SOLANA_PUBLIC)).toBe(
+      true,
+    );
+  });
+
   it('loads and maps Solana history items with Solscan links', async (): Promise<void> => {
     const fetchMock: ReturnType<typeof vi.fn> = vi
       .fn()

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 
 import {
   detectSolanaSplTransfer,
@@ -12,18 +12,34 @@ import {
   resolveSolanaLamportsDelta,
   resolveSolanaTimestampSec,
 } from './solana-history-mapper.util';
+import {
+  HTTP_STATUS_TOO_MANY_REQUESTS,
+  HISTORY_WARN_COOLDOWN_MS,
+  SOLANA_HISTORY_REQUEST_TIMEOUT_MS,
+  SOLANA_SCAN_LIMIT_MAX,
+  SOLANA_SIGNATURES_BATCH_DEFAULT,
+  SOLANA_SIGNATURES_BATCH_MAX,
+  SOL_NATIVE_DECIMALS,
+  SOLSCAN_TX_BASE_URL,
+  SPL_TOKEN_DECIMALS,
+  resolveSolanaHistoryLimiterKey,
+  resolveSolanaHistoryScanLimit,
+  type ISolanaHistoryScanState,
+} from './solana-rpc-history.constants';
 import type {
   ISolanaSignatureInfo,
   ISolanaTransactionValue,
 } from './solana-rpc-history.interfaces';
 import { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
 import type { IHistoryExplorerAdapter } from '../../../common/interfaces/explorers/history-explorer.interfaces';
+import { RateLimitedWarningEmitter } from '../../../common/utils/logging/rate-limited-warning-emitter';
 import { AppConfigService } from '../../../config/app-config.service';
 import {
   LimiterKey,
   RequestPriority,
 } from '../../blockchain/rate-limiting/bottleneck-rate-limiter.interfaces';
 import { BottleneckRateLimiterService } from '../../blockchain/rate-limiting/bottleneck-rate-limiter.service';
+import { MetricsService } from '../../observability/metrics.service';
 import {
   HistoryDirection,
   HistoryItemType,
@@ -32,29 +48,17 @@ import {
 } from '../../whales/entities/history-item.dto';
 import { type IHistoryRequestDto } from '../../whales/entities/history-request.dto';
 
-const SOLSCAN_TX_BASE_URL = 'https://solscan.io/tx/';
-const SOLANA_HISTORY_REQUEST_TIMEOUT_MS = 10_000;
-const SPL_TOKEN_DECIMALS = 6;
-const SOL_NATIVE_DECIMALS = 9;
-const SOLANA_SIGNATURES_BATCH_MAX = 1_000;
-const SOLANA_SIGNATURES_SCAN_MAX_PER_PAGE = 1_000;
-const SOLANA_SIGNATURES_BATCH_DEFAULT = 200;
-
-interface ISolanaHistoryScanState {
-  readonly signatures: ISolanaSignatureInfo[];
-  reachedSignaturesEnd: boolean;
-  signatureCursor: number;
-  scannedSignaturesCount: number;
-  readonly pageItems: IHistoryItemDto[];
-}
-
 @Injectable()
 export class SolanaRpcHistoryAdapter implements IHistoryExplorerAdapter {
   private readonly logger: Logger = new Logger(SolanaRpcHistoryAdapter.name);
+  private readonly warningEmitter: RateLimitedWarningEmitter = new RateLimitedWarningEmitter(
+    HISTORY_WARN_COOLDOWN_MS,
+  );
 
   public constructor(
     private readonly appConfigService: AppConfigService,
     private readonly rateLimiterService: BottleneckRateLimiterService,
+    @Optional() private readonly metricsService: MetricsService | null = null,
   ) {}
 
   public async loadRecentTransactions(request: IHistoryRequestDto): Promise<IHistoryPageDto> {
@@ -204,9 +208,11 @@ export class SolanaRpcHistoryAdapter implements IHistoryExplorerAdapter {
     endpointUrls: readonly string[],
     scanState: ISolanaHistoryScanState,
   ): Promise<void> {
+    const scanLimit: number = resolveSolanaHistoryScanLimit(request.offset, request.limit);
+
     while (
       scanState.pageItems.length < request.limit &&
-      scanState.scannedSignaturesCount < SOLANA_SIGNATURES_SCAN_MAX_PER_PAGE
+      scanState.scannedSignaturesCount < scanLimit
     ) {
       const hasAvailableSignature: boolean = await this.ensureSignatureAvailable(
         request,
@@ -300,12 +306,14 @@ export class SolanaRpcHistoryAdapter implements IHistoryExplorerAdapter {
   }
 
   private logTruncatedScan(request: IHistoryRequestDto, scannedSignaturesCount: number): void {
-    if (scannedSignaturesCount < SOLANA_SIGNATURES_SCAN_MAX_PER_PAGE) {
+    const scanLimit: number = resolveSolanaHistoryScanLimit(request.offset, request.limit);
+
+    if (scannedSignaturesCount < scanLimit) {
       return;
     }
 
     this.logger.warn(
-      `solana history scan truncated address=${request.address} scanned=${String(scannedSignaturesCount)} limit=${String(request.limit)} offset=${String(request.offset)}`,
+      `solana history scan truncated address=${request.address} scanned=${String(scannedSignaturesCount)} scanLimit=${String(scanLimit)} limit=${String(request.limit)} offset=${String(request.offset)}`,
     );
   }
 
@@ -324,7 +332,7 @@ export class SolanaRpcHistoryAdapter implements IHistoryExplorerAdapter {
     const hasUnknownTail: boolean =
       scanState.pageItems.length >= requestLimit &&
       (!scanState.reachedSignaturesEnd ||
-        scanState.scannedSignaturesCount >= SOLANA_SIGNATURES_SCAN_MAX_PER_PAGE);
+        scanState.scannedSignaturesCount >= SOLANA_SCAN_LIMIT_MAX);
     const hasNextPage: boolean =
       scanState.pageItems.length >= requestLimit && (hasKnownTail || hasUnknownTail);
 
@@ -410,9 +418,12 @@ export class SolanaRpcHistoryAdapter implements IHistoryExplorerAdapter {
         return await operation(endpointUrl);
       } catch (error: unknown) {
         const errorMessage: string = error instanceof Error ? error.message : String(error);
-        this.logger.warn(
-          `solana history endpoint failed endpoint=${endpointUrl} reason=${errorMessage}`,
-        );
+        const warningKey: string = `endpoint_failed:${endpointUrl}:${errorMessage}`;
+        if (this.warningEmitter.shouldEmit(warningKey)) {
+          this.logger.warn(
+            `[SOL] history endpoint failed endpoint=${endpointUrl} reason=${errorMessage}`,
+          );
+        }
         lastError = error instanceof Error ? error : new Error(errorMessage);
       }
     }
@@ -429,8 +440,12 @@ export class SolanaRpcHistoryAdapter implements IHistoryExplorerAdapter {
     method: string,
     params: readonly unknown[],
   ): Promise<unknown> {
+    const limiterKey: LimiterKey = resolveSolanaHistoryLimiterKey(
+      endpointUrl,
+      this.appConfigService.solanaPublicHttpUrl,
+    );
     const response: Response = await this.rateLimiterService.schedule(
-      LimiterKey.SOLANA_HELIUS,
+      limiterKey,
       async (): Promise<Response> =>
         fetch(endpointUrl, {
           method: 'POST',
@@ -449,6 +464,19 @@ export class SolanaRpcHistoryAdapter implements IHistoryExplorerAdapter {
     );
 
     if (!response.ok) {
+      if (response.status === HTTP_STATUS_TOO_MANY_REQUESTS && this.metricsService !== null) {
+        this.metricsService.historyHttp429Total.inc({
+          chain: ChainKey.SOLANA_MAINNET,
+          adapter: 'solana_rpc_history',
+        });
+        const warningKey: string = `history_http_429:${endpointUrl}:${method}`;
+        if (this.warningEmitter.shouldEmit(warningKey)) {
+          this.logger.warn(
+            `history_http_429 chain=${ChainKey.SOLANA_MAINNET} adapter=solana_rpc_history endpoint=${endpointUrl} method=${method}`,
+          );
+        }
+      }
+
       throw new Error(`Solana RPC HTTP ${response.status}`);
     }
 

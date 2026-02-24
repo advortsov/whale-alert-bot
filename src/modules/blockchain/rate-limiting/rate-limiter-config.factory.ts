@@ -22,8 +22,8 @@ export function buildLimiterConfigs(
   });
 
   map.set(LimiterKey.SOLANA_PUBLIC, {
-    minTime: 100,
-    maxConcurrent: 2,
+    minTime: config.rateLimitSolanaPublicMinTimeMs,
+    maxConcurrent: config.rateLimitSolanaPublicMaxConcurrent,
   });
 
   map.set(LimiterKey.TRON_GRID, {
@@ -32,8 +32,8 @@ export function buildLimiterConfigs(
   });
 
   map.set(LimiterKey.TRON_PUBLIC, {
-    minTime: 1000,
-    maxConcurrent: 1,
+    minTime: config.rateLimitTronPublicMinTimeMs,
+    maxConcurrent: config.rateLimitTronPublicMaxConcurrent,
   });
 
   map.set(LimiterKey.ETHERSCAN, {

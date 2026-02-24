@@ -24,8 +24,12 @@ class RpcConfigStub {
   public readonly rateLimitEtherscanMaxConcurrent: number = 1;
   public readonly rateLimitSolanaHeliusMinTimeMs: number = 0;
   public readonly rateLimitSolanaHeliusMaxConcurrent: number = 10;
+  public readonly rateLimitSolanaPublicMinTimeMs: number = 0;
+  public readonly rateLimitSolanaPublicMaxConcurrent: number = 10;
   public readonly rateLimitTronGridMinTimeMs: number = 0;
   public readonly rateLimitTronGridMaxConcurrent: number = 10;
+  public readonly rateLimitTronPublicMinTimeMs: number = 0;
+  public readonly rateLimitTronPublicMaxConcurrent: number = 10;
   public readonly rateLimitCoingeckoMinTimeMs: number = 0;
   public readonly rateLimitCoingeckoMaxConcurrent: number = 1;
 }

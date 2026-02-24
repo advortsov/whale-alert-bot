@@ -247,6 +247,34 @@ export class AppConfigService {
     return this.config.historyStaleOnErrorSec;
   }
 
+  public get historyHotCacheEnabled(): boolean {
+    return this.config.historyHotCacheEnabled;
+  }
+
+  public get historyHotCacheTopWallets(): number {
+    return this.config.historyHotCacheTopWallets;
+  }
+
+  public get historyHotCacheRefreshIntervalSec(): number {
+    return this.config.historyHotCacheRefreshIntervalSec;
+  }
+
+  public get historyHotCachePageLimit(): number {
+    return this.config.historyHotCachePageLimit;
+  }
+
+  public get historyHotCacheMaxItemsPerWallet(): number {
+    return this.config.historyHotCacheMaxItemsPerWallet;
+  }
+
+  public get historyHotCacheTtlSec(): number {
+    return this.config.historyHotCacheTtlSec;
+  }
+
+  public get historyHotCacheStaleSec(): number {
+    return this.config.historyHotCacheStaleSec;
+  }
+
   public get metricsEnabled(): boolean {
     return this.config.metricsEnabled;
   }
@@ -267,12 +295,28 @@ export class AppConfigService {
     return this.config.rateLimitSolanaHeliusMaxConcurrent;
   }
 
+  public get rateLimitSolanaPublicMinTimeMs(): number {
+    return this.config.rateLimitSolanaPublicMinTimeMs;
+  }
+
+  public get rateLimitSolanaPublicMaxConcurrent(): number {
+    return this.config.rateLimitSolanaPublicMaxConcurrent;
+  }
+
   public get rateLimitTronGridMinTimeMs(): number {
     return this.config.rateLimitTronGridMinTimeMs;
   }
 
   public get rateLimitTronGridMaxConcurrent(): number {
     return this.config.rateLimitTronGridMaxConcurrent;
+  }
+
+  public get rateLimitTronPublicMinTimeMs(): number {
+    return this.config.rateLimitTronPublicMinTimeMs;
+  }
+
+  public get rateLimitTronPublicMaxConcurrent(): number {
+    return this.config.rateLimitTronPublicMaxConcurrent;
   }
 
   public get rateLimitCoingeckoMinTimeMs(): number {

@@ -454,6 +454,166 @@
           "refId": "A"
         }
       ]
+    },
+    {
+      "title": "History 429 Rate (5m)",
+      "description": "History adapter rate limit responses per second",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 64 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 10 },
+          "unit": "reqps",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum by(chain,adapter) (rate(history_history_http_429_total[5m]))",
+          "legendFormat": "{{chain}} {{adapter}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Hot Cache Refresh Success/Fail",
+      "description": "Refresh cycles grouped by status and chain",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 64 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 10 },
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rate(history_hot_cache_refresh_total[5m])",
+          "legendFormat": "{{chain}} {{status}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Hot Cache New vs Duplicate",
+      "description": "New cached items vs skipped duplicates",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 72 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 10 },
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rate(history_hot_cache_new_items_total[5m])",
+          "legendFormat": "{{chain}} new",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(history_hot_cache_duplicate_items_total[5m])",
+          "legendFormat": "{{chain}} duplicate",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "title": "Hot Cache Coverage (wallets)",
+      "description": "Wallets currently stored in Top-100 hot cache",
+      "type": "gauge",
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 72 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "green", "value": 90 }
+            ]
+          },
+          "unit": "short",
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "targets": [
+        {
+          "expr": "history_hot_cache_wallets_gauge",
+          "legendFormat": "wallets",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Hot Cache Refresh p95",
+      "description": "95th percentile refresh duration by chain",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 72 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 10 },
+          "unit": "s",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(history_hot_cache_refresh_duration_seconds_bucket[5m]))",
+          "legendFormat": "{{chain}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Hot Cache Avg Items By Chain",
+      "description": "Average history items in hot cache entries",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 80 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 10 },
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "history_hot_cache_entry_items_gauge",
+          "legendFormat": "{{chain}}",
+          "refId": "A"
+        }
+      ]
     }
   ],
   "refresh": "30s",

@@ -3,7 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { HistoryDirectionFilter, HistoryKind } from '../entities/history-request.dto';
 import type { IParsedHistoryQueryParams } from '../entities/tracking-history-request.dto';
 
-const DEFAULT_HISTORY_LIMIT = 5;
+const DEFAULT_HISTORY_LIMIT = 20;
 const MAX_HISTORY_LIMIT = 20;
 const MAX_HISTORY_OFFSET = 10_000;
 

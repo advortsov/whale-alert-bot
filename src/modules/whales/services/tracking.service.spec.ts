@@ -1,16 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import type { HistoryCacheService } from './history-cache.service';
+import type { HistoryHotCacheService } from './history-hot-cache.service';
 import type { HistoryRateLimiterService } from './history-rate-limiter.service';
 import { TrackingAddressService } from './tracking-address.service';
 import { TrackingHistoryFormatterService } from './tracking-history-formatter.service';
 import { TrackingHistoryPageBuilderService } from './tracking-history-page-builder.service';
 import { TrackingHistoryPageService } from './tracking-history-page.service';
 import { TrackingHistoryQueryParserService } from './tracking-history-query-parser.service';
-import {
-  TrackingHistoryService,
-  TrackingHistoryServiceDependencies,
-} from './tracking-history.service';
+import { TrackingHistoryService } from './tracking-history.service';
+import { TrackingHistoryServiceDependencies } from './tracking-history.service.dependencies';
 import { TrackingSettingsParserService } from './tracking-settings-parser.service';
 import {
   TrackingSettingsService,
@@ -80,6 +79,11 @@ type HistoryRateLimiterServiceStub = {
   readonly getSnapshot: ReturnType<typeof vi.fn>;
 };
 
+type HistoryHotCacheServiceStub = {
+  readonly getFreshPage: ReturnType<typeof vi.fn>;
+  readonly getStalePage: ReturnType<typeof vi.fn>;
+};
+
 type UserAlertPreferencesRepositoryStub = {
   readonly findOrCreateByUserId: ReturnType<typeof vi.fn>;
   readonly updateMute: ReturnType<typeof vi.fn>;
@@ -115,6 +119,7 @@ type TestContext = {
   readonly addressCodecRegistryStub: AddressCodecRegistryStub;
   readonly historyCacheServiceStub: HistoryCacheServiceStub;
   readonly historyRateLimiterServiceStub: HistoryRateLimiterServiceStub;
+  readonly historyHotCacheServiceStub: HistoryHotCacheServiceStub;
   readonly userAlertPreferencesRepositoryStub: UserAlertPreferencesRepositoryStub;
   readonly userAlertSettingsRepositoryStub: UserAlertSettingsRepositoryStub;
   readonly userWalletAlertPreferencesRepositoryStub: UserWalletAlertPreferencesRepositoryStub;
@@ -160,6 +165,12 @@ const createTestContext = (): TestContext => {
     evaluate: vi.fn(),
     getSnapshot: vi.fn(),
   };
+  const historyHotCacheServiceStub: HistoryHotCacheServiceStub = {
+    getFreshPage: vi.fn(),
+    getStalePage: vi.fn(),
+  };
+  historyHotCacheServiceStub.getFreshPage.mockReturnValue(null);
+  historyHotCacheServiceStub.getStalePage.mockReturnValue(null);
   const userAlertPreferencesRepositoryStub: UserAlertPreferencesRepositoryStub = {
     findOrCreateByUserId: vi.fn(),
     updateMute: vi.fn(),
@@ -385,6 +396,8 @@ const createTestContext = (): TestContext => {
     historyDeps as { historyRateLimiterService: HistoryRateLimiterService }
   ).historyRateLimiterService =
     historyRateLimiterServiceStub as unknown as HistoryRateLimiterService;
+  (historyDeps as { historyHotCacheService: HistoryHotCacheService }).historyHotCacheService =
+    historyHotCacheServiceStub as unknown as HistoryHotCacheService;
   (
     historyDeps as { trackingHistoryPageService: TrackingHistoryPageService }
   ).trackingHistoryPageService = trackingHistoryPageService;
@@ -419,6 +432,7 @@ const createTestContext = (): TestContext => {
     addressCodecRegistryStub,
     historyCacheServiceStub,
     historyRateLimiterServiceStub,
+    historyHotCacheServiceStub,
     userAlertPreferencesRepositoryStub,
     userAlertSettingsRepositoryStub,
     userWalletAlertPreferencesRepositoryStub,

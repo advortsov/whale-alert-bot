@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TronGridHistoryAdapter } from './tron-grid-history.adapter';
 import { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
 import type { AppConfigService } from '../../../config/app-config.service';
+import { LimiterKey } from '../../../modules/blockchain/rate-limiting/bottleneck-rate-limiter.interfaces';
 import type { BottleneckRateLimiterService } from '../../../modules/blockchain/rate-limiting/bottleneck-rate-limiter.service';
 import { TronAddressCodec } from '../../../modules/chains/tron/tron-address.codec';
 import { HistoryDirection, HistoryItemType } from '../../whales/entities/history-item.dto';
@@ -44,6 +45,45 @@ describe('TronGridHistoryAdapter', (): void => {
 
   afterEach((): void => {
     vi.restoreAllMocks();
+  });
+
+  it('uses TRON_PUBLIC limiter when TronGrid API key is missing', async (): Promise<void> => {
+    const limiterKeys: LimiterKey[] = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (): Promise<Response> => {
+      return new Response(
+        JSON.stringify({
+          data: [],
+          meta: {},
+        }),
+        {
+          status: 200,
+          headers: {
+            'content-type': 'application/json',
+          },
+        },
+      );
+    });
+    const appConfigStub: AppConfigStub = {
+      tronGridApiBaseUrl: 'https://api.trongrid.io',
+      tronGridApiKey: null,
+      tronscanTxBaseUrl: 'https://tronscan.org/#/transaction/',
+    };
+    const adapter: TronGridHistoryAdapter = new TronGridHistoryAdapter(
+      appConfigStub as unknown as AppConfigService,
+      new TronAddressCodec(),
+      {
+        schedule: async (key: LimiterKey, op: () => Promise<unknown>): Promise<unknown> => {
+          limiterKeys.push(key);
+          return op();
+        },
+      } as unknown as BottleneckRateLimiterService,
+    );
+
+    await adapter.loadRecentTransactions(createRequest());
+
+    expect(limiterKeys.every((key: LimiterKey): boolean => key === LimiterKey.TRON_PUBLIC)).toBe(
+      true,
+    );
   });
 
   it('loads TRON native history items and maps transfer fields', async (): Promise<void> => {

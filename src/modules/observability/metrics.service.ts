@@ -23,6 +23,13 @@ export class MetricsService {
   public readonly cacheKeys: Gauge;
   public readonly cacheHitsTotal: Gauge;
   public readonly cacheMissesTotal: Gauge;
+  public readonly historyHotCacheRefreshTotal: Counter;
+  public readonly historyHotCacheNewItemsTotal: Counter;
+  public readonly historyHotCacheDuplicateItemsTotal: Counter;
+  public readonly historyHotCacheWalletsGauge: Gauge;
+  public readonly historyHotCacheEntryItemsGauge: Gauge;
+  public readonly historyHotCacheRefreshDurationSeconds: Histogram;
+  public readonly historyHttp429Total: Counter;
 
   public constructor() {
     this.registry = new Registry();
@@ -50,6 +57,15 @@ export class MetricsService {
     this.cacheKeys = cache.keys;
     this.cacheHitsTotal = cache.hitsTotal;
     this.cacheMissesTotal = cache.missesTotal;
+
+    const historyHotCache = this.createHistoryHotCacheMetrics();
+    this.historyHotCacheRefreshTotal = historyHotCache.refreshTotal;
+    this.historyHotCacheNewItemsTotal = historyHotCache.newItemsTotal;
+    this.historyHotCacheDuplicateItemsTotal = historyHotCache.duplicateItemsTotal;
+    this.historyHotCacheWalletsGauge = historyHotCache.walletsGauge;
+    this.historyHotCacheEntryItemsGauge = historyHotCache.entryItemsGauge;
+    this.historyHotCacheRefreshDurationSeconds = historyHotCache.refreshDurationSeconds;
+    this.historyHttp429Total = historyHotCache.historyHttp429Total;
   }
 
   public async getMetrics(): Promise<string> {
@@ -156,6 +172,61 @@ export class MetricsService {
         name: 'cache_misses_total',
         help: 'Total cache misses since start',
         labelNames: ['cache'] as const,
+        registers: [this.registry],
+      }),
+    };
+  }
+
+  private createHistoryHotCacheMetrics(): {
+    refreshTotal: Counter;
+    newItemsTotal: Counter;
+    duplicateItemsTotal: Counter;
+    walletsGauge: Gauge;
+    entryItemsGauge: Gauge;
+    refreshDurationSeconds: Histogram;
+    historyHttp429Total: Counter;
+  } {
+    return {
+      refreshTotal: new Counter({
+        name: 'history_hot_cache_refresh_total',
+        help: 'Total number of history hot cache refresh cycles',
+        labelNames: ['status', 'chain'] as const,
+        registers: [this.registry],
+      }),
+      newItemsTotal: new Counter({
+        name: 'history_hot_cache_new_items_total',
+        help: 'Total number of new history items added to hot cache',
+        labelNames: ['chain'] as const,
+        registers: [this.registry],
+      }),
+      duplicateItemsTotal: new Counter({
+        name: 'history_hot_cache_duplicate_items_total',
+        help: 'Total number of duplicate history items skipped by hot cache',
+        labelNames: ['chain'] as const,
+        registers: [this.registry],
+      }),
+      walletsGauge: new Gauge({
+        name: 'history_hot_cache_wallets_gauge',
+        help: 'Current number of wallets in hot cache top set',
+        registers: [this.registry],
+      }),
+      entryItemsGauge: new Gauge({
+        name: 'history_hot_cache_entry_items_gauge',
+        help: 'Average number of cached history items per wallet for chain',
+        labelNames: ['chain'] as const,
+        registers: [this.registry],
+      }),
+      refreshDurationSeconds: new Histogram({
+        name: 'history_hot_cache_refresh_duration_seconds',
+        help: 'Duration of history hot cache refresh cycle in seconds',
+        labelNames: ['chain'] as const,
+        buckets: RPC_DURATION_BUCKETS,
+        registers: [this.registry],
+      }),
+      historyHttp429Total: new Counter({
+        name: 'history_history_http_429_total',
+        help: 'Total number of HTTP 429 responses for history adapters',
+        labelNames: ['chain', 'adapter'] as const,
         registers: [this.registry],
       }),
     };

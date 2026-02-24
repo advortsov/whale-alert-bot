@@ -12,8 +12,12 @@ const createConfigStub = (): AppConfigService =>
     rateLimitEtherscanMaxConcurrent: 1,
     rateLimitSolanaHeliusMinTimeMs: 0,
     rateLimitSolanaHeliusMaxConcurrent: 5,
+    rateLimitSolanaPublicMinTimeMs: 0,
+    rateLimitSolanaPublicMaxConcurrent: 1,
     rateLimitTronGridMinTimeMs: 0,
     rateLimitTronGridMaxConcurrent: 1,
+    rateLimitTronPublicMinTimeMs: 0,
+    rateLimitTronPublicMaxConcurrent: 1,
     rateLimitCoingeckoMinTimeMs: 0,
     rateLimitCoingeckoMaxConcurrent: 1,
   }) as unknown as AppConfigService;

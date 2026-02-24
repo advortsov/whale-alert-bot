@@ -1,17 +1,9 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 
-import { HistoryCacheService } from './history-cache.service';
-import { HistoryRateLimiterService } from './history-rate-limiter.service';
-import { TrackingAddressService } from './tracking-address.service';
-import { TrackingHistoryFormatterService } from './tracking-history-formatter.service';
-import { TrackingHistoryPageBuilderService } from './tracking-history-page-builder.service';
-import { TrackingHistoryPageService } from './tracking-history-page.service';
-import { TrackingHistoryQueryParserService } from './tracking-history-query-parser.service';
+import { TrackingHistoryServiceDependencies } from './tracking-history.service.dependencies';
 import { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
-import { HISTORY_EXPLORER_ADAPTER } from '../../../common/interfaces/explorers/explorer-port.tokens';
-import type { IHistoryExplorerAdapter } from '../../../common/interfaces/explorers/history-explorer.interfaces';
-import { UsersRepository } from '../../../database/repositories/users.repository';
 import type { HistoryCacheEntry } from '../entities/history-cache.interfaces';
+import type { IHistoryHotCacheLookupResult } from '../entities/history-hot-cache.interfaces';
 import type { IHistoryPageDto } from '../entities/history-item.dto';
 import type { HistoryPageResult } from '../entities/history-page.interfaces';
 import {
@@ -25,7 +17,6 @@ import type {
   ITrackingHistoryRequestDto,
 } from '../entities/tracking-history-request.dto';
 import type {
-  IFirstHistoryPageContext,
   IHistoryTargetSnapshot,
   IHistoryUserRef,
   ILoadHistoryWithFallbackContext,
@@ -33,34 +24,9 @@ import type {
   IRateLimitedHistoryContext,
 } from '../entities/tracking-history.interfaces';
 
-@Injectable()
-export class TrackingHistoryServiceDependencies {
-  @Inject(UsersRepository)
-  public readonly usersRepository!: UsersRepository;
-
-  @Inject(TrackingAddressService)
-  public readonly trackingAddressService!: TrackingAddressService;
-
-  @Inject(HISTORY_EXPLORER_ADAPTER)
-  public readonly historyExplorerAdapter!: IHistoryExplorerAdapter;
-
-  @Inject(HistoryCacheService)
-  public readonly historyCacheService!: HistoryCacheService;
-
-  @Inject(HistoryRateLimiterService)
-  public readonly historyRateLimiterService!: HistoryRateLimiterService;
-
-  @Inject(TrackingHistoryPageService)
-  public readonly trackingHistoryPageService!: TrackingHistoryPageService;
-
-  @Inject(TrackingHistoryPageBuilderService)
-  public readonly historyPageBuilderService!: TrackingHistoryPageBuilderService;
-
-  @Inject(TrackingHistoryFormatterService)
-  public readonly historyFormatter!: TrackingHistoryFormatterService;
-
-  @Inject(TrackingHistoryQueryParserService)
-  public readonly historyQueryParserService!: TrackingHistoryQueryParserService;
+interface IHistoryPageContext {
+  readonly target: IHistoryTargetSnapshot;
+  readonly historyParams: IParsedHistoryQueryParams;
 }
 
 @Injectable()
@@ -83,70 +49,17 @@ export class TrackingHistoryService {
     userRef: IHistoryUserRef,
     request: ITrackingHistoryPageRequestDto,
   ): Promise<HistoryPageResult> {
-    const user = await this.deps.usersRepository.findOrCreate(userRef.telegramId, userRef.username);
-    const historyTarget = await this.deps.trackingAddressService.resolveHistoryTarget(
-      user.id,
-      request.rawAddress,
-    );
-    const historyParams: IParsedHistoryQueryParams =
-      this.deps.historyQueryParserService.parseHistoryParams(request);
-
-    this.deps.trackingAddressService.assertHistoryChainIsSupported(historyTarget.chainKey);
-
-    const target: IHistoryTargetSnapshot = {
-      address: historyTarget.address,
-      walletId: historyTarget.walletId,
-      chainKey: historyTarget.chainKey,
-    };
-
-    if (historyParams.offset === 0) {
-      return this.buildFirstHistoryPage({
-        userRef,
-        request,
-        target,
-        historyParams,
-      });
-    }
-
+    const context: IHistoryPageContext = await this.resolveHistoryPageContext(userRef, request);
     this.assertHistoryRequestAllowed(userRef.telegramId, request.source);
-    const localHistoryPage: ILocalHistoryPageData =
-      await this.deps.trackingHistoryPageService.loadLocalHistoryPage({
-        chainKey: historyTarget.chainKey,
-        normalizedAddress: historyTarget.address,
-        historyParams,
-      });
-
-    if (historyTarget.chainKey !== ChainKey.ETHEREUM_MAINNET) {
-      try {
-        return await this.deps.historyPageBuilderService.buildOffsetHistoryPageFromExplorer({
-          target,
-          historyParams,
-        });
-      } catch (error: unknown) {
-        if (localHistoryPage.pageEvents.length > 0) {
-          return this.deps.historyPageBuilderService.buildOffsetHistoryPage({
-            target,
-            historyParams,
-            localHistoryPage,
-          });
-        }
-
-        throw error;
-      }
+    const localPageResult: HistoryPageResult | null = await this.tryBuildLocalOffsetPage(context);
+    if (localPageResult !== null) {
+      return localPageResult;
     }
-
-    if (localHistoryPage.pageEvents.length === 0) {
-      return this.deps.historyPageBuilderService.buildOffsetHistoryPageFromExplorer({
-        target,
-        historyParams,
-      });
+    const hotPageResult: HistoryPageResult | null = this.tryBuildHotOffsetPage(context, false);
+    if (hotPageResult !== null) {
+      return hotPageResult;
     }
-
-    return this.deps.historyPageBuilderService.buildOffsetHistoryPage({
-      target,
-      historyParams,
-      localHistoryPage,
-    });
+    return this.buildExplorerOffsetPageWithFallback(context);
   }
 
   public async getAddressHistoryWithPolicy(
@@ -211,32 +124,6 @@ export class TrackingHistoryService {
     });
   }
 
-  private async buildFirstHistoryPage(
-    context: IFirstHistoryPageContext,
-  ): Promise<HistoryPageResult> {
-    const message: string = await this.getAddressHistoryWithPolicy(context.userRef, {
-      rawAddress: context.request.rawAddress,
-      rawLimit: String(context.historyParams.limit),
-      source: context.request.source,
-      rawKind: context.request.rawKind,
-      rawDirection: context.request.rawDirection,
-    });
-
-    const localHistoryPage: ILocalHistoryPageData =
-      await this.deps.trackingHistoryPageService.loadLocalHistoryPage({
-        chainKey: context.target.chainKey,
-        normalizedAddress: context.target.address,
-        historyParams: context.historyParams,
-      });
-
-    return this.deps.historyPageBuilderService.buildFirstHistoryPage({
-      message,
-      target: context.target,
-      historyParams: context.historyParams,
-      localHistoryPage,
-    });
-  }
-
   private assertHistoryRequestAllowed(telegramId: string, source: HistoryRequestSource): void {
     const decision: HistoryRateLimitDecision = this.deps.historyRateLimiterService.evaluate(
       telegramId,
@@ -278,48 +165,15 @@ export class TrackingHistoryService {
 
   private async loadHistoryWithFallback(context: ILoadHistoryWithFallbackContext): Promise<string> {
     try {
-      const localHistoryPage: ILocalHistoryPageData =
-        await this.deps.trackingHistoryPageService.loadLocalHistoryPage({
-          chainKey: context.chainKey,
-          normalizedAddress: context.normalizedAddress,
-          historyParams: {
-            ...context.historyParams,
-            offset: 0,
-          },
-        });
-
-      if (localHistoryPage.pageEvents.length > 0) {
-        const message: string = this.deps.historyFormatter.formatWalletEventsHistoryMessage(
-          context.normalizedAddress,
-          localHistoryPage.pageEvents,
-          {
-            offset: 0,
-            kind: context.historyParams.kind,
-            direction: context.historyParams.direction,
-            chainKey: context.chainKey,
-          },
-        );
-        this.cacheHistory(context.normalizedAddress, context.historyParams, message);
-        return message;
+      const localMessage: string | null = await this.tryBuildLocalHistoryMessage(context);
+      if (localMessage !== null) {
+        return localMessage;
       }
-
-      const historyPage: IHistoryPageDto =
-        await this.deps.historyExplorerAdapter.loadRecentTransactions({
-          chainKey: context.chainKey,
-          address: context.normalizedAddress,
-          limit: context.historyParams.limit,
-          offset: 0,
-          kind: context.historyParams.kind,
-          direction: context.historyParams.direction,
-          minAmountUsd: null,
-        });
-
-      const historyMessage: string = this.deps.historyFormatter.formatHistoryMessage(
-        context.normalizedAddress,
-        historyPage.items,
-      );
-      this.cacheHistory(context.normalizedAddress, context.historyParams, historyMessage);
-      return historyMessage;
+      const hotMessage: string | null = this.tryBuildHotHistoryMessage(context, false);
+      if (hotMessage !== null) {
+        return hotMessage;
+      }
+      return await this.buildExplorerHistoryMessage(context);
     } catch (error: unknown) {
       const errorMessage: string = error instanceof Error ? error.message : String(error);
       this.logger.error(
@@ -329,27 +183,273 @@ export class TrackingHistoryService {
       if (!this.isRateLimitOrTimeout(errorMessage)) {
         throw error;
       }
+      return this.resolveRateLimitedFallback(context);
+    }
+  }
 
-      const staleEntry: HistoryCacheEntry | null = this.deps.historyCacheService.getStale(
-        context.normalizedAddress,
-        context.historyParams.limit,
-        {
-          kind: context.historyParams.kind,
-          direction: context.historyParams.direction,
-        },
+  private async resolveHistoryPageContext(
+    userRef: IHistoryUserRef,
+    request: ITrackingHistoryPageRequestDto,
+  ): Promise<IHistoryPageContext> {
+    const user = await this.deps.usersRepository.findOrCreate(userRef.telegramId, userRef.username);
+    const historyTarget = await this.deps.trackingAddressService.resolveHistoryTarget(
+      user.id,
+      request.rawAddress,
+    );
+    const historyParams: IParsedHistoryQueryParams =
+      this.deps.historyQueryParserService.parseHistoryParams(request);
+    this.deps.trackingAddressService.assertHistoryChainIsSupported(historyTarget.chainKey);
+
+    return {
+      target: {
+        address: historyTarget.address,
+        walletId: historyTarget.walletId,
+        chainKey: historyTarget.chainKey,
+      },
+      historyParams,
+    };
+  }
+
+  private async tryBuildLocalOffsetPage(
+    context: IHistoryPageContext,
+  ): Promise<HistoryPageResult | null> {
+    const localHistoryPage: ILocalHistoryPageData =
+      await this.deps.trackingHistoryPageService.loadLocalHistoryPage({
+        chainKey: context.target.chainKey,
+        normalizedAddress: context.target.address,
+        historyParams: context.historyParams,
+      });
+    if (localHistoryPage.pageEvents.length === 0) {
+      return null;
+    }
+    const shouldPreferExplorerOnShortFirstPage: boolean =
+      context.target.chainKey !== ChainKey.ETHEREUM_MAINNET;
+    const isShortFirstPage: boolean =
+      shouldPreferExplorerOnShortFirstPage &&
+      context.historyParams.offset === 0 &&
+      localHistoryPage.pageEvents.length < context.historyParams.limit;
+    if (isShortFirstPage) {
+      return null;
+    }
+    this.logger.debug(
+      `history_source_selected source=local chain=${context.target.chainKey} address=${context.target.address} offset=${String(context.historyParams.offset)} limit=${String(context.historyParams.limit)}`,
+    );
+    return this.deps.historyPageBuilderService.buildOffsetHistoryPage({
+      target: context.target,
+      historyParams: context.historyParams,
+      localHistoryPage,
+    });
+  }
+
+  private tryBuildHotOffsetPage(
+    context: IHistoryPageContext,
+    allowStale: boolean,
+  ): HistoryPageResult | null {
+    const hotLookup: IHistoryHotCacheLookupResult | null = this.resolveHotCachePageLookup(
+      context.target.chainKey,
+      context.target.address,
+      context.historyParams,
+      allowStale,
+    );
+    if (hotLookup === null || hotLookup.page.items.length === 0) {
+      return null;
+    }
+    const source: string = allowStale ? 'hot_stale' : 'hot';
+    this.logger.debug(
+      `history_source_selected source=${source} chain=${context.target.chainKey} address=${context.target.address} offset=${String(context.historyParams.offset)} limit=${String(context.historyParams.limit)}`,
+    );
+    return this.buildPageResultFromHistoryItems(
+      context.target,
+      context.historyParams,
+      hotLookup.page,
+      context.historyParams.offset,
+    );
+  }
+
+  private async buildExplorerOffsetPageWithFallback(
+    context: IHistoryPageContext,
+  ): Promise<HistoryPageResult> {
+    try {
+      this.logger.debug(
+        `history_source_selected source=explorer chain=${context.target.chainKey} address=${context.target.address} offset=${String(context.historyParams.offset)} limit=${String(context.historyParams.limit)}`,
       );
-
-      if (staleEntry != null) {
-        this.logger.warn(
-          `history_stale_served telegramId=${context.telegramId} source=${context.source} address=${context.normalizedAddress} limit=${String(context.historyParams.limit)} reason=external_rate_limit`,
-        );
-        return this.deps.historyFormatter.buildStaleMessage(staleEntry.message);
+      return await this.deps.historyPageBuilderService.buildOffsetHistoryPageFromExplorer({
+        target: context.target,
+        historyParams: context.historyParams,
+      });
+    } catch (error: unknown) {
+      const errorMessage: string = error instanceof Error ? error.message : String(error);
+      if (!this.isRateLimitOrTimeout(errorMessage)) {
+        throw error;
       }
-
+      const staleResult: HistoryPageResult | null = this.tryBuildHotOffsetPage(context, true);
+      if (staleResult !== null) {
+        return staleResult;
+      }
       throw new Error(
         'Внешний API временно ограничил доступ (429). Повтори через несколько секунд.',
       );
     }
+  }
+
+  private async tryBuildLocalHistoryMessage(
+    context: ILoadHistoryWithFallbackContext,
+  ): Promise<string | null> {
+    const localHistoryPage: ILocalHistoryPageData =
+      await this.deps.trackingHistoryPageService.loadLocalHistoryPage({
+        chainKey: context.chainKey,
+        normalizedAddress: context.normalizedAddress,
+        historyParams: {
+          ...context.historyParams,
+          offset: 0,
+        },
+      });
+    if (localHistoryPage.pageEvents.length === 0) {
+      return null;
+    }
+    this.logger.debug(
+      `history_source_selected source=local chain=${context.chainKey} address=${context.normalizedAddress} offset=0 limit=${String(context.historyParams.limit)}`,
+    );
+    const message: string = this.deps.historyFormatter.formatWalletEventsHistoryMessage(
+      context.normalizedAddress,
+      localHistoryPage.pageEvents,
+      {
+        offset: 0,
+        kind: context.historyParams.kind,
+        direction: context.historyParams.direction,
+        chainKey: context.chainKey,
+      },
+    );
+    this.cacheHistory(context.normalizedAddress, context.historyParams, message);
+    return message;
+  }
+
+  private tryBuildHotHistoryMessage(
+    context: ILoadHistoryWithFallbackContext,
+    allowStale: boolean,
+  ): string | null {
+    const hotLookup: IHistoryHotCacheLookupResult | null = this.resolveHotCachePageLookup(
+      context.chainKey,
+      context.normalizedAddress,
+      context.historyParams,
+      allowStale,
+    );
+    if (hotLookup === null || hotLookup.page.items.length === 0) {
+      return null;
+    }
+    const source: string = allowStale ? 'hot_stale' : 'hot';
+    this.logger.debug(
+      `history_source_selected source=${source} chain=${context.chainKey} address=${context.normalizedAddress} offset=0 limit=${String(context.historyParams.limit)}`,
+    );
+    const message: string = this.deps.historyFormatter.formatHistoryMessage(
+      context.normalizedAddress,
+      hotLookup.page.items,
+    );
+    if (!allowStale) {
+      this.cacheHistory(context.normalizedAddress, context.historyParams, message);
+    }
+    return message;
+  }
+
+  private async buildExplorerHistoryMessage(
+    context: ILoadHistoryWithFallbackContext,
+  ): Promise<string> {
+    this.logger.debug(
+      `history_source_selected source=explorer chain=${context.chainKey} address=${context.normalizedAddress} offset=0 limit=${String(context.historyParams.limit)}`,
+    );
+    const historyPage: IHistoryPageDto =
+      await this.deps.historyExplorerAdapter.loadRecentTransactions({
+        chainKey: context.chainKey,
+        address: context.normalizedAddress,
+        limit: context.historyParams.limit,
+        offset: 0,
+        kind: context.historyParams.kind,
+        direction: context.historyParams.direction,
+        minAmountUsd: null,
+      });
+    const historyMessage: string = this.deps.historyFormatter.formatHistoryMessage(
+      context.normalizedAddress,
+      historyPage.items,
+    );
+    this.cacheHistory(context.normalizedAddress, context.historyParams, historyMessage);
+    return historyMessage;
+  }
+
+  private resolveRateLimitedFallback(context: ILoadHistoryWithFallbackContext): string {
+    const staleEntry: HistoryCacheEntry | null = this.deps.historyCacheService.getStale(
+      context.normalizedAddress,
+      context.historyParams.limit,
+      {
+        kind: context.historyParams.kind,
+        direction: context.historyParams.direction,
+      },
+    );
+    if (staleEntry !== null) {
+      this.logger.warn(
+        `history_stale_served telegramId=${context.telegramId} source=${context.source} address=${context.normalizedAddress} limit=${String(context.historyParams.limit)} reason=external_rate_limit`,
+      );
+      return this.deps.historyFormatter.buildStaleMessage(staleEntry.message);
+    }
+    const staleHotMessage: string | null = this.tryBuildHotHistoryMessage(context, true);
+    if (staleHotMessage !== null) {
+      return staleHotMessage;
+    }
+    throw new Error('Внешний API временно ограничил доступ (429). Повтори через несколько секунд.');
+  }
+
+  private resolveHotCachePageLookup(
+    chainKey: ChainKey,
+    address: string,
+    historyParams: IParsedHistoryQueryParams,
+    allowStale: boolean,
+  ): IHistoryHotCacheLookupResult | null {
+    if (allowStale) {
+      return this.deps.historyHotCacheService.getStalePage({
+        chainKey,
+        address,
+        limit: historyParams.limit,
+        offset: historyParams.offset,
+        kind: historyParams.kind,
+        direction: historyParams.direction,
+      });
+    }
+    return this.deps.historyHotCacheService.getFreshPage({
+      chainKey,
+      address,
+      limit: historyParams.limit,
+      offset: historyParams.offset,
+      kind: historyParams.kind,
+      direction: historyParams.direction,
+    });
+  }
+
+  private buildPageResultFromHistoryItems(
+    target: IHistoryTargetSnapshot,
+    historyParams: IParsedHistoryQueryParams,
+    page: IHistoryPageDto,
+    offset: number,
+  ): HistoryPageResult {
+    const message: string = this.deps.historyFormatter.formatHistoryMessage(
+      target.address,
+      page.items,
+    );
+    const items = this.deps.trackingHistoryPageService.mapExplorerItemsToListItems(
+      page.items,
+      target.chainKey,
+    );
+
+    return {
+      message,
+      resolvedAddress: target.address,
+      walletId: target.walletId,
+      limit: historyParams.limit,
+      offset,
+      kind: historyParams.kind,
+      direction: historyParams.direction,
+      hasNextPage: page.nextOffset !== null,
+      items,
+      nextOffset: page.nextOffset,
+    };
   }
 
   private cacheHistory(

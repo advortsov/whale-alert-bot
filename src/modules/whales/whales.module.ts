@@ -15,6 +15,7 @@ import { AlertSuppressionService } from './services/alert-suppression.service';
 import { CexAddressBookService } from './services/cex-address-book.service';
 import { HistoryCacheService } from './services/history-cache.service';
 import { HistoryExplorerRouterAdapter } from './services/history-explorer-router.adapter';
+import { HistoryHotCacheService } from './services/history-hot-cache.service';
 import { HistoryRateLimiterService } from './services/history-rate-limiter.service';
 import { QuietHoursService } from './services/quiet-hours.service';
 import { TokenMetadataService } from './services/token-metadata.service';
@@ -23,10 +24,8 @@ import { TrackingHistoryFormatterService } from './services/tracking-history-for
 import { TrackingHistoryPageBuilderService } from './services/tracking-history-page-builder.service';
 import { TrackingHistoryPageService } from './services/tracking-history-page.service';
 import { TrackingHistoryQueryParserService } from './services/tracking-history-query-parser.service';
-import {
-  TrackingHistoryService,
-  TrackingHistoryServiceDependencies,
-} from './services/tracking-history.service';
+import { TrackingHistoryService } from './services/tracking-history.service';
+import { TrackingHistoryServiceDependencies } from './services/tracking-history.service.dependencies';
 import { TrackingSettingsParserService } from './services/tracking-settings-parser.service';
 import {
   TrackingSettingsService,
@@ -49,9 +48,15 @@ import { SolanaRpcHistoryAdapter } from '../chains/solana/solana-rpc-history.ada
 import { CoinGeckoPricingAdapter } from '../integrations/coingecko/coingecko-pricing.adapter';
 import { EtherscanHistoryAdapter } from '../integrations/etherscan/etherscan-history.adapter';
 import { TronGridHistoryAdapter } from '../integrations/trongrid/tron-grid-history.adapter';
+import { ObservabilityModule } from '../observability/observability.module';
 
 @Module({
-  imports: [DatabaseModule, RateLimitingModule, forwardRef(() => ChainsModule)],
+  imports: [
+    DatabaseModule,
+    RateLimitingModule,
+    forwardRef(() => ChainsModule),
+    ObservabilityModule,
+  ],
   providers: [
     // --- Address codecs + registry ---
     AddressCodecRegistry,
@@ -82,6 +87,7 @@ import { TronGridHistoryAdapter } from '../integrations/trongrid/tron-grid-histo
     AlertDispatcherService,
     // --- Tracking services ---
     HistoryCacheService,
+    HistoryHotCacheService,
     HistoryRateLimiterService,
     TrackingAddressService,
     TrackingHistoryFormatterService,

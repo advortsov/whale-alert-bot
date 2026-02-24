@@ -15,3 +15,10 @@ export type SubscriberWalletRecipient = {
   readonly walletId: number;
   readonly chainKey: ChainKey;
 };
+
+export type PopularTrackedWalletView = {
+  readonly walletId: number;
+  readonly chainKey: ChainKey;
+  readonly address: string;
+  readonly subscriberCount: number;
+};

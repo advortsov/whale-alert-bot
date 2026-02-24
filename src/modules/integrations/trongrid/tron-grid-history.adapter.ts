@@ -1,5 +1,21 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 
+import {
+  HISTORY_WARN_COOLDOWN_MS,
+  HTTP_STATUS_BAD_REQUEST,
+  HTTP_STATUS_TOO_MANY_REQUESTS,
+  QUERY_POLICIES,
+  RESPONSE_PREVIEW_MAX_LENGTH,
+  TRON_HISTORY_REQUEST_TIMEOUT_MS,
+  TRON_MAX_PAGE_REQUESTS,
+  TRON_MAX_PAGE_SIZE,
+  TronGridBadRequestError,
+  type ITronGridFallbackResult,
+  type ITronGridPageLoadResult,
+  type ITronGridPageRequestOptions,
+  type ITronGridRequestQueryPolicy,
+  resolveTronHistoryLimiterKey,
+} from './tron-grid-history.constants';
 import type {
   ITronGridListResponse,
   ITronGridNativeTransactionItem,
@@ -8,6 +24,7 @@ import type {
 import { TronGridHistoryMapper } from './tron-grid-history.mapper';
 import { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
 import type { IHistoryExplorerAdapter } from '../../../common/interfaces/explorers/history-explorer.interfaces';
+import { RateLimitedWarningEmitter } from '../../../common/utils/logging/rate-limited-warning-emitter';
 import { AppConfigService } from '../../../config/app-config.service';
 import {
   LimiterKey,
@@ -15,60 +32,23 @@ import {
 } from '../../../modules/blockchain/rate-limiting/bottleneck-rate-limiter.interfaces';
 import { BottleneckRateLimiterService } from '../../../modules/blockchain/rate-limiting/bottleneck-rate-limiter.service';
 import { TronAddressCodec } from '../../../modules/chains/tron/tron-address.codec';
+import { MetricsService } from '../../observability/metrics.service';
 import { type IHistoryItemDto, type IHistoryPageDto } from '../../whales/entities/history-item.dto';
 import { HistoryKind, type IHistoryRequestDto } from '../../whales/entities/history-request.dto';
-
-interface ITronGridPageRequestOptions {
-  readonly path: string;
-  readonly pageSize: number;
-  readonly fingerprint: string | null;
-}
-
-interface ITronGridPageLoadResult<TItem> {
-  readonly items: readonly TItem[];
-  readonly nextFingerprint: string | null;
-}
-
-interface ITronGridFallbackResult {
-  readonly payload: ITronGridListResponse<unknown>;
-  readonly resolvedPolicy: ITronGridRequestQueryPolicy;
-}
-
-interface ITronGridRequestQueryPolicy {
-  readonly includeOnlyConfirmed: boolean;
-  readonly includeOrderBy: boolean;
-}
-
-const TRON_HISTORY_REQUEST_TIMEOUT_MS = 10_000;
-const TRON_MAX_PAGE_SIZE = 200;
-const TRON_MAX_PAGE_REQUESTS = 20;
-const HTTP_STATUS_BAD_REQUEST = 400;
-const RESPONSE_PREVIEW_MAX_LENGTH = 300;
-
-const QUERY_POLICIES: readonly ITronGridRequestQueryPolicy[] = [
-  {
-    includeOnlyConfirmed: true,
-    includeOrderBy: true,
-  },
-  {
-    includeOnlyConfirmed: true,
-    includeOrderBy: false,
-  },
-  {
-    includeOnlyConfirmed: false,
-    includeOrderBy: false,
-  },
-];
 
 @Injectable()
 export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
   private readonly logger: Logger = new Logger(TronGridHistoryAdapter.name);
   private readonly mapper: TronGridHistoryMapper;
+  private readonly warningEmitter: RateLimitedWarningEmitter = new RateLimitedWarningEmitter(
+    HISTORY_WARN_COOLDOWN_MS,
+  );
 
   public constructor(
     private readonly appConfigService: AppConfigService,
     private readonly tronAddressCodec: TronAddressCodec,
     private readonly rateLimiterService: BottleneckRateLimiterService,
+    @Optional() private readonly metricsService: MetricsService | null = null,
   ) {
     this.mapper = new TronGridHistoryMapper(
       this.tronAddressCodec,
@@ -339,8 +319,9 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
         }
 
         lastError = error;
-        this.logger.warn(
-          `tron history HTTP 400, retry with next query policy` +
+        this.warnWithCooldown(
+          `history_http_400:${options.path}:${String(queryPolicy.includeOnlyConfirmed)}:${String(queryPolicy.includeOrderBy)}`,
+          `[TRON] history HTTP 400 retry with next query policy` +
             ` onlyConfirmed=${String(queryPolicy.includeOnlyConfirmed)}` +
             ` orderBy=${String(queryPolicy.includeOrderBy)}`,
         );
@@ -361,10 +342,14 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
     }
 
     const requestUrl: URL = this.buildRequestUrl(options, queryPolicy);
+    const limiterKey: LimiterKey = resolveTronHistoryLimiterKey(
+      this.appConfigService.tronGridApiKey,
+      requestUrl.hostname.toLowerCase(),
+    );
     this.logger.debug(`tron history request url=${requestUrl.toString()}`);
 
     const response: Response = await this.rateLimiterService.schedule(
-      LimiterKey.TRON_GRID,
+      limiterKey,
       async (): Promise<Response> =>
         fetch(requestUrl, {
           method: 'GET',
@@ -391,6 +376,17 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
 
     if (response.status === HTTP_STATUS_BAD_REQUEST) {
       throw new TronGridBadRequestError(errorMessage);
+    }
+
+    if (response.status === HTTP_STATUS_TOO_MANY_REQUESTS && this.metricsService !== null) {
+      this.metricsService.historyHttp429Total.inc({
+        chain: ChainKey.TRON_MAINNET,
+        adapter: 'tron_grid_history',
+      });
+      this.warnWithCooldown(
+        `history_http_429:${requestUrl.origin}:${options.path}`,
+        `history_http_429 chain=${ChainKey.TRON_MAINNET} adapter=tron_grid_history endpoint=${requestUrl.origin} path=${options.path}`,
+      );
     }
 
     throw new Error(errorMessage);
@@ -481,11 +477,11 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
 
     return normalizedValue;
   }
-}
 
-class TronGridBadRequestError extends Error {
-  public constructor(message: string) {
-    super(message);
-    this.name = 'TronGridBadRequestError';
+  private warnWithCooldown(key: string, message: string): void {
+    if (!this.warningEmitter.shouldEmit(key)) {
+      return;
+    }
+    this.logger.warn(message);
   }
 }

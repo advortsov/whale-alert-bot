@@ -57,12 +57,22 @@ const DEFAULT_HISTORY_CACHE_TTL_SEC = 120;
 const DEFAULT_HISTORY_RATE_LIMIT_PER_MINUTE = 12;
 const DEFAULT_HISTORY_BUTTON_COOLDOWN_SEC = 3;
 const DEFAULT_HISTORY_STALE_ON_ERROR_SEC = 600;
+const DEFAULT_HISTORY_HOT_CACHE_TOP_WALLETS = 100;
+const DEFAULT_HISTORY_HOT_CACHE_REFRESH_INTERVAL_SEC = 30;
+const DEFAULT_HISTORY_HOT_CACHE_PAGE_LIMIT = 20;
+const DEFAULT_HISTORY_HOT_CACHE_MAX_ITEMS_PER_WALLET = 200;
+const DEFAULT_HISTORY_HOT_CACHE_TTL_SEC = 900;
+const DEFAULT_HISTORY_HOT_CACHE_STALE_SEC = 1800;
 const DEFAULT_RATE_LIMIT_ETHERSCAN_MIN_TIME_MS = 200;
 const DEFAULT_RATE_LIMIT_ETHERSCAN_MAX_CONCURRENT = 1;
 const DEFAULT_RATE_LIMIT_SOLANA_HELIUS_MIN_TIME_MS = 40;
 const DEFAULT_RATE_LIMIT_SOLANA_HELIUS_MAX_CONCURRENT = 5;
+const DEFAULT_RATE_LIMIT_SOLANA_PUBLIC_MIN_TIME_MS = 250;
+const DEFAULT_RATE_LIMIT_SOLANA_PUBLIC_MAX_CONCURRENT = 1;
 const DEFAULT_RATE_LIMIT_TRON_GRID_MIN_TIME_MS = 1000;
 const DEFAULT_RATE_LIMIT_TRON_GRID_MAX_CONCURRENT = 1;
+const DEFAULT_RATE_LIMIT_TRON_PUBLIC_MIN_TIME_MS = 1200;
+const DEFAULT_RATE_LIMIT_TRON_PUBLIC_MAX_CONCURRENT = 1;
 const DEFAULT_RATE_LIMIT_COINGECKO_MIN_TIME_MS = 2000;
 const DEFAULT_RATE_LIMIT_COINGECKO_MAX_CONCURRENT = 1;
 const DEFAULT_RATE_LIMIT_ETH_RPC_MIN_TIME_MS = 350;
@@ -173,6 +183,37 @@ export const envSchema = z.object({
     .int()
     .positive()
     .default(DEFAULT_HISTORY_STALE_ON_ERROR_SEC),
+  HISTORY_HOT_CACHE_ENABLED: booleanSchema.default(true),
+  HISTORY_HOT_CACHE_TOP_WALLETS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(DEFAULT_HISTORY_HOT_CACHE_TOP_WALLETS),
+  HISTORY_HOT_CACHE_REFRESH_INTERVAL_SEC: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(DEFAULT_HISTORY_HOT_CACHE_REFRESH_INTERVAL_SEC),
+  HISTORY_HOT_CACHE_PAGE_LIMIT: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(DEFAULT_HISTORY_HOT_CACHE_PAGE_LIMIT),
+  HISTORY_HOT_CACHE_MAX_ITEMS_PER_WALLET: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(DEFAULT_HISTORY_HOT_CACHE_MAX_ITEMS_PER_WALLET),
+  HISTORY_HOT_CACHE_TTL_SEC: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(DEFAULT_HISTORY_HOT_CACHE_TTL_SEC),
+  HISTORY_HOT_CACHE_STALE_SEC: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(DEFAULT_HISTORY_HOT_CACHE_STALE_SEC),
   METRICS_ENABLED: booleanSchema.default(true),
   RATE_LIMIT_ETHERSCAN_MIN_TIME_MS: z.coerce
     .number()
@@ -194,6 +235,16 @@ export const envSchema = z.object({
     .int()
     .positive()
     .default(DEFAULT_RATE_LIMIT_SOLANA_HELIUS_MAX_CONCURRENT),
+  RATE_LIMIT_SOLANA_PUBLIC_MIN_TIME_MS: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .default(DEFAULT_RATE_LIMIT_SOLANA_PUBLIC_MIN_TIME_MS),
+  RATE_LIMIT_SOLANA_PUBLIC_MAX_CONCURRENT: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(DEFAULT_RATE_LIMIT_SOLANA_PUBLIC_MAX_CONCURRENT),
   RATE_LIMIT_TRON_GRID_MIN_TIME_MS: z.coerce
     .number()
     .int()
@@ -204,6 +255,16 @@ export const envSchema = z.object({
     .int()
     .positive()
     .default(DEFAULT_RATE_LIMIT_TRON_GRID_MAX_CONCURRENT),
+  RATE_LIMIT_TRON_PUBLIC_MIN_TIME_MS: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .default(DEFAULT_RATE_LIMIT_TRON_PUBLIC_MIN_TIME_MS),
+  RATE_LIMIT_TRON_PUBLIC_MAX_CONCURRENT: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(DEFAULT_RATE_LIMIT_TRON_PUBLIC_MAX_CONCURRENT),
   RATE_LIMIT_COINGECKO_MIN_TIME_MS: z.coerce
     .number()
     .int()
