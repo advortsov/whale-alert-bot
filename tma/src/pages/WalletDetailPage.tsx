@@ -1,5 +1,14 @@
 import React from 'react';
-import { Button, Cell, List, Placeholder, Section, Text, Title } from '@telegram-apps/telegram-ui';
+import {
+  Button,
+  Cell,
+  List,
+  Placeholder,
+  Section,
+  Spinner,
+  Text,
+  Title,
+} from '@telegram-apps/telegram-ui';
 import {
   useInfiniteQuery,
   useMutation,
@@ -14,10 +23,16 @@ import { ChainBadge } from '../components/ChainBadge';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { useAuth } from '../hooks/useAuth';
 import type { IWalletDetailDto, IWalletHistoryResult } from '../types/api.types';
+import { formatShortAddress } from '../utils/format';
 import { openExternalLink } from '../utils/telegram-webapp';
 
 const DEFAULT_HISTORY_OFFSET: number = 0;
 const DEFAULT_HISTORY_LIMIT: number = 20;
+const CHAIN_NAME_BY_KEY: Record<string, string> = {
+  ethereum_mainnet: 'Ethereum',
+  solana_mainnet: 'Solana',
+  tron_mainnet: 'TRON',
+};
 
 export const WalletDetailPage = (): React.JSX.Element => {
   const params = useParams();
@@ -111,20 +126,24 @@ export const WalletDetailPage = (): React.JSX.Element => {
   const isHistoryFetching: boolean = historyQuery.isFetchingNextPage;
   const historyErrorMessage: string | null =
     historyQuery.error instanceof Error ? historyQuery.error.message : null;
+  const walletTitle: string = walletQuery.data.label ?? 'Кошелёк';
+  const walletSubtitle: string = formatShortAddress(walletQuery.data.address);
+  const chainName: string =
+    CHAIN_NAME_BY_KEY[walletQuery.data.chainKey] ?? walletQuery.data.chainKey;
 
   return (
     <section className="tma-screen">
       <List>
-        <Section>
+        <Section className="tma-wallet-detail-header">
           <Title level="2" weight="2">
-            Кошелёк {walletQuery.data.walletId}
+            {walletTitle}
           </Title>
+          <Text className="tma-wallet-detail-subtitle">{walletSubtitle}</Text>
           <ChainBadge chainKey={walletQuery.data.chainKey} />
-          <Text>{walletQuery.data.label ?? 'Без label'}</Text>
         </Section>
 
         <Section header="Детали">
-          <Cell subhead="Сеть">{walletQuery.data.chainKey}</Cell>
+          <Cell subhead="Сеть">{chainName}</Cell>
           <Cell subhead="Адрес" multiline>
             {walletQuery.data.address}
           </Cell>
@@ -133,64 +152,66 @@ export const WalletDetailPage = (): React.JSX.Element => {
           </Cell>
         </Section>
 
-        <section id="history">
-          <Section header={`История транзакций (${historyItems.length})`}>
-            {historyQuery.isLoading ? <Text>Загрузка истории…</Text> : null}
-            {historyQuery.isError ? (
-              <Placeholder
-                header="Не удалось загрузить историю"
-                description={historyErrorMessage ?? 'Повтори запрос.'}
-              >
-                <Button
-                  mode="bezeled"
-                  size="s"
-                  onClick={(): void => {
-                    void historyQuery.refetch();
-                  }}
-                >
-                  Повторить
-                </Button>
-              </Placeholder>
-            ) : null}
-            {historyItems.length === 0 && !historyQuery.isError && !historyQuery.isLoading ? (
-              <Placeholder header="Пока нет событий" />
-            ) : (
-              historyItems.map((item) => (
-                <Cell
-                  key={`${item.txHash}-${item.occurredAt}`}
-                  subtitle={new Date(item.occurredAt).toLocaleString('ru-RU', { hour12: false })}
-                  after={
-                    <Button
-                      mode="plain"
-                      size="s"
-                      className="tma-tx-link-button"
-                      onClick={(): void => {
-                        openExternalLink(item.txUrl);
-                      }}
-                    >
-                      Tx
-                    </Button>
-                  }
-                >
-                  {item.eventType} • {item.direction} • {item.amountText}
-                </Cell>
-              ))
-            )}
-            {hasNextHistoryPage ? (
+        <Section id="history" header={`История транзакций (${historyItems.length})`}>
+          {historyQuery.isLoading ? (
+            <div className="tma-history-loading">
+              <Spinner size="m" />
+            </div>
+          ) : null}
+          {historyQuery.isError ? (
+            <Placeholder
+              header="Не удалось загрузить историю"
+              description={historyErrorMessage ?? 'Повтори запрос.'}
+            >
               <Button
                 mode="bezeled"
-                size="m"
-                stretched
-                disabled={isHistoryFetching}
+                size="s"
                 onClick={(): void => {
-                  void historyQuery.fetchNextPage();
+                  void historyQuery.refetch();
                 }}
               >
-                {isHistoryFetching ? 'Загрузка…' : 'Показать ещё'}
+                Повторить
               </Button>
-            ) : null}
-          </Section>
-        </section>
+            </Placeholder>
+          ) : null}
+          {historyItems.length === 0 && !historyQuery.isError && !historyQuery.isLoading ? (
+            <Placeholder header="Пока нет событий" />
+          ) : (
+            historyItems.map((item) => (
+              <Cell
+                key={`${item.txHash}-${item.occurredAt}`}
+                subtitle={new Date(item.occurredAt).toLocaleString('ru-RU', { hour12: false })}
+                after={
+                  <Button
+                    mode="plain"
+                    size="s"
+                    className="tma-tx-link-button"
+                    onClick={(): void => {
+                      openExternalLink(item.txUrl);
+                    }}
+                  >
+                    Tx
+                  </Button>
+                }
+              >
+                {item.eventType} • {item.direction} • {item.amountText}
+              </Cell>
+            ))
+          )}
+          {hasNextHistoryPage ? (
+            <Button
+              mode="bezeled"
+              size="m"
+              stretched
+              disabled={isHistoryFetching}
+              onClick={(): void => {
+                void historyQuery.fetchNextPage();
+              }}
+            >
+              {isHistoryFetching ? <Spinner size="s" /> : 'Показать ещё'}
+            </Button>
+          ) : null}
+        </Section>
 
         {actionStatus === null ? null : (
           <Section>

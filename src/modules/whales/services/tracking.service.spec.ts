@@ -4,6 +4,7 @@ import type { HistoryCacheService } from './history-cache.service';
 import type { HistoryRateLimiterService } from './history-rate-limiter.service';
 import { TrackingAddressService } from './tracking-address.service';
 import { TrackingHistoryFormatterService } from './tracking-history-formatter.service';
+import { TrackingHistoryPageBuilderService } from './tracking-history-page-builder.service';
 import { TrackingHistoryPageService } from './tracking-history-page.service';
 import { TrackingHistoryQueryParserService } from './tracking-history-query-parser.service';
 import {
@@ -387,6 +388,15 @@ const createTestContext = (): TestContext => {
   (
     historyDeps as { trackingHistoryPageService: TrackingHistoryPageService }
   ).trackingHistoryPageService = trackingHistoryPageService;
+  const historyPageBuilderService: TrackingHistoryPageBuilderService =
+    new TrackingHistoryPageBuilderService(
+      historyExplorerAdapterStub as unknown as IHistoryExplorerAdapter,
+      trackingHistoryPageService,
+      historyFormatter,
+    );
+  (
+    historyDeps as { historyPageBuilderService: TrackingHistoryPageBuilderService }
+  ).historyPageBuilderService = historyPageBuilderService;
   (historyDeps as { historyFormatter: TrackingHistoryFormatterService }).historyFormatter =
     historyFormatter;
   (
@@ -703,6 +713,137 @@ describe('TrackingService', (): void => {
       chainKey: ChainKey.TRON_MAINNET,
     });
     expect(page.nextOffset).toBe(20);
+  });
+
+  it('uses explorer page for first Solana history page when local history is short', async (): Promise<void> => {
+    const context: TestContext = createTestContext();
+    context.subscriptionsRepositoryStub.listByUserId.mockResolvedValue([
+      {
+        subscriptionId: 1,
+        walletId: 22,
+        chainKey: ChainKey.SOLANA_MAINNET,
+        walletAddress: '11111111111111111111111111111111',
+        walletLabel: 'sol-main',
+        createdAt: new Date('2026-02-01T00:00:00.000Z'),
+      },
+    ]);
+    context.walletEventsRepositoryStub.listRecentByTrackedAddress.mockResolvedValue([
+      {
+        chainId: 101,
+        chainKey: ChainKey.SOLANA_MAINNET,
+        txHash: 'local-sol-tx-1',
+        logIndex: 0,
+        trackedAddress: '11111111111111111111111111111111',
+        eventType: 'TRANSFER',
+        direction: 'IN',
+        contractAddress: null,
+        tokenAddress: null,
+        tokenSymbol: 'SOL',
+        tokenDecimals: 9,
+        tokenAmountRaw: '1000000000',
+        valueFormatted: '1.0',
+        dex: null,
+        pair: null,
+        occurredAt: new Date('2026-02-23T00:00:00.000Z'),
+      },
+    ]);
+    context.historyExplorerAdapterStub.loadRecentTransactions.mockResolvedValue({
+      items: [
+        {
+          txHash: 'explorer-sol-tx-1',
+          from: '11111111111111111111111111111111',
+          to: '22222222222222222222222222222222',
+          valueRaw: '2000000000',
+          isError: false,
+          timestampSec: 1739160000,
+          assetSymbol: 'SOL',
+          assetDecimals: 9,
+          eventType: HistoryItemType.TRANSFER,
+          direction: HistoryDirection.OUT,
+          txLink: 'https://solscan.io/tx/explorer-sol-tx-1',
+        },
+      ],
+      nextOffset: 10,
+    });
+
+    const page = await context.service.getAddressHistoryPageWithPolicy(context.userRef, {
+      rawAddress: '#22',
+      rawLimit: '10',
+      rawOffset: '0',
+      source: HistoryRequestSource.COMMAND,
+      rawKind: null,
+      rawDirection: null,
+    });
+
+    expect(context.historyExplorerAdapterStub.loadRecentTransactions).toHaveBeenCalledTimes(1);
+    expect(page.items).toHaveLength(1);
+    expect(page.items[0]?.txHash).toBe('explorer-sol-tx-1');
+    expect(page.nextOffset).toBe(10);
+  });
+
+  it('uses explorer page for Solana offset history when available', async (): Promise<void> => {
+    const context: TestContext = createTestContext();
+    context.subscriptionsRepositoryStub.listByUserId.mockResolvedValue([
+      {
+        subscriptionId: 1,
+        walletId: 23,
+        chainKey: ChainKey.SOLANA_MAINNET,
+        walletAddress: '33333333333333333333333333333333',
+        walletLabel: 'sol-offset',
+        createdAt: new Date('2026-02-01T00:00:00.000Z'),
+      },
+    ]);
+    context.walletEventsRepositoryStub.listRecentByTrackedAddress.mockResolvedValue([
+      {
+        chainId: 101,
+        chainKey: ChainKey.SOLANA_MAINNET,
+        txHash: 'local-sol-offset',
+        logIndex: 0,
+        trackedAddress: '33333333333333333333333333333333',
+        eventType: 'TRANSFER',
+        direction: 'OUT',
+        contractAddress: null,
+        tokenAddress: null,
+        tokenSymbol: 'SOL',
+        tokenDecimals: 9,
+        tokenAmountRaw: '500000000',
+        valueFormatted: '0.5',
+        dex: null,
+        pair: null,
+        occurredAt: new Date('2026-02-22T00:00:00.000Z'),
+      },
+    ]);
+    context.historyExplorerAdapterStub.loadRecentTransactions.mockResolvedValue({
+      items: [
+        {
+          txHash: 'explorer-sol-offset-1',
+          from: '33333333333333333333333333333333',
+          to: '44444444444444444444444444444444',
+          valueRaw: '4000000000',
+          isError: false,
+          timestampSec: 1739160010,
+          assetSymbol: 'SOL',
+          assetDecimals: 9,
+          eventType: HistoryItemType.TRANSFER,
+          direction: HistoryDirection.OUT,
+          txLink: 'https://solscan.io/tx/explorer-sol-offset-1',
+        },
+      ],
+      nextOffset: 30,
+    });
+
+    const page = await context.service.getAddressHistoryPageWithPolicy(context.userRef, {
+      rawAddress: '#23',
+      rawLimit: '10',
+      rawOffset: '20',
+      source: HistoryRequestSource.COMMAND,
+      rawKind: null,
+      rawDirection: null,
+    });
+
+    expect(page.items).toHaveLength(1);
+    expect(page.items[0]?.txHash).toBe('explorer-sol-offset-1');
+    expect(page.nextOffset).toBe(30);
   });
 
   it('builds Solscan links for local Solana history entries', async (): Promise<void> => {

@@ -205,4 +205,119 @@ describe('SolanaRpcHistoryAdapter', (): void => {
     expect(result.items[0]?.assetSymbol).toBe('SOL');
     expect(result.items[0]?.direction).toBe(HistoryDirection.IN);
   });
+
+  it('loads additional signature batches to support deep offset pagination', async (): Promise<void> => {
+    const firstBatchSignatures = Array.from({ length: 1_000 }, (_value: unknown, index: number) => {
+      return {
+        signature: `sig-${String(index)}`,
+        blockTime: 1_739_150_000 + index,
+        err: null,
+      };
+    });
+    const fetchMock: ReturnType<typeof vi.fn> = vi
+      .fn()
+      .mockResolvedValueOnce(
+        createJsonResponse({
+          jsonrpc: '2.0',
+          id: 1,
+          result: firstBatchSignatures,
+        }),
+      )
+      .mockResolvedValueOnce(
+        createJsonResponse({
+          jsonrpc: '2.0',
+          id: 2,
+          result: [
+            { signature: 'sig-1000', blockTime: 1_739_151_000, err: null },
+            { signature: 'sig-1001', blockTime: 1_739_151_001, err: null },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(
+        createJsonResponse({
+          jsonrpc: '2.0',
+          id: 3,
+          result: {
+            blockTime: 1_739_150_002,
+            transaction: {
+              message: {
+                accountKeys: ['tracked-sol-address', 'receiver-sol-address'],
+              },
+            },
+            meta: {
+              preBalances: [4_000_000_000, 0],
+              postBalances: [3_000_000_000, 0],
+              err: null,
+              logMessages: ['Program log: transfer'],
+            },
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        createJsonResponse({
+          jsonrpc: '2.0',
+          id: 4,
+          result: {
+            blockTime: 1_739_150_003,
+            transaction: {
+              message: {
+                accountKeys: ['tracked-sol-address', 'receiver-sol-address'],
+              },
+            },
+            meta: {
+              preBalances: [6_000_000_000, 0],
+              postBalances: [5_000_000_000, 0],
+              err: null,
+              logMessages: ['Program log: transfer'],
+            },
+          },
+        }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const configStub: SolanaConfigStub = {
+      solanaHeliusHttpUrl: 'https://helius.solana.test',
+      solanaPublicHttpUrl: null,
+    };
+    const adapter: SolanaRpcHistoryAdapter = new SolanaRpcHistoryAdapter(
+      configStub as unknown as AppConfigService,
+      {
+        schedule: async (_k: unknown, op: () => Promise<unknown>): Promise<unknown> => op(),
+      } as unknown as BottleneckRateLimiterService,
+    );
+
+    const result = await adapter.loadRecentTransactions({
+      chainKey: ChainKey.SOLANA_MAINNET,
+      address: 'tracked-sol-address',
+      limit: 1,
+      offset: 1_000,
+      kind: HistoryKind.ALL,
+      direction: HistoryDirectionFilter.ALL,
+      minAmountUsd: null,
+    });
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]?.txHash).toBe('sig-1000');
+    expect(result.nextOffset).toBe(1001);
+
+    const secondRequestInit = fetchMock.mock.calls[1]?.[1] as { readonly body?: string };
+    const secondRequestBody: string =
+      typeof secondRequestInit.body === 'string' ? secondRequestInit.body : '{}';
+    const secondPayload = JSON.parse(secondRequestBody) as {
+      readonly params?: readonly unknown[];
+    };
+    const secondRequestOptions = secondPayload.params?.[1] as
+      | {
+          readonly before?: string;
+        }
+      | undefined;
+
+    expect(secondRequestOptions).toBeDefined();
+    const beforeSignature: string | undefined = (
+      secondRequestOptions as {
+        readonly before?: string;
+      }
+    ).before;
+    expect(beforeSignature).toBe('sig-999');
+  });
 });

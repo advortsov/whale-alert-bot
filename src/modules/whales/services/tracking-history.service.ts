@@ -4,8 +4,10 @@ import { HistoryCacheService } from './history-cache.service';
 import { HistoryRateLimiterService } from './history-rate-limiter.service';
 import { TrackingAddressService } from './tracking-address.service';
 import { TrackingHistoryFormatterService } from './tracking-history-formatter.service';
+import { TrackingHistoryPageBuilderService } from './tracking-history-page-builder.service';
 import { TrackingHistoryPageService } from './tracking-history-page.service';
 import { TrackingHistoryQueryParserService } from './tracking-history-query-parser.service';
+import { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
 import { HISTORY_EXPLORER_ADAPTER } from '../../../common/interfaces/explorers/explorer-port.tokens';
 import type { IHistoryExplorerAdapter } from '../../../common/interfaces/explorers/history-explorer.interfaces';
 import { UsersRepository } from '../../../database/repositories/users.repository';
@@ -30,7 +32,6 @@ import type {
   ILocalHistoryPageData,
   IRateLimitedHistoryContext,
 } from '../entities/tracking-history.interfaces';
-import type { IWalletHistoryListItem } from '../entities/wallet-history-list-item.dto';
 
 @Injectable()
 export class TrackingHistoryServiceDependencies {
@@ -51,6 +52,9 @@ export class TrackingHistoryServiceDependencies {
 
   @Inject(TrackingHistoryPageService)
   public readonly trackingHistoryPageService!: TrackingHistoryPageService;
+
+  @Inject(TrackingHistoryPageBuilderService)
+  public readonly historyPageBuilderService!: TrackingHistoryPageBuilderService;
 
   @Inject(TrackingHistoryFormatterService)
   public readonly historyFormatter!: TrackingHistoryFormatterService;
@@ -105,7 +109,6 @@ export class TrackingHistoryService {
     }
 
     this.assertHistoryRequestAllowed(userRef.telegramId, request.source);
-
     const localHistoryPage: ILocalHistoryPageData =
       await this.deps.trackingHistoryPageService.loadLocalHistoryPage({
         chainKey: historyTarget.chainKey,
@@ -113,14 +116,33 @@ export class TrackingHistoryService {
         historyParams,
       });
 
+    if (historyTarget.chainKey !== ChainKey.ETHEREUM_MAINNET) {
+      try {
+        return await this.deps.historyPageBuilderService.buildOffsetHistoryPageFromExplorer({
+          target,
+          historyParams,
+        });
+      } catch (error: unknown) {
+        if (localHistoryPage.pageEvents.length > 0) {
+          return this.deps.historyPageBuilderService.buildOffsetHistoryPage({
+            target,
+            historyParams,
+            localHistoryPage,
+          });
+        }
+
+        throw error;
+      }
+    }
+
     if (localHistoryPage.pageEvents.length === 0) {
-      return this.buildOffsetHistoryPageFromExplorer({
+      return this.deps.historyPageBuilderService.buildOffsetHistoryPageFromExplorer({
         target,
         historyParams,
       });
     }
 
-    return this.buildOffsetHistoryPage({
+    return this.deps.historyPageBuilderService.buildOffsetHistoryPage({
       target,
       historyParams,
       localHistoryPage,
@@ -207,141 +229,12 @@ export class TrackingHistoryService {
         historyParams: context.historyParams,
       });
 
-    const localItems: readonly IWalletHistoryListItem[] =
-      this.deps.trackingHistoryPageService.mapWalletEventsToListItems(
-        localHistoryPage.pageEvents,
-        context.target.chainKey,
-      );
-
-    if (localItems.length > 0) {
-      return {
-        message,
-        resolvedAddress: context.target.address,
-        walletId: context.target.walletId,
-        limit: context.historyParams.limit,
-        offset: 0,
-        kind: context.historyParams.kind,
-        direction: context.historyParams.direction,
-        hasNextPage: localHistoryPage.hasNextPage,
-        items: localItems,
-        nextOffset: localHistoryPage.nextOffset,
-      };
-    }
-
-    let explorerPage: IHistoryPageDto = {
-      items: [],
-      nextOffset: null,
-    };
-
-    try {
-      explorerPage = await this.deps.historyExplorerAdapter.loadRecentTransactions({
-        chainKey: context.target.chainKey,
-        address: context.target.address,
-        limit: context.historyParams.limit,
-        offset: 0,
-        kind: context.historyParams.kind,
-        direction: context.historyParams.direction,
-        minAmountUsd: null,
-      });
-    } catch (error: unknown) {
-      const errorMessage: string = error instanceof Error ? error.message : String(error);
-      this.logger.warn(
-        `history_page_items_fallback_failed address=${context.target.address} chain=${context.target.chainKey} reason=${errorMessage}`,
-      );
-    }
-
-    const explorerItems: readonly IWalletHistoryListItem[] =
-      this.deps.trackingHistoryPageService.mapExplorerItemsToListItems(
-        explorerPage.items,
-        context.target.chainKey,
-      );
-
-    return {
+    return this.deps.historyPageBuilderService.buildFirstHistoryPage({
       message,
-      resolvedAddress: context.target.address,
-      walletId: context.target.walletId,
-      limit: context.historyParams.limit,
-      offset: 0,
-      kind: context.historyParams.kind,
-      direction: context.historyParams.direction,
-      hasNextPage: explorerPage.nextOffset !== null,
-      items: explorerItems,
-      nextOffset: explorerPage.nextOffset,
-    };
-  }
-
-  private buildOffsetHistoryPage(context: {
-    readonly target: IHistoryTargetSnapshot;
-    readonly historyParams: IParsedHistoryQueryParams;
-    readonly localHistoryPage: ILocalHistoryPageData;
-  }): HistoryPageResult {
-    const message: string = this.deps.historyFormatter.formatWalletEventsHistoryMessage(
-      context.target.address,
-      context.localHistoryPage.pageEvents,
-      {
-        offset: context.historyParams.offset,
-        kind: context.historyParams.kind,
-        direction: context.historyParams.direction,
-        chainKey: context.target.chainKey,
-      },
-    );
-
-    const items: readonly IWalletHistoryListItem[] =
-      this.deps.trackingHistoryPageService.mapWalletEventsToListItems(
-        context.localHistoryPage.pageEvents,
-        context.target.chainKey,
-      );
-
-    return {
-      message,
-      resolvedAddress: context.target.address,
-      walletId: context.target.walletId,
-      limit: context.historyParams.limit,
-      offset: context.historyParams.offset,
-      kind: context.historyParams.kind,
-      direction: context.historyParams.direction,
-      hasNextPage: context.localHistoryPage.hasNextPage,
-      items,
-      nextOffset: context.localHistoryPage.nextOffset,
-    };
-  }
-
-  private async buildOffsetHistoryPageFromExplorer(context: {
-    readonly target: IHistoryTargetSnapshot;
-    readonly historyParams: IParsedHistoryQueryParams;
-  }): Promise<HistoryPageResult> {
-    const explorerPage: IHistoryPageDto =
-      await this.deps.historyExplorerAdapter.loadRecentTransactions({
-        chainKey: context.target.chainKey,
-        address: context.target.address,
-        limit: context.historyParams.limit,
-        offset: context.historyParams.offset,
-        kind: context.historyParams.kind,
-        direction: context.historyParams.direction,
-        minAmountUsd: null,
-      });
-    const message: string = this.deps.historyFormatter.formatHistoryMessage(
-      context.target.address,
-      explorerPage.items,
-    );
-    const items: readonly IWalletHistoryListItem[] =
-      this.deps.trackingHistoryPageService.mapExplorerItemsToListItems(
-        explorerPage.items,
-        context.target.chainKey,
-      );
-
-    return {
-      message,
-      resolvedAddress: context.target.address,
-      walletId: context.target.walletId,
-      limit: context.historyParams.limit,
-      offset: context.historyParams.offset,
-      kind: context.historyParams.kind,
-      direction: context.historyParams.direction,
-      hasNextPage: explorerPage.nextOffset !== null,
-      items,
-      nextOffset: explorerPage.nextOffset,
-    };
+      target: context.target,
+      historyParams: context.historyParams,
+      localHistoryPage,
+    });
   }
 
   private assertHistoryRequestAllowed(telegramId: string, source: HistoryRequestSource): void {

@@ -137,3 +137,22 @@ a {
   font-weight: 600;
   padding: 0;
 }
+
+.tma-wallet-detail-header {
+  display: grid;
+  gap: 8px;
+}
+
+.tma-wallet-detail-subtitle {
+  color: var(--tg-theme-hint-color, #8ea2c5);
+}
+
+.tma-history-loading {
+  min-height: 64px;
+  display: grid;
+  place-items: center;
+}
+
+.tma-filter-toggle {
+  align-items: center;
+}

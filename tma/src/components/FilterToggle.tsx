@@ -11,6 +11,7 @@ export const FilterToggle = ({ label, value, onChange }: IFilterToggleProps): Re
   return (
     <Cell
       multiline
+      className="tma-filter-toggle"
       after={
         <Switch
           checked={value}

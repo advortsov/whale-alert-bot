@@ -29,6 +29,7 @@ const SOLSCAN_TX_BASE_URL = 'https://solscan.io/tx/';
 const SOLANA_HISTORY_REQUEST_TIMEOUT_MS = 10_000;
 const SPL_TOKEN_DECIMALS = 6;
 const SOL_NATIVE_DECIMALS = 9;
+const SOLANA_SIGNATURES_BATCH_MAX = 1_000;
 
 @Injectable()
 export class SolanaRpcHistoryAdapter implements IHistoryExplorerAdapter {
@@ -45,11 +46,11 @@ export class SolanaRpcHistoryAdapter implements IHistoryExplorerAdapter {
     }
 
     const endpointUrls: readonly string[] = this.resolveSolanaRpcEndpoints();
-    const signaturesLimit: number = Math.max(request.offset + request.limit, request.limit);
+    const signaturesLimit: number = Math.max(request.offset + request.limit + 1, request.limit + 1);
     const signatures: readonly ISolanaSignatureInfo[] = await this.callWithFallback(
       endpointUrls,
       async (endpointUrl: string): Promise<readonly ISolanaSignatureInfo[]> =>
-        this.getSignatures(endpointUrl, request.address, signaturesLimit),
+        this.getSignaturesPage(endpointUrl, request.address, signaturesLimit),
     );
 
     const pageSignatures: readonly ISolanaSignatureInfo[] = signatures.slice(
@@ -124,19 +125,63 @@ export class SolanaRpcHistoryAdapter implements IHistoryExplorerAdapter {
     endpointUrl: string,
     address: string,
     limit: number,
+    beforeSignature: string | null,
   ): Promise<readonly ISolanaSignatureInfo[]> {
-    const payload: unknown = await this.callRpc(endpointUrl, 'getSignaturesForAddress', [
+    const payloadParams: readonly unknown[] = [
       address,
-      {
-        limit,
-      },
-    ]);
+      beforeSignature === null
+        ? {
+            limit,
+          }
+        : {
+            limit,
+            before: beforeSignature,
+          },
+    ];
+    const payload: unknown = await this.callRpc(
+      endpointUrl,
+      'getSignaturesForAddress',
+      payloadParams,
+    );
 
     if (!Array.isArray(payload)) {
       throw new Error('Solana getSignaturesForAddress returned invalid payload.');
     }
 
     return payload.map((value: unknown): ISolanaSignatureInfo => this.parseSignatureInfo(value));
+  }
+
+  private async getSignaturesPage(
+    endpointUrl: string,
+    address: string,
+    limit: number,
+  ): Promise<readonly ISolanaSignatureInfo[]> {
+    const signatures: ISolanaSignatureInfo[] = [];
+    let beforeSignature: string | null = null;
+
+    while (signatures.length < limit) {
+      const remainingCount: number = limit - signatures.length;
+      const batchLimit: number = Math.min(remainingCount, SOLANA_SIGNATURES_BATCH_MAX);
+      const batch: readonly ISolanaSignatureInfo[] = await this.getSignatures(
+        endpointUrl,
+        address,
+        batchLimit,
+        beforeSignature,
+      );
+
+      if (batch.length === 0) {
+        break;
+      }
+
+      signatures.push(...batch);
+      beforeSignature = batch[batch.length - 1]?.signature ?? null;
+
+      if (batch.length < batchLimit) {
+        break;
+      }
+    }
+
+    return signatures;
   }
 
   private parseSignatureInfo(value: unknown): ISolanaSignatureInfo {
