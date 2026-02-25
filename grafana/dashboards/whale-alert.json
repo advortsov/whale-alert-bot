@@ -472,7 +472,7 @@
       },
       "targets": [
         {
-          "expr": "sum by(chain,adapter) (rate(history_history_http_429_total[5m]))",
+          "expr": "sum by(chain,adapter) (rate(history_history_http_429_total[5m])) or on() vector(0)",
           "legendFormat": "{{chain}} {{adapter}}",
           "refId": "A"
         }
@@ -495,7 +495,7 @@
       },
       "targets": [
         {
-          "expr": "rate(history_hot_cache_refresh_total[5m])",
+          "expr": "sum by(chain,status) (rate(history_hot_cache_refresh_total[5m])) or on() vector(0)",
           "legendFormat": "{{chain}} {{status}}",
           "refId": "A"
         }
@@ -518,12 +518,12 @@
       },
       "targets": [
         {
-          "expr": "rate(history_hot_cache_new_items_total[5m])",
+          "expr": "sum by(chain) (rate(history_hot_cache_new_items_total[5m])) or on() vector(0)",
           "legendFormat": "{{chain}} new",
           "refId": "A"
         },
         {
-          "expr": "rate(history_hot_cache_duplicate_items_total[5m])",
+          "expr": "sum by(chain) (rate(history_hot_cache_duplicate_items_total[5m])) or on() vector(0)",
           "legendFormat": "{{chain}} duplicate",
           "refId": "B"
         }
@@ -563,7 +563,7 @@
       },
       "targets": [
         {
-          "expr": "history_hot_cache_wallets_gauge",
+          "expr": "history_hot_cache_wallets_gauge or on() vector(0)",
           "legendFormat": "wallets",
           "refId": "A"
         }
@@ -586,7 +586,7 @@
       },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, rate(history_hot_cache_refresh_duration_seconds_bucket[5m]))",
+          "expr": "histogram_quantile(0.95, sum by(chain,le) (rate(history_hot_cache_refresh_duration_seconds_bucket[5m]))) or on() vector(0)",
           "legendFormat": "{{chain}}",
           "refId": "A"
         }
@@ -609,7 +609,7 @@
       },
       "targets": [
         {
-          "expr": "history_hot_cache_entry_items_gauge",
+          "expr": "history_hot_cache_entry_items_gauge or on() vector(0)",
           "legendFormat": "{{chain}}",
           "refId": "A"
         }

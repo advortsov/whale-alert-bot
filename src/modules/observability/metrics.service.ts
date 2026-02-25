@@ -1,10 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { collectDefaultMetrics, Counter, Gauge, Histogram, Registry } from 'prom-client';
+import { ChainKey } from '../../common/interfaces/chain-key.interfaces';
 
 // Histogram bucket boundaries in seconds for RPC latency distribution
 /* eslint-disable no-magic-numbers */
 const RPC_DURATION_BUCKETS: number[] = [0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10];
 /* eslint-enable no-magic-numbers */
+const HOT_CACHE_STATUS_VALUES: readonly string[] = ['success', 'partial', 'failed'];
+const HISTORY_ADAPTER_VALUES: readonly string[] = [
+  'solana_rpc_history',
+  'tron_grid_history',
+  'etherscan_history',
+];
 
 @Injectable()
 export class MetricsService {
@@ -66,6 +73,8 @@ export class MetricsService {
     this.historyHotCacheEntryItemsGauge = historyHotCache.entryItemsGauge;
     this.historyHotCacheRefreshDurationSeconds = historyHotCache.refreshDurationSeconds;
     this.historyHttp429Total = historyHotCache.historyHttp429Total;
+
+    this.initializeHistoryMetricSeries();
   }
 
   public async getMetrics(): Promise<string> {
@@ -230,5 +239,25 @@ export class MetricsService {
         registers: [this.registry],
       }),
     };
+  }
+
+  private initializeHistoryMetricSeries(): void {
+    const chainKeys: readonly ChainKey[] = Object.values(ChainKey);
+
+    for (const chainKey of chainKeys) {
+      for (const status of HOT_CACHE_STATUS_VALUES) {
+        this.historyHotCacheRefreshTotal.inc({ status, chain: chainKey }, 0);
+      }
+
+      this.historyHotCacheNewItemsTotal.inc({ chain: chainKey }, 0);
+      this.historyHotCacheDuplicateItemsTotal.inc({ chain: chainKey }, 0);
+      this.historyHotCacheEntryItemsGauge.set({ chain: chainKey }, 0);
+
+      for (const adapter of HISTORY_ADAPTER_VALUES) {
+        this.historyHttp429Total.inc({ chain: chainKey, adapter }, 0);
+      }
+    }
+
+    this.historyHotCacheWalletsGauge.set(0);
   }
 }

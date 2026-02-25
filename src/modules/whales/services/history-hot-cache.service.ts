@@ -488,6 +488,11 @@ export class HistoryHotCacheService implements OnModuleInit, OnModuleDestroy {
     const snapshot: IHistoryHotCacheMetricsSnapshot = this.getMetricsSnapshot();
     this.metricsService.historyHotCacheWalletsGauge.set(snapshot.walletsInTopSet);
 
+    const chainKeys: readonly ChainKey[] = Object.values(ChainKey);
+    for (const chainKey of chainKeys) {
+      this.metricsService.historyHotCacheEntryItemsGauge.set({ chain: chainKey }, 0);
+    }
+
     for (const [chainKey, avgItems] of snapshot.avgItemsByChain) {
       this.metricsService.historyHotCacheEntryItemsGauge.set({ chain: chainKey }, avgItems);
     }
