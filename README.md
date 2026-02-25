@@ -229,6 +229,8 @@ npm run db:migrate
 - для Solana стартовый backoff отдельный: `CHAIN_SOLANA_BACKOFF_BASE_MS=5000`; авто-сброс Solana backoff отключен, чтобы не возвращаться к `429`-шторму.
 - для Solana/TRON добавлен bounded catchup и контролируемая деградация очереди (retain tail window), чтобы не срывать поток при burst.
 - v1 провайдеры: Alchemy (primary), Infura (fallback).
+- для внешних history/pricing API (Etherscan, Solana RPC history, TronGrid, CoinGecko) добавлен экспоненциальный retry-backoff поверх Bottleneck.
+- hot-cache истории top-кошельков при первом прогреве берет базу из `wallet_events`, а потом инкрементально добавляет только новые транзакции.
 
 ## Multichain-ready архитектура (Core + Adapters, домены)
 
@@ -296,7 +298,7 @@ TRONSCAN_TX_BASE_URL=https://tronscan.org/#/transaction/
 COINGECKO_API_BASE_URL=https://api.coingecko.com/api/v3
 COINGECKO_TIMEOUT_MS=8000
 PRICE_CACHE_MAX_ENTRIES=1000
-PRICE_CACHE_FRESH_TTL_SEC=120
+PRICE_CACHE_FRESH_TTL_SEC=60
 PRICE_CACHE_STALE_TTL_SEC=600
 HISTORY_CACHE_TTL_SEC=120
 HISTORY_RATE_LIMIT_PER_MINUTE=12

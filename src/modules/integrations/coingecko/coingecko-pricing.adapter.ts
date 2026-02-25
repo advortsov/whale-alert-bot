@@ -13,6 +13,7 @@ import {
   type IPriceRequestDto,
 } from '../../../common/interfaces/token-pricing/token-pricing.interfaces';
 import { registerCache, SimpleCacheImpl } from '../../../common/utils/cache';
+import { executeWithExponentialBackoff } from '../../../common/utils/network/exponential-backoff.util';
 import { AppConfigService } from '../../../config/app-config.service';
 import {
   LimiterKey,
@@ -21,6 +22,19 @@ import {
 import { BottleneckRateLimiterService } from '../../../modules/blockchain/rate-limiting/bottleneck-rate-limiter.service';
 
 const HTTP_STATUS_TOO_MANY_REQUESTS = 429;
+const HTTP_STATUS_INTERNAL_SERVER_ERROR = 500;
+const CURRENT_PRICE_MIN_REFRESH_TTL_MS = 60_000;
+const COINGECKO_MAX_ATTEMPTS = 4;
+const COINGECKO_NATIVE_COIN_ID: Readonly<Record<KnownChainKey, string>> = {
+  [KnownChainKey.ETHEREUM_MAINNET]: 'ethereum',
+  [KnownChainKey.SOLANA_MAINNET]: 'solana',
+  [KnownChainKey.TRON_MAINNET]: 'tron',
+};
+const COINGECKO_NATIVE_SYMBOL: Readonly<Record<KnownChainKey, string>> = {
+  [KnownChainKey.ETHEREUM_MAINNET]: 'ETH',
+  [KnownChainKey.SOLANA_MAINNET]: 'SOL',
+  [KnownChainKey.TRON_MAINNET]: 'TRX',
+};
 
 type CoinGeckoCacheEntryInput = {
   readonly key: string;
@@ -41,7 +55,10 @@ export class CoinGeckoPricingAdapter implements ITokenPricingPort {
     private readonly appConfigService: AppConfigService,
     private readonly rateLimiterService: BottleneckRateLimiterService,
   ) {
-    this.freshTtlMs = this.appConfigService.priceCacheFreshTtlSec * 1000;
+    this.freshTtlMs = Math.max(
+      this.appConfigService.priceCacheFreshTtlSec * 1000,
+      CURRENT_PRICE_MIN_REFRESH_TTL_MS,
+    );
     this.cache = new SimpleCacheImpl<ICoinGeckoPriceCacheEntry>({
       ttlSec: this.appConfigService.priceCacheStaleTtlSec,
       maxKeys: this.appConfigService.priceCacheMaxEntries,
@@ -50,10 +67,6 @@ export class CoinGeckoPricingAdapter implements ITokenPricingPort {
   }
 
   public async getUsdQuote(request: IPriceRequestDto): Promise<IPriceQuoteDto | null> {
-    if (request.chainKey !== KnownChainKey.ETHEREUM_MAINNET) {
-      return null;
-    }
-
     const key: string = this.buildCacheKey(
       request.chainKey,
       request.tokenAddress,
@@ -97,61 +110,123 @@ export class CoinGeckoPricingAdapter implements ITokenPricingPort {
 
   private async fetchUsdQuote(request: IPriceRequestDto): Promise<ICoinGeckoQuoteResult> {
     try {
-      if (this.isEthereumNative(request.tokenAddress, request.tokenSymbol)) {
-        const nativeResponse: Response = await this.rateLimiterService.schedule(
-          LimiterKey.COINGECKO,
-          async (): Promise<Response> =>
-            fetch(this.buildNativePriceUrl(), {
-              method: 'GET',
-              signal: AbortSignal.timeout(this.appConfigService.coingeckoTimeoutMs),
-            }),
-          RequestPriority.NORMAL,
-        );
-        return await this.mapFetchResponse(nativeResponse, 'ethereum');
-      }
-
-      const normalizedTokenAddress: string | null = request.tokenAddress?.toLowerCase() ?? null;
-
-      if (!normalizedTokenAddress) {
-        return {
-          usdPrice: null,
-          stale: false,
-          failureReason: PriceFailureReason.NOT_FOUND,
-        };
-      }
-
-      const tokenResponse: Response = await this.rateLimiterService.schedule(
-        LimiterKey.COINGECKO,
-        async (): Promise<Response> =>
-          fetch(this.buildTokenPriceUrl(normalizedTokenAddress), {
-            method: 'GET',
-            signal: AbortSignal.timeout(this.appConfigService.coingeckoTimeoutMs),
-          }),
-        RequestPriority.NORMAL,
-      );
-
-      return await this.mapFetchResponse(tokenResponse, normalizedTokenAddress);
+      return await this.fetchUsdQuoteInternal(request);
     } catch (error: unknown) {
-      const errorMessage: string = error instanceof Error ? error.message : String(error);
-      const normalizedErrorMessage: string = errorMessage.toLowerCase();
+      return this.resolveQuoteError(error);
+    }
+  }
 
-      if (
-        normalizedErrorMessage.includes('timeout') ||
-        normalizedErrorMessage.includes('aborted')
-      ) {
-        return {
-          usdPrice: null,
-          stale: false,
-          failureReason: PriceFailureReason.TIMEOUT,
-        };
-      }
+  private async fetchUsdQuoteInternal(request: IPriceRequestDto): Promise<ICoinGeckoQuoteResult> {
+    if (this.isNativeAsset(request)) {
+      return await this.fetchNativeUsdQuote(request.chainKey);
+    }
 
+    if (request.chainKey !== KnownChainKey.ETHEREUM_MAINNET) {
+      return this.buildNotFoundResult();
+    }
+
+    const normalizedTokenAddress: string | null =
+      request.tokenAddress?.trim().toLowerCase() ?? null;
+
+    if (!normalizedTokenAddress) {
+      return this.buildNotFoundResult();
+    }
+
+    return await this.fetchEthereumTokenUsdQuote(normalizedTokenAddress);
+  }
+
+  private async fetchNativeUsdQuote(chainKey: ChainKey): Promise<ICoinGeckoQuoteResult> {
+    const nativeCoinId: string = COINGECKO_NATIVE_COIN_ID[chainKey];
+    const nativeResponse: Response = await this.executeCoingeckoRequest(
+      this.buildNativePriceUrl(nativeCoinId),
+      nativeCoinId,
+    );
+
+    return this.mapFetchResponse(nativeResponse, nativeCoinId);
+  }
+
+  private async fetchEthereumTokenUsdQuote(
+    normalizedTokenAddress: string,
+  ): Promise<ICoinGeckoQuoteResult> {
+    const tokenResponse: Response = await this.executeCoingeckoRequest(
+      this.buildTokenPriceUrl(normalizedTokenAddress),
+      normalizedTokenAddress,
+    );
+
+    return this.mapFetchResponse(tokenResponse, normalizedTokenAddress);
+  }
+
+  private buildNotFoundResult(): ICoinGeckoQuoteResult {
+    return {
+      usdPrice: null,
+      stale: false,
+      failureReason: PriceFailureReason.NOT_FOUND,
+    };
+  }
+
+  private resolveQuoteError(error: unknown): ICoinGeckoQuoteResult {
+    const errorMessage: string = error instanceof Error ? error.message : String(error);
+    const normalizedErrorMessage: string = errorMessage.toLowerCase();
+
+    if (normalizedErrorMessage.includes('timeout') || normalizedErrorMessage.includes('aborted')) {
       return {
         usdPrice: null,
         stale: false,
-        failureReason: PriceFailureReason.NETWORK,
+        failureReason: PriceFailureReason.TIMEOUT,
       };
     }
+
+    if (normalizedErrorMessage.includes('429') || normalizedErrorMessage.includes('rate limit')) {
+      return {
+        usdPrice: null,
+        stale: false,
+        failureReason: PriceFailureReason.RATE_LIMIT,
+      };
+    }
+
+    return {
+      usdPrice: null,
+      stale: false,
+      failureReason: PriceFailureReason.NETWORK,
+    };
+  }
+
+  private async executeCoingeckoRequest(url: URL, key: string): Promise<Response> {
+    return executeWithExponentialBackoff<Response>(
+      async (): Promise<Response> =>
+        this.rateLimiterService.schedule(
+          LimiterKey.COINGECKO,
+          async (): Promise<Response> => {
+            const response: Response = await fetch(url, {
+              method: 'GET',
+              signal: AbortSignal.timeout(this.appConfigService.coingeckoTimeoutMs),
+            });
+
+            if (response.status === HTTP_STATUS_TOO_MANY_REQUESTS) {
+              throw new Error(`CoinGecko HTTP ${response.status}`);
+            }
+
+            if (!response.ok && response.status >= HTTP_STATUS_INTERNAL_SERVER_ERROR) {
+              throw new Error(`CoinGecko HTTP ${response.status}`);
+            }
+
+            return response;
+          },
+          RequestPriority.NORMAL,
+        ),
+      {
+        maxAttempts: COINGECKO_MAX_ATTEMPTS,
+        baseDelayMs: this.appConfigService.chainBackoffBaseMs,
+        maxDelayMs: this.appConfigService.chainBackoffMaxMs,
+        shouldRetry: (error: unknown): boolean => this.shouldRetryExternalCall(error),
+        onRetry: (error: unknown, attempt: number, delayMs: number): void => {
+          const errorMessage: string = error instanceof Error ? error.message : String(error);
+          this.logger.warn(
+            `coingecko_current_retry key=${key} attempt=${String(attempt)} delayMs=${String(delayMs)} reason=${errorMessage}`,
+          );
+        },
+      },
+    );
   }
 
   private mapFetchResponse(response: Response, key: string): Promise<ICoinGeckoQuoteResult> {
@@ -282,17 +357,22 @@ export class CoinGeckoPricingAdapter implements ITokenPricingPort {
     return `${chainKey}:${normalizedAddress}:${normalizedSymbol}`;
   }
 
-  private isEthereumNative(tokenAddress: string | null, tokenSymbol: string | null): boolean {
-    if (tokenAddress === null) {
-      return tokenSymbol?.toUpperCase() === 'ETH';
+  private isNativeAsset(request: IPriceRequestDto): boolean {
+    const normalizedAddress: string = request.tokenAddress?.trim().toLowerCase() ?? '';
+
+    if (normalizedAddress.length > 0) {
+      return normalizedAddress === '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
     }
 
-    return tokenAddress.toLowerCase() === '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
+    const nativeSymbol: string = COINGECKO_NATIVE_SYMBOL[request.chainKey];
+
+    const normalizedSymbol: string = request.tokenSymbol?.trim().toUpperCase() ?? '';
+    return normalizedSymbol.length === 0 || normalizedSymbol === nativeSymbol;
   }
 
-  private buildNativePriceUrl(): URL {
+  private buildNativePriceUrl(nativeCoinId: string): URL {
     const url: URL = new URL('/simple/price', this.appConfigService.coingeckoApiBaseUrl);
-    url.searchParams.set('ids', 'ethereum');
+    url.searchParams.set('ids', nativeCoinId);
     url.searchParams.set('vs_currencies', 'usd');
     return url;
   }
@@ -305,5 +385,17 @@ export class CoinGeckoPricingAdapter implements ITokenPricingPort {
     url.searchParams.set('contract_addresses', tokenAddress);
     url.searchParams.set('vs_currencies', 'usd');
     return url;
+  }
+
+  private shouldRetryExternalCall(error: unknown): boolean {
+    const errorMessage: string = error instanceof Error ? error.message : String(error);
+    const normalizedErrorMessage: string = errorMessage.toLowerCase();
+
+    return (
+      normalizedErrorMessage.includes('http 5') ||
+      normalizedErrorMessage.includes('timeout') ||
+      normalizedErrorMessage.includes('aborted') ||
+      normalizedErrorMessage.includes('network')
+    );
   }
 }

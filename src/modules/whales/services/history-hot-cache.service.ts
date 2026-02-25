@@ -8,19 +8,36 @@ import {
 } from '@nestjs/common';
 
 import {
+  buildHistoryHotCacheItemIdentity,
+  buildHistoryHotCacheKey,
+  matchesHistoryHotCacheDirection,
+  matchesHistoryHotCacheKind,
+} from './history-hot-cache-item.util';
+import {
   recordHistoryHotCacheMetrics,
   updateHistoryHotCacheGaugeMetrics,
 } from './history-hot-cache-metrics.util';
+import {
+  mapWalletEventsToHistoryItems,
+  type IHistoryHotCacheTxBaseUrls,
+} from './history-hot-cache-persisted.util';
 import {
   getChainCooldownRemainingMs,
   isRateLimitHistoryError,
   setChainCooldown,
 } from './history-hot-cache-rate-limit.util';
+import {
+  buildEmptyHistoryHotCacheRefreshResult,
+  createEmptyHistoryHotCacheChainMetrics,
+  createHistoryHotCacheRefreshCounters,
+  toHistoryHotCacheRefreshResult,
+} from './history-hot-cache-refresh.util';
 import type {
   IHistoryHotCacheChainMetrics,
   IHistoryHotCacheRefreshCounters,
   IHistoryHotCacheWalletRefreshStats,
 } from './history-hot-cache.service.interfaces';
+import { isZeroExplorerHistoryItem } from './history-value.util';
 import { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
 import { HISTORY_EXPLORER_ADAPTER } from '../../../common/interfaces/explorers/explorer-port.tokens';
 import type { IHistoryExplorerAdapter } from '../../../common/interfaces/explorers/history-explorer.interfaces';
@@ -28,6 +45,7 @@ import { registerCache, SimpleCacheImpl } from '../../../common/utils/cache';
 import { AppConfigService } from '../../../config/app-config.service';
 import { SubscriptionsRepository } from '../../../database/repositories/subscriptions.repository';
 import type { PopularTrackedWalletView } from '../../../database/repositories/subscriptions.repository.interfaces';
+import { WalletEventsRepository } from '../../../database/repositories/wallet-events.repository';
 import { MetricsService } from '../../observability/metrics.service';
 import {
   HistoryHotCacheSource,
@@ -38,17 +56,11 @@ import {
   type IHistoryHotCacheRefreshResult,
   type IPopularWalletRef,
 } from '../entities/history-hot-cache.interfaces';
-import {
-  HistoryDirection,
-  type IHistoryItemDto,
-  type IHistoryPageDto,
-} from '../entities/history-item.dto';
+import { type IHistoryItemDto, type IHistoryPageDto } from '../entities/history-item.dto';
 import { HistoryDirectionFilter, HistoryKind } from '../entities/history-request.dto';
 
-const DEFAULT_REFRESH_DURATION_MS = 0;
 const DEFAULT_ENTRY_COUNT = 0;
 const DEFAULT_ITEM_COUNT = 0;
-const IDENTITY_DELIMITER = '::';
 const ITEM_MAX_MULTIPLIER = 1;
 const WALLET_COUNT_DIVIDER_FALLBACK = 1;
 const HOT_CACHE_RATE_LIMIT_COOLDOWN_MS = 180_000;
@@ -56,6 +68,9 @@ const HOT_CACHE_RATE_LIMIT_COOLDOWN_MS = 180_000;
 @Injectable()
 export class HistoryHotCacheService implements OnModuleInit, OnModuleDestroy {
   private readonly logger: Logger = new Logger(HistoryHotCacheService.name);
+  @Optional()
+  @Inject(MetricsService)
+  private readonly metricsService: MetricsService | null = null;
   private readonly cache: SimpleCacheImpl<IHistoryHotCacheEntry>;
   private readonly freshTtlMs: number;
   private readonly staleTtlMs: number;
@@ -64,6 +79,7 @@ export class HistoryHotCacheService implements OnModuleInit, OnModuleDestroy {
   private readonly pageLimit: number;
   private readonly maxItemsPerWallet: number;
   private readonly enabled: boolean;
+  private readonly txBaseUrls: IHistoryHotCacheTxBaseUrls;
   private intervalHandle: ReturnType<typeof setInterval> | null = null;
   private refreshInProgress: boolean = false;
   private readonly chainCooldownUntilMs: Map<ChainKey, number> = new Map<ChainKey, number>();
@@ -71,9 +87,9 @@ export class HistoryHotCacheService implements OnModuleInit, OnModuleDestroy {
   public constructor(
     private readonly appConfigService: AppConfigService,
     private readonly subscriptionsRepository: SubscriptionsRepository,
+    private readonly walletEventsRepository: WalletEventsRepository,
     @Inject(HISTORY_EXPLORER_ADAPTER)
     private readonly historyExplorerAdapter: IHistoryExplorerAdapter,
-    @Optional() private readonly metricsService: MetricsService | null = null,
   ) {
     this.enabled = this.appConfigService.historyHotCacheEnabled;
     this.topWalletsLimit = this.appConfigService.historyHotCacheTopWallets;
@@ -86,6 +102,10 @@ export class HistoryHotCacheService implements OnModuleInit, OnModuleDestroy {
       ttlSec: this.appConfigService.historyHotCacheStaleSec,
       maxKeys: this.topWalletsLimit,
     });
+    this.txBaseUrls = {
+      etherscanTxBaseUrl: this.appConfigService.etherscanTxBaseUrl,
+      tronscanTxBaseUrl: this.appConfigService.tronscanTxBaseUrl,
+    };
     registerCache('history_hot_top100', this.cache as SimpleCacheImpl<unknown>);
   }
 
@@ -153,17 +173,17 @@ export class HistoryHotCacheService implements OnModuleInit, OnModuleDestroy {
 
   private async refreshTopWallets(): Promise<IHistoryHotCacheRefreshResult> {
     if (!this.enabled) {
-      return this.buildEmptyRefreshResult();
+      return buildEmptyHistoryHotCacheRefreshResult();
     }
 
     if (this.refreshInProgress) {
       this.logger.debug('history_hot_cache_refresh_skip reason=already_running');
-      return this.buildEmptyRefreshResult();
+      return buildEmptyHistoryHotCacheRefreshResult();
     }
 
     this.refreshInProgress = true;
     const startMs: number = Date.now();
-    const counters: IHistoryHotCacheRefreshCounters = this.createRefreshCounters();
+    const counters: IHistoryHotCacheRefreshCounters = createHistoryHotCacheRefreshCounters();
     const chainMetricsMap: Map<ChainKey, IHistoryHotCacheChainMetrics> = new Map<
       ChainKey,
       IHistoryHotCacheChainMetrics
@@ -173,7 +193,7 @@ export class HistoryHotCacheService implements OnModuleInit, OnModuleDestroy {
     try {
       const walletRefs: readonly IPopularWalletRef[] = await this.loadPopularWalletRefs();
       await this.refreshWalletEntries(walletRefs, counters, chainMetricsMap);
-      const result: IHistoryHotCacheRefreshResult = this.toRefreshResult(
+      const result: IHistoryHotCacheRefreshResult = toHistoryHotCacheRefreshResult(
         counters,
         Date.now() - startMs,
       );
@@ -187,27 +207,6 @@ export class HistoryHotCacheService implements OnModuleInit, OnModuleDestroy {
     } finally {
       this.refreshInProgress = false;
     }
-  }
-
-  private buildEmptyRefreshResult(): IHistoryHotCacheRefreshResult {
-    return {
-      processedWallets: 0,
-      successWallets: 0,
-      failedWallets: 0,
-      newItemsTotal: 0,
-      duplicateItemsTotal: 0,
-      durationMs: DEFAULT_REFRESH_DURATION_MS,
-    };
-  }
-
-  private createRefreshCounters(): IHistoryHotCacheRefreshCounters {
-    return {
-      processedWallets: 0,
-      successWallets: 0,
-      failedWallets: 0,
-      newItemsTotal: 0,
-      duplicateItemsTotal: 0,
-    };
   }
 
   private async loadPopularWalletRefs(): Promise<readonly IPopularWalletRef[]> {
@@ -270,7 +269,7 @@ export class HistoryHotCacheService implements OnModuleInit, OnModuleDestroy {
     walletDurationMs: number,
   ): void {
     const metrics: IHistoryHotCacheChainMetrics =
-      chainMetricsMap.get(chainKey) ?? this.createEmptyChainMetrics();
+      chainMetricsMap.get(chainKey) ?? createEmptyHistoryHotCacheChainMetrics();
     metrics.success += 1;
     metrics.newItems += updateResult.newItems;
     metrics.duplicateItems += updateResult.duplicateItems;
@@ -284,7 +283,7 @@ export class HistoryHotCacheService implements OnModuleInit, OnModuleDestroy {
     error: unknown,
   ): void {
     const metrics: IHistoryHotCacheChainMetrics =
-      chainMetricsMap.get(walletRef.chainKey) ?? this.createEmptyChainMetrics();
+      chainMetricsMap.get(walletRef.chainKey) ?? createEmptyHistoryHotCacheChainMetrics();
     metrics.failed += 1;
     chainMetricsMap.set(walletRef.chainKey, metrics);
     const errorMessage: string = error instanceof Error ? error.message : String(error);
@@ -306,23 +305,15 @@ export class HistoryHotCacheService implements OnModuleInit, OnModuleDestroy {
     );
   }
 
-  private toRefreshResult(
-    counters: IHistoryHotCacheRefreshCounters,
-    durationMs: number,
-  ): IHistoryHotCacheRefreshResult {
-    return {
-      processedWallets: counters.processedWallets,
-      successWallets: counters.successWallets,
-      failedWallets: counters.failedWallets,
-      newItemsTotal: counters.newItemsTotal,
-      duplicateItemsTotal: counters.duplicateItemsTotal,
-      durationMs,
-    };
-  }
-
   private async refreshWalletEntry(
     walletRef: IPopularWalletRef,
   ): Promise<IHistoryHotCacheWalletRefreshStats> {
+    const cacheKey: string = buildHistoryHotCacheKey(walletRef.chainKey, walletRef.address);
+    const nowEpochMs: number = Date.now();
+    const existingEntry: IHistoryHotCacheEntry | undefined = this.cache.get(cacheKey);
+    const persistedItems: readonly IHistoryItemDto[] =
+      existingEntry === undefined ? await this.loadPersistedHistory(walletRef) : [];
+    const existingItems: readonly IHistoryItemDto[] = existingEntry?.items ?? persistedItems;
     const historyPage: IHistoryPageDto = await this.historyExplorerAdapter.loadRecentTransactions({
       chainKey: walletRef.chainKey,
       address: walletRef.address,
@@ -332,18 +323,17 @@ export class HistoryHotCacheService implements OnModuleInit, OnModuleDestroy {
       direction: HistoryDirectionFilter.ALL,
       minAmountUsd: null,
     });
-    const cacheKey: string = this.buildCacheKey(walletRef.chainKey, walletRef.address);
-    const nowEpochMs: number = Date.now();
-    const existingEntry: IHistoryHotCacheEntry | undefined = this.cache.get(cacheKey);
-    const existingItems: readonly IHistoryItemDto[] = existingEntry?.items ?? [];
     const identitySet: Set<string> = new Set<string>(
-      existingItems.map((item: IHistoryItemDto): string => this.buildItemIdentity(item)),
+      existingItems.map((item: IHistoryItemDto): string => buildHistoryHotCacheItemIdentity(item)),
     );
     const newItems: IHistoryItemDto[] = [];
     let duplicateItems: number = 0;
 
     for (const item of historyPage.items) {
-      const itemIdentity: string = this.buildItemIdentity(item);
+      if (isZeroExplorerHistoryItem(item)) {
+        continue;
+      }
+      const itemIdentity: string = buildHistoryHotCacheItemIdentity(item);
       if (identitySet.has(itemIdentity)) {
         duplicateItems += 1;
         continue;
@@ -376,11 +366,24 @@ export class HistoryHotCacheService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
+  private async loadPersistedHistory(
+    walletRef: IPopularWalletRef,
+  ): Promise<readonly IHistoryItemDto[]> {
+    const events = await this.walletEventsRepository.listRecentByTrackedAddress(
+      walletRef.chainKey,
+      walletRef.address,
+      this.maxItemsPerWallet,
+      0,
+    );
+
+    return mapWalletEventsToHistoryItems(walletRef.chainKey, events, this.txBaseUrls);
+  }
+
   private getPageFromCache(
     request: IHistoryHotCachePageRequest,
     allowStale: boolean,
   ): IHistoryHotCacheLookupResult | null {
-    const cacheKey: string = this.buildCacheKey(request.chainKey, request.address);
+    const cacheKey: string = buildHistoryHotCacheKey(request.chainKey, request.address);
     const entry: IHistoryHotCacheEntry | undefined = this.cache.get(cacheKey);
 
     if (entry === undefined) {
@@ -401,8 +404,10 @@ export class HistoryHotCacheService implements OnModuleInit, OnModuleDestroy {
     }
 
     const filteredItems: readonly IHistoryItemDto[] = entry.items
-      .filter((item: IHistoryItemDto): boolean => this.matchKind(item, request.kind))
-      .filter((item: IHistoryItemDto): boolean => this.matchDirection(item, request.direction));
+      .filter((item: IHistoryItemDto): boolean => matchesHistoryHotCacheKind(item, request.kind))
+      .filter((item: IHistoryItemDto): boolean =>
+        matchesHistoryHotCacheDirection(item, request.direction),
+      );
     const pageItems: readonly IHistoryItemDto[] = filteredItems.slice(
       request.offset,
       request.offset + request.limit,
@@ -416,57 +421,6 @@ export class HistoryHotCacheService implements OnModuleInit, OnModuleDestroy {
         items: pageItems,
         nextOffset,
       },
-    };
-  }
-
-  private buildCacheKey(chainKey: ChainKey, address: string): string {
-    return `${chainKey}:${address.toLowerCase()}`;
-  }
-
-  private buildItemIdentity(item: IHistoryItemDto): string {
-    return [
-      item.txHash,
-      item.assetSymbol,
-      item.direction,
-      item.valueRaw,
-      String(item.timestampSec),
-    ].join(IDENTITY_DELIMITER);
-  }
-
-  private matchKind(item: IHistoryItemDto, kind: HistoryKind): boolean {
-    if (kind === HistoryKind.ALL) {
-      return true;
-    }
-
-    const nativeSymbols: readonly string[] = ['ETH', 'SOL', 'TRX'];
-    const isNativeAsset: boolean = nativeSymbols.includes(item.assetSymbol.toUpperCase());
-
-    if (kind === HistoryKind.ETH) {
-      return isNativeAsset;
-    }
-
-    return !isNativeAsset;
-  }
-
-  private matchDirection(item: IHistoryItemDto, direction: HistoryDirectionFilter): boolean {
-    if (direction === HistoryDirectionFilter.ALL) {
-      return true;
-    }
-
-    if (direction === HistoryDirectionFilter.IN) {
-      return item.direction === HistoryDirection.IN;
-    }
-
-    return item.direction === HistoryDirection.OUT;
-  }
-
-  private createEmptyChainMetrics(): IHistoryHotCacheChainMetrics {
-    return {
-      success: 0,
-      failed: 0,
-      newItems: 0,
-      duplicateItems: 0,
-      durationMs: 0,
     };
   }
 

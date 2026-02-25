@@ -8,6 +8,7 @@ import {
 } from './etherscan-history.interfaces';
 import { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
 import type { IHistoryExplorerAdapter } from '../../../common/interfaces/explorers/history-explorer.interfaces';
+import { executeWithExponentialBackoff } from '../../../common/utils/network/exponential-backoff.util';
 import { AppConfigService } from '../../../config/app-config.service';
 import {
   LimiterKey,
@@ -27,6 +28,7 @@ import {
 } from '../../whales/entities/history-request.dto';
 
 const ETHERSCAN_FETCH_TIMEOUT_MS = 10_000;
+const ETHERSCAN_MAX_ATTEMPTS = 4;
 
 @Injectable()
 export class EtherscanHistoryAdapter implements IHistoryExplorerAdapter {
@@ -162,19 +164,37 @@ export class EtherscanHistoryAdapter implements IHistoryExplorerAdapter {
     url.searchParams.set('sort', 'desc');
     url.searchParams.set('apikey', apiKey);
 
-    const response: Response = await this.rateLimiterService.schedule(
-      LimiterKey.ETHERSCAN,
+    const response: Response = await executeWithExponentialBackoff<Response>(
       async (): Promise<Response> =>
-        fetch(url, {
-          method: 'GET',
-          signal: AbortSignal.timeout(ETHERSCAN_FETCH_TIMEOUT_MS),
-        }),
-      RequestPriority.NORMAL,
-    );
+        this.rateLimiterService.schedule(
+          LimiterKey.ETHERSCAN,
+          async (): Promise<Response> => {
+            const fetchResponse: Response = await fetch(url, {
+              method: 'GET',
+              signal: AbortSignal.timeout(ETHERSCAN_FETCH_TIMEOUT_MS),
+            });
 
-    if (!response.ok) {
-      throw new Error(`Etherscan HTTP ${response.status}`);
-    }
+            if (!fetchResponse.ok) {
+              throw new Error(`Etherscan HTTP ${fetchResponse.status}`);
+            }
+
+            return fetchResponse;
+          },
+          RequestPriority.NORMAL,
+        ),
+      {
+        maxAttempts: ETHERSCAN_MAX_ATTEMPTS,
+        baseDelayMs: this.appConfigService.chainBackoffBaseMs,
+        maxDelayMs: this.appConfigService.chainBackoffMaxMs,
+        shouldRetry: (error: unknown): boolean => this.shouldRetryExternalCall(error),
+        onRetry: (error: unknown, attempt: number, delayMs: number): void => {
+          const errorMessage: string = error instanceof Error ? error.message : String(error);
+          this.logger.warn(
+            `etherscan_request_retry attempt=${String(attempt)} delayMs=${String(delayMs)} reason=${errorMessage}`,
+          );
+        },
+      },
+    );
 
     const payload: unknown = await response.json();
     return this.parseHistoryResponse(payload);
@@ -186,6 +206,20 @@ export class EtherscanHistoryAdapter implements IHistoryExplorerAdapter {
     }
 
     return Math.floor(offset / limit) + 1;
+  }
+
+  private shouldRetryExternalCall(error: unknown): boolean {
+    const errorMessage: string = error instanceof Error ? error.message : String(error);
+    const normalizedErrorMessage: string = errorMessage.toLowerCase();
+
+    return (
+      normalizedErrorMessage.includes('429') ||
+      normalizedErrorMessage.includes('rate limit') ||
+      normalizedErrorMessage.includes('http 5') ||
+      normalizedErrorMessage.includes('timeout') ||
+      normalizedErrorMessage.includes('aborted') ||
+      normalizedErrorMessage.includes('network')
+    );
   }
 
   private isZeroValue(valueRaw: string): boolean {

@@ -4,6 +4,7 @@ import type { IHistoryItemDto } from '../../whales/entities/history-item.dto';
 
 export const SOLSCAN_TX_BASE_URL = 'https://solscan.io/tx/';
 export const SOLANA_HISTORY_REQUEST_TIMEOUT_MS = 10_000;
+export const SOLANA_HISTORY_MAX_ATTEMPTS = 4;
 export const SPL_TOKEN_DECIMALS = 6;
 export const SOL_NATIVE_DECIMALS = 9;
 export const SOLANA_SIGNATURES_BATCH_MAX = 1_000;
@@ -35,4 +36,16 @@ export const resolveSolanaHistoryLimiterKey = (
 export const resolveSolanaHistoryScanLimit = (offset: number, limit: number): number => {
   const desiredScan: number = offset + limit * SOLANA_SCAN_LIMIT_MULTIPLIER;
   return Math.min(Math.max(desiredScan, limit), SOLANA_SCAN_LIMIT_MAX);
+};
+
+export const isRetriableSolanaHistoryError = (errorMessage: string): boolean => {
+  const normalizedErrorMessage: string = errorMessage.toLowerCase();
+
+  return (
+    normalizedErrorMessage.includes('429') ||
+    normalizedErrorMessage.includes('http 5') ||
+    normalizedErrorMessage.includes('timeout') ||
+    normalizedErrorMessage.includes('aborted') ||
+    normalizedErrorMessage.includes('too many requests')
+  );
 };

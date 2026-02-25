@@ -11,14 +11,16 @@ import {
   resolveSolanaTransferDetails,
   resolveSolanaTimestampSec,
 } from './solana-history-mapper.util';
+import { buildSolanaHistoryPageResult } from './solana-rpc-history-page.util';
 import {
   HTTP_STATUS_TOO_MANY_REQUESTS,
   HISTORY_WARN_COOLDOWN_MS,
+  SOLANA_HISTORY_MAX_ATTEMPTS,
   SOLANA_HISTORY_REQUEST_TIMEOUT_MS,
-  SOLANA_SCAN_LIMIT_MAX,
   SOLANA_SIGNATURES_BATCH_DEFAULT,
   SOLANA_SIGNATURES_BATCH_MAX,
   SOLSCAN_TX_BASE_URL,
+  isRetriableSolanaHistoryError,
   resolveSolanaHistoryLimiterKey,
   resolveSolanaHistoryScanLimit,
   type ISolanaHistoryScanState,
@@ -30,6 +32,7 @@ import type {
 import { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
 import type { IHistoryExplorerAdapter } from '../../../common/interfaces/explorers/history-explorer.interfaces';
 import { RateLimitedWarningEmitter } from '../../../common/utils/logging/rate-limited-warning-emitter';
+import { executeWithExponentialBackoff } from '../../../common/utils/network/exponential-backoff.util';
 import { AppConfigService } from '../../../config/app-config.service';
 import {
   LimiterKey,
@@ -68,8 +71,13 @@ export class SolanaRpcHistoryAdapter implements IHistoryExplorerAdapter {
       endpointUrls,
     );
     await this.collectHistoryItemsForPage(request, endpointUrls, scanState);
-    this.logTruncatedScan(request, scanState.scannedSignaturesCount);
-    return this.buildHistoryPageResult(request.limit, scanState);
+    const scanLimit: number = resolveSolanaHistoryScanLimit(request.offset, request.limit);
+    if (scanState.scannedSignaturesCount >= scanLimit) {
+      this.logger.warn(
+        `solana history scan truncated address=${request.address} scanned=${String(scanState.scannedSignaturesCount)} scanLimit=${String(scanLimit)} limit=${String(request.limit)} offset=${String(request.offset)}`,
+      );
+    }
+    return buildSolanaHistoryPageResult(request.limit, scanState);
   }
 
   private resolveSolanaRpcEndpoints(): readonly string[] {
@@ -124,11 +132,6 @@ export class SolanaRpcHistoryAdapter implements IHistoryExplorerAdapter {
     }
 
     return payload.map((value: unknown): ISolanaSignatureInfo => parseSolanaSignatureInfo(value));
-  }
-
-  private resolveSignaturesBatchLimit(limit: number): number {
-    const withBuffer: number = Math.max(limit * 2, SOLANA_SIGNATURES_BATCH_DEFAULT);
-    return Math.min(withBuffer, SOLANA_SIGNATURES_BATCH_MAX);
   }
 
   private async getSignaturesPage(
@@ -244,7 +247,10 @@ export class SolanaRpcHistoryAdapter implements IHistoryExplorerAdapter {
       return false;
     }
 
-    const additionalSignaturesLimit: number = this.resolveSignaturesBatchLimit(request.limit);
+    const additionalSignaturesLimit: number = Math.min(
+      Math.max(request.limit * 2, SOLANA_SIGNATURES_BATCH_DEFAULT),
+      SOLANA_SIGNATURES_BATCH_MAX,
+    );
     const additionalSignaturesBatch: readonly ISolanaSignatureInfo[] = await this.callWithFallback(
       endpointUrls,
       async (endpointUrl: string): Promise<readonly ISolanaSignatureInfo[]> =>
@@ -299,43 +305,6 @@ export class SolanaRpcHistoryAdapter implements IHistoryExplorerAdapter {
     }
 
     scanState.pageItems.push(item);
-  }
-
-  private logTruncatedScan(request: IHistoryRequestDto, scannedSignaturesCount: number): void {
-    const scanLimit: number = resolveSolanaHistoryScanLimit(request.offset, request.limit);
-
-    if (scannedSignaturesCount < scanLimit) {
-      return;
-    }
-
-    this.logger.warn(
-      `solana history scan truncated address=${request.address} scanned=${String(scannedSignaturesCount)} scanLimit=${String(scanLimit)} limit=${String(request.limit)} offset=${String(request.offset)}`,
-    );
-  }
-
-  private buildHistoryPageResult(
-    requestLimit: number,
-    scanState: ISolanaHistoryScanState,
-  ): IHistoryPageDto {
-    if (scanState.pageItems.length === 0) {
-      return {
-        items: [],
-        nextOffset: null,
-      };
-    }
-
-    const hasKnownTail: boolean = scanState.signatureCursor < scanState.signatures.length;
-    const hasUnknownTail: boolean =
-      scanState.pageItems.length >= requestLimit &&
-      (!scanState.reachedSignaturesEnd ||
-        scanState.scannedSignaturesCount >= SOLANA_SCAN_LIMIT_MAX);
-    const hasNextPage: boolean =
-      scanState.pageItems.length >= requestLimit && (hasKnownTail || hasUnknownTail);
-
-    return {
-      items: scanState.pageItems,
-      nextOffset: hasNextPage ? scanState.signatureCursor : null,
-    };
   }
 
   private async mapSignatureToHistoryItem(
@@ -418,42 +387,77 @@ export class SolanaRpcHistoryAdapter implements IHistoryExplorerAdapter {
       endpointUrl,
       this.appConfigService.solanaPublicHttpUrl,
     );
-    const response: Response = await this.rateLimiterService.schedule(
-      limiterKey,
+    const response: Response = await executeWithExponentialBackoff<Response>(
       async (): Promise<Response> =>
-        fetch(endpointUrl, {
-          method: 'POST',
-          headers: {
-            'content-type': 'application/json',
-          },
-          body: JSON.stringify({
-            jsonrpc: '2.0',
-            id: Date.now(),
-            method,
-            params,
-          }),
-          signal: AbortSignal.timeout(SOLANA_HISTORY_REQUEST_TIMEOUT_MS),
-        }),
-      RequestPriority.NORMAL,
+        this.rateLimiterService.schedule(
+          limiterKey,
+          async (): Promise<Response> => this.fetchRpcResponse(endpointUrl, method, params),
+          RequestPriority.NORMAL,
+        ),
+      {
+        maxAttempts: SOLANA_HISTORY_MAX_ATTEMPTS,
+        baseDelayMs: this.appConfigService.chainSolanaBackoffBaseMs,
+        maxDelayMs: this.appConfigService.chainBackoffMaxMs,
+        shouldRetry: (error: unknown): boolean => {
+          const errorMessage: string = error instanceof Error ? error.message : String(error);
+          return isRetriableSolanaHistoryError(errorMessage);
+        },
+        onRetry: (error: unknown, attempt: number, delayMs: number): void => {
+          const errorMessage: string = error instanceof Error ? error.message : String(error);
+          this.logger.warn(
+            `[SOL] history retry endpoint=${endpointUrl} method=${method} attempt=${String(attempt)} delayMs=${String(delayMs)} reason=${errorMessage}`,
+          );
+        },
+      },
     );
 
-    if (!response.ok) {
-      if (response.status === HTTP_STATUS_TOO_MANY_REQUESTS && this.metricsService !== null) {
-        this.metricsService.historyHttp429Total.inc({
-          chain: ChainKey.SOLANA_MAINNET,
-          adapter: 'solana_rpc_history',
-        });
-        const warningKey: string = `history_http_429:${endpointUrl}:${method}`;
-        if (this.warningEmitter.shouldEmit(warningKey)) {
-          this.logger.warn(
-            `history_http_429 chain=${ChainKey.SOLANA_MAINNET} adapter=solana_rpc_history endpoint=${endpointUrl} method=${method}`,
-          );
-        }
-      }
+    return this.parseRpcPayload(response);
+  }
 
-      throw new Error(`Solana RPC HTTP ${response.status}`);
+  private async fetchRpcResponse(
+    endpointUrl: string,
+    method: string,
+    params: readonly unknown[],
+  ): Promise<Response> {
+    const fetchResponse: Response = await fetch(endpointUrl, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: Date.now(),
+        method,
+        params,
+      }),
+      signal: AbortSignal.timeout(SOLANA_HISTORY_REQUEST_TIMEOUT_MS),
+    });
+    this.ensureRpcResponseOk(fetchResponse, endpointUrl, method);
+    return fetchResponse;
+  }
+
+  private ensureRpcResponseOk(fetchResponse: Response, endpointUrl: string, method: string): void {
+    if (fetchResponse.ok) {
+      return;
     }
 
+    if (fetchResponse.status === HTTP_STATUS_TOO_MANY_REQUESTS && this.metricsService !== null) {
+      this.metricsService.historyHttp429Total.inc({
+        chain: ChainKey.SOLANA_MAINNET,
+        adapter: 'solana_rpc_history',
+      });
+      const warningKey: string = `history_http_429:${endpointUrl}:${method}`;
+      if (this.warningEmitter.shouldEmit(warningKey)) {
+        this.logger.warn(
+          `history_http_429 chain=${ChainKey.SOLANA_MAINNET} adapter=solana_rpc_history endpoint=${endpointUrl} method=${method}`,
+        );
+      }
+    }
+
+    throw new Error(`Solana RPC HTTP ${fetchResponse.status}`);
+  }
+
+  private async parseRpcPayload(response: Response): Promise<unknown> {
     const payload = (await response.json()) as {
       readonly result?: unknown;
       readonly error?: {
@@ -462,12 +466,12 @@ export class SolanaRpcHistoryAdapter implements IHistoryExplorerAdapter {
       };
     };
 
-    if (payload.error !== undefined) {
-      const errorCode: string = String(payload.error.code ?? 'unknown');
-      const errorMessage: string = payload.error.message ?? 'unknown error';
-      throw new Error(`Solana RPC error code=${errorCode} message=${errorMessage}`);
+    if (payload.error === undefined) {
+      return payload.result ?? null;
     }
 
-    return payload.result ?? null;
+    const errorCode: string = String(payload.error.code ?? 'unknown');
+    const errorMessage: string = payload.error.message ?? 'unknown error';
+    throw new Error(`Solana RPC error code=${errorCode} message=${errorMessage}`);
   }
 }

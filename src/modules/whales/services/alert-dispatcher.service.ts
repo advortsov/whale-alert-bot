@@ -149,16 +149,13 @@ export class AlertDispatcherService implements IAlertDispatcher {
     event: ClassifiedEvent,
     chainKey: ChainKey,
   ): Promise<IEventUsdContext> {
-    const existingUsdAmount: number | null = this.resolveExistingUsdAmount(event);
-
-    if (existingUsdAmount !== null) {
-      return this.buildResolvedUsdContext(existingUsdAmount);
-    }
-
     const value: number | null = this.parsePositiveValue(event.valueFormatted);
 
     if (value === null) {
-      return this.buildUnavailableUsdContext();
+      const existingUsdAmount: number | null = this.resolveExistingUsdAmount(event);
+      return existingUsdAmount === null
+        ? this.buildUnavailableUsdContext()
+        : this.buildResolvedUsdContext(existingUsdAmount);
     }
 
     const quote = await this.tokenPricingPort.getUsdQuote({
@@ -168,7 +165,10 @@ export class AlertDispatcherService implements IAlertDispatcher {
     });
 
     if (quote === null || !Number.isFinite(quote.usdPrice) || quote.usdPrice <= 0) {
-      return this.buildUnavailableUsdContext();
+      const existingUsdAmount: number | null = this.resolveExistingUsdAmount(event);
+      return existingUsdAmount === null
+        ? this.buildUnavailableUsdContext()
+        : this.buildResolvedUsdContext(existingUsdAmount);
     }
 
     return this.buildResolvedUsdContext(value * quote.usdPrice);

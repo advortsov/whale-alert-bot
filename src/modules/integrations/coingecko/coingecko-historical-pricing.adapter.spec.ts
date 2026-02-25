@@ -8,6 +8,8 @@ import type { BottleneckRateLimiterService } from '../../blockchain/rate-limitin
 type AppConfigServiceStub = {
   readonly coingeckoApiBaseUrl: string;
   readonly coingeckoTimeoutMs: number;
+  readonly chainBackoffBaseMs: number;
+  readonly chainBackoffMaxMs: number;
   readonly priceHistoryCacheTtlSec: number;
   readonly priceHistoryCacheStaleSec: number;
   readonly priceHistoryCacheMaxEntries: number;
@@ -17,6 +19,8 @@ type AppConfigServiceStub = {
 const createConfigStub = (): AppConfigServiceStub => ({
   coingeckoApiBaseUrl: 'https://api.coingecko.com/api/v3',
   coingeckoTimeoutMs: 5000,
+  chainBackoffBaseMs: 1000,
+  chainBackoffMaxMs: 60_000,
   priceHistoryCacheTtlSec: 60,
   priceHistoryCacheStaleSec: 600,
   priceHistoryCacheMaxEntries: 100,

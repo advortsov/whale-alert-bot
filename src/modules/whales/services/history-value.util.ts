@@ -3,6 +3,10 @@ import type { WalletEventHistoryView } from '../../../database/repositories/wall
 import type { IHistoryItemDto } from '../entities/history-item.dto';
 import type { IWalletHistoryListItem } from '../entities/wallet-history-list-item.dto';
 
+const DISPLAY_PRECISION_DECIMALS = 6;
+const BIGINT_TEN = BigInt('10');
+const DISPLAY_ZERO_THRESHOLD = Number.parseFloat(`1e-${String(DISPLAY_PRECISION_DECIMALS)}`);
+
 const parseBigIntSafe = (rawValue: string | null): bigint | null => {
   if (typeof rawValue !== 'string') {
     return null;
@@ -41,7 +45,32 @@ const isParsedNumberZero = (value: number | null): boolean => {
     return false;
   }
 
-  return Math.abs(value) === 0;
+  return Math.abs(value) < DISPLAY_ZERO_THRESHOLD;
+};
+
+const isEffectivelyZeroBigIntAmount = (
+  rawValue: string | null,
+  decimals: number | null,
+): boolean => {
+  const parsedValue: bigint | null = parseBigIntSafe(rawValue);
+
+  if (parsedValue === null) {
+    return false;
+  }
+
+  const absoluteValue: bigint = parsedValue < BigInt(0) ? -parsedValue : parsedValue;
+
+  if (absoluteValue === BigInt(0)) {
+    return true;
+  }
+
+  if (decimals === null || decimals <= DISPLAY_PRECISION_DECIMALS) {
+    return false;
+  }
+
+  const thresholdPower: number = decimals - DISPLAY_PRECISION_DECIMALS;
+  const threshold: bigint = BIGINT_TEN ** BigInt(thresholdPower);
+  return absoluteValue < threshold;
 };
 
 export const isZeroBigIntString = (rawValue: string | null): boolean => {
@@ -50,6 +79,10 @@ export const isZeroBigIntString = (rawValue: string | null): boolean => {
 };
 
 export const isZeroClassifiedEvent = (event: ClassifiedEvent): boolean => {
+  if (isEffectivelyZeroBigIntAmount(event.tokenAmountRaw, event.tokenDecimals)) {
+    return true;
+  }
+
   if (isZeroBigIntString(event.tokenAmountRaw)) {
     return true;
   }
@@ -69,6 +102,10 @@ export const isZeroClassifiedEvent = (event: ClassifiedEvent): boolean => {
 };
 
 export const isZeroWalletEventHistory = (event: WalletEventHistoryView): boolean => {
+  if (isEffectivelyZeroBigIntAmount(event.tokenAmountRaw, event.tokenDecimals)) {
+    return true;
+  }
+
   if (isZeroBigIntString(event.tokenAmountRaw)) {
     return true;
   }
@@ -81,6 +118,10 @@ export const isZeroWalletEventHistory = (event: WalletEventHistoryView): boolean
 };
 
 export const isZeroExplorerHistoryItem = (item: IHistoryItemDto): boolean => {
+  if (isEffectivelyZeroBigIntAmount(item.valueRaw, item.assetDecimals)) {
+    return true;
+  }
+
   return isZeroBigIntString(item.valueRaw);
 };
 

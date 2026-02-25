@@ -23,6 +23,8 @@ export interface ITronGridRequestQueryPolicy {
 }
 
 export const TRON_HISTORY_REQUEST_TIMEOUT_MS = 10_000;
+export const TRON_HISTORY_MAX_ATTEMPTS = 4;
+export const HTTP_STATUS_INTERNAL_SERVER_ERROR = 500;
 export const TRON_MAX_PAGE_SIZE = 200;
 export const TRON_MAX_PAGE_REQUESTS = 20;
 export const HTTP_STATUS_BAD_REQUEST = 400;
@@ -63,4 +65,20 @@ export const resolveTronHistoryLimiterKey = (
     return LimiterKey.TRON_GRID;
   }
   return LimiterKey.TRON_PUBLIC;
+};
+
+export const isRetriableTronHistoryError = (error: unknown): boolean => {
+  if (error instanceof TronGridBadRequestError) {
+    return false;
+  }
+
+  const errorMessage: string = error instanceof Error ? error.message : String(error);
+  const normalizedErrorMessage: string = errorMessage.toLowerCase();
+
+  return (
+    normalizedErrorMessage.includes('429') ||
+    normalizedErrorMessage.includes('http 5') ||
+    normalizedErrorMessage.includes('timeout') ||
+    normalizedErrorMessage.includes('aborted')
+  );
 };

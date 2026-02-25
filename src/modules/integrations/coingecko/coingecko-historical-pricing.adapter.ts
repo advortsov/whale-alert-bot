@@ -9,6 +9,7 @@ import type {
 } from '../../../common/interfaces/token-pricing/token-pricing.interfaces';
 import { HistoricalPriceSource } from '../../../common/interfaces/token-pricing/token-pricing.interfaces';
 import { registerCache, SimpleCacheImpl } from '../../../common/utils/cache';
+import { executeWithExponentialBackoff } from '../../../common/utils/network/exponential-backoff.util';
 import { AppConfigService } from '../../../config/app-config.service';
 import {
   LimiterKey,
@@ -17,9 +18,11 @@ import {
 import { BottleneckRateLimiterService } from '../../blockchain/rate-limiting/bottleneck-rate-limiter.service';
 
 const HTTP_STATUS_TOO_MANY_REQUESTS = 429;
+const HTTP_STATUS_INTERNAL_SERVER_ERROR = 500;
 const RANGE_BUCKET_SEC = 300;
 const RANGE_PADDING_SEC = 300;
 const SEC_IN_DAY = 86_400;
+const COINGECKO_HISTORY_MAX_ATTEMPTS = 4;
 const COINGECKO_CHAIN_ASSET_MAP: Readonly<
   Record<ChainKey, { readonly coinId: string; readonly nativeSymbol: string }>
 > = {
@@ -205,20 +208,42 @@ export class CoinGeckoHistoricalPricingAdapter implements ITokenHistoricalPricin
 
   private async fetchJson(url: URL): Promise<unknown> {
     try {
-      const response: Response = await this.rateLimiterService.schedule(
-        LimiterKey.COINGECKO_HISTORY,
+      const response: Response = await executeWithExponentialBackoff<Response>(
         async (): Promise<Response> =>
-          fetch(url, {
-            method: 'GET',
-            signal: AbortSignal.timeout(this.appConfigService.coingeckoTimeoutMs),
-          }),
-        RequestPriority.NORMAL,
-      );
+          this.rateLimiterService.schedule(
+            LimiterKey.COINGECKO_HISTORY,
+            async (): Promise<Response> => {
+              const fetchResponse: Response = await fetch(url, {
+                method: 'GET',
+                signal: AbortSignal.timeout(this.appConfigService.coingeckoTimeoutMs),
+              });
 
-      if (response.status === HTTP_STATUS_TOO_MANY_REQUESTS) {
-        this.logger.warn(`coingecko historical 429 url=${url.pathname}`);
-        return null;
-      }
+              if (fetchResponse.status === HTTP_STATUS_TOO_MANY_REQUESTS) {
+                this.logger.warn(`coingecko historical 429 url=${url.pathname}`);
+                throw new Error(`CoinGecko historical HTTP ${fetchResponse.status}`);
+              }
+
+              if (!fetchResponse.ok && fetchResponse.status >= HTTP_STATUS_INTERNAL_SERVER_ERROR) {
+                throw new Error(`CoinGecko historical HTTP ${fetchResponse.status}`);
+              }
+
+              return fetchResponse;
+            },
+            RequestPriority.NORMAL,
+          ),
+        {
+          maxAttempts: COINGECKO_HISTORY_MAX_ATTEMPTS,
+          baseDelayMs: this.appConfigService.chainBackoffBaseMs,
+          maxDelayMs: this.appConfigService.chainBackoffMaxMs,
+          shouldRetry: (error: unknown): boolean => this.shouldRetryExternalCall(error),
+          onRetry: (error: unknown, attempt: number, delayMs: number): void => {
+            const errorMessage: string = error instanceof Error ? error.message : String(error);
+            this.logger.warn(
+              `coingecko_history_retry path=${url.pathname} attempt=${String(attempt)} delayMs=${String(delayMs)} reason=${errorMessage}`,
+            );
+          },
+        },
+      );
 
       if (!response.ok) {
         return null;
@@ -230,6 +255,18 @@ export class CoinGeckoHistoricalPricingAdapter implements ITokenHistoricalPricin
       this.logger.warn(`coingecko historical request failed reason=${errorMessage}`);
       return null;
     }
+  }
+
+  private shouldRetryExternalCall(error: unknown): boolean {
+    const errorMessage: string = error instanceof Error ? error.message : String(error);
+    const normalizedErrorMessage: string = errorMessage.toLowerCase();
+
+    return (
+      normalizedErrorMessage.includes('http 5') ||
+      normalizedErrorMessage.includes('timeout') ||
+      normalizedErrorMessage.includes('aborted') ||
+      normalizedErrorMessage.includes('network')
+    );
   }
 
   private buildNativeRangeUrl(chainKey: ChainKey, timestampSec: number): URL {

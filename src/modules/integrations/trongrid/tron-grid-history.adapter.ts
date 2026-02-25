@@ -1,11 +1,18 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 
 import {
+  readTronHistoryResponseDetails,
+  resolveTronHistoryNextFingerprint,
+  resolveTronHistoryResponseData,
+} from './tron-grid-history-response.util';
+import {
   HISTORY_WARN_COOLDOWN_MS,
+  HTTP_STATUS_INTERNAL_SERVER_ERROR,
   HTTP_STATUS_BAD_REQUEST,
   HTTP_STATUS_TOO_MANY_REQUESTS,
   QUERY_POLICIES,
   RESPONSE_PREVIEW_MAX_LENGTH,
+  TRON_HISTORY_MAX_ATTEMPTS,
   TRON_HISTORY_REQUEST_TIMEOUT_MS,
   TRON_MAX_PAGE_REQUESTS,
   TRON_MAX_PAGE_SIZE,
@@ -14,6 +21,7 @@ import {
   type ITronGridPageLoadResult,
   type ITronGridPageRequestOptions,
   type ITronGridRequestQueryPolicy,
+  isRetriableTronHistoryError,
   resolveTronHistoryLimiterKey,
 } from './tron-grid-history.constants';
 import type {
@@ -25,6 +33,7 @@ import { TronGridHistoryMapper } from './tron-grid-history.mapper';
 import { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
 import type { IHistoryExplorerAdapter } from '../../../common/interfaces/explorers/history-explorer.interfaces';
 import { RateLimitedWarningEmitter } from '../../../common/utils/logging/rate-limited-warning-emitter';
+import { executeWithExponentialBackoff } from '../../../common/utils/network/exponential-backoff.util';
 import { AppConfigService } from '../../../config/app-config.service';
 import {
   LimiterKey,
@@ -242,7 +251,7 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
   private parseNativePagePayload(
     payload: ITronGridListResponse<unknown>,
   ): ITronGridPageLoadResult<ITronGridNativeTransactionItem> {
-    const rawItems: readonly unknown[] = this.resolveResponseData(payload);
+    const rawItems: readonly unknown[] = resolveTronHistoryResponseData(payload);
     const parsedItems: ITronGridNativeTransactionItem[] = rawItems
       .map((item: unknown): ITronGridNativeTransactionItem | null =>
         this.mapper.parseNativeTransactionItem(item),
@@ -255,7 +264,7 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
 
     return {
       items: parsedItems,
-      nextFingerprint: this.resolveNextFingerprint(payload),
+      nextFingerprint: resolveTronHistoryNextFingerprint(payload),
     };
   }
 
@@ -283,7 +292,7 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
   private parseTrc20PagePayload(
     payload: ITronGridListResponse<unknown>,
   ): ITronGridPageLoadResult<ITronGridTrc20TransactionItem> {
-    const rawItems: readonly unknown[] = this.resolveResponseData(payload);
+    const rawItems: readonly unknown[] = resolveTronHistoryResponseData(payload);
     const parsedItems: ITronGridTrc20TransactionItem[] = rawItems
       .map((item: unknown): ITronGridTrc20TransactionItem | null =>
         this.mapper.parseTrc20TransactionItem(item),
@@ -296,7 +305,7 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
 
     return {
       items: parsedItems,
-      nextFingerprint: this.resolveNextFingerprint(payload),
+      nextFingerprint: resolveTronHistoryNextFingerprint(payload),
     };
   }
 
@@ -335,30 +344,100 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
     options: ITronGridPageRequestOptions,
     queryPolicy: ITronGridRequestQueryPolicy,
   ): Promise<ITronGridListResponse<unknown>> {
-    const headers: Record<string, string> = {};
-
-    if (this.appConfigService.tronGridApiKey !== null) {
-      headers['TRON-PRO-API-KEY'] = this.appConfigService.tronGridApiKey;
-    }
-
+    const headers: Record<string, string> = this.buildRequestHeaders();
     const requestUrl: URL = this.buildRequestUrl(options, queryPolicy);
     const limiterKey: LimiterKey = resolveTronHistoryLimiterKey(
       this.appConfigService.tronGridApiKey,
       requestUrl.hostname.toLowerCase(),
     );
     this.logger.debug(`tron history request url=${requestUrl.toString()}`);
-
-    const response: Response = await this.rateLimiterService.schedule(
+    const response: Response = await this.executeRequestWithBackoff(
+      requestUrl,
+      headers,
       limiterKey,
-      async (): Promise<Response> =>
-        fetch(requestUrl, {
-          method: 'GET',
-          headers,
-          signal: AbortSignal.timeout(TRON_HISTORY_REQUEST_TIMEOUT_MS),
-        }),
-      RequestPriority.NORMAL,
+      options.path,
     );
+    return this.parseResponsePayload(response);
+  }
 
+  private buildRequestHeaders(): Record<string, string> {
+    if (this.appConfigService.tronGridApiKey === null) {
+      return {};
+    }
+
+    return {
+      'TRON-PRO-API-KEY': this.appConfigService.tronGridApiKey,
+    };
+  }
+
+  private async executeRequestWithBackoff(
+    requestUrl: URL,
+    headers: Record<string, string>,
+    limiterKey: LimiterKey,
+    path: string,
+  ): Promise<Response> {
+    return executeWithExponentialBackoff<Response>(
+      async (): Promise<Response> =>
+        this.rateLimiterService.schedule(
+          limiterKey,
+          async (): Promise<Response> => this.fetchPageResponse(requestUrl, headers, path),
+          RequestPriority.NORMAL,
+        ),
+      {
+        maxAttempts: TRON_HISTORY_MAX_ATTEMPTS,
+        baseDelayMs: this.appConfigService.chainBackoffBaseMs,
+        maxDelayMs: this.appConfigService.chainBackoffMaxMs,
+        shouldRetry: isRetriableTronHistoryError,
+        onRetry: (error: unknown, attempt: number, delayMs: number): void => {
+          const errorMessage: string = error instanceof Error ? error.message : String(error);
+          this.warnWithCooldown(
+            `history_retry:${requestUrl.origin}:${path}:${String(attempt)}`,
+            `[TRON] history retry endpoint=${requestUrl.origin} path=${path} attempt=${String(attempt)} delayMs=${String(delayMs)} reason=${errorMessage}`,
+          );
+        },
+      },
+    );
+  }
+
+  private async fetchPageResponse(
+    requestUrl: URL,
+    headers: Record<string, string>,
+    path: string,
+  ): Promise<Response> {
+    const fetchResponse: Response = await fetch(requestUrl, {
+      method: 'GET',
+      headers,
+      signal: AbortSignal.timeout(TRON_HISTORY_REQUEST_TIMEOUT_MS),
+    });
+    this.assertRetriableResponse(fetchResponse, requestUrl, path);
+    return fetchResponse;
+  }
+
+  private assertRetriableResponse(fetchResponse: Response, requestUrl: URL, path: string): void {
+    if (fetchResponse.status === HTTP_STATUS_TOO_MANY_REQUESTS) {
+      if (this.metricsService !== null) {
+        this.metricsService.historyHttp429Total.inc({
+          chain: ChainKey.TRON_MAINNET,
+          adapter: 'tron_grid_history',
+        });
+      }
+      this.warnWithCooldown(
+        `history_http_429:${requestUrl.origin}:${path}`,
+        `history_http_429 chain=${ChainKey.TRON_MAINNET} adapter=tron_grid_history endpoint=${requestUrl.origin} path=${path}`,
+      );
+      throw new Error(`TRON history HTTP ${fetchResponse.status}`);
+    }
+
+    if (
+      !fetchResponse.ok &&
+      fetchResponse.status !== HTTP_STATUS_BAD_REQUEST &&
+      fetchResponse.status >= HTTP_STATUS_INTERNAL_SERVER_ERROR
+    ) {
+      throw new Error(`TRON history HTTP ${fetchResponse.status}`);
+    }
+  }
+
+  private async parseResponsePayload(response: Response): Promise<ITronGridListResponse<unknown>> {
     if (response.ok) {
       const payload: unknown = await response.json();
 
@@ -369,24 +448,16 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
       return payload as ITronGridListResponse<unknown>;
     }
 
-    const responseDetails: string = await this.readResponseDetails(response);
+    const responseDetails: string = await readTronHistoryResponseDetails(
+      response,
+      RESPONSE_PREVIEW_MAX_LENGTH,
+    );
     const errorMessage: string =
       `TRON history HTTP ${response.status}` +
       (responseDetails.length > 0 ? `: ${responseDetails}` : '');
 
     if (response.status === HTTP_STATUS_BAD_REQUEST) {
       throw new TronGridBadRequestError(errorMessage);
-    }
-
-    if (response.status === HTTP_STATUS_TOO_MANY_REQUESTS && this.metricsService !== null) {
-      this.metricsService.historyHttp429Total.inc({
-        chain: ChainKey.TRON_MAINNET,
-        adapter: 'tron_grid_history',
-      });
-      this.warnWithCooldown(
-        `history_http_429:${requestUrl.origin}:${options.path}`,
-        `history_http_429 chain=${ChainKey.TRON_MAINNET} adapter=tron_grid_history endpoint=${requestUrl.origin} path=${options.path}`,
-      );
     }
 
     throw new Error(errorMessage);
@@ -412,70 +483,6 @@ export class TronGridHistoryAdapter implements IHistoryExplorerAdapter {
     }
 
     return requestUrl;
-  }
-
-  private async readResponseDetails(response: Response): Promise<string> {
-    try {
-      const responseText: string = (await response.text()).trim();
-
-      if (responseText.length === 0) {
-        return '';
-      }
-
-      const normalizedResponseText: string = responseText.replace(/\s+/g, ' ');
-      return normalizedResponseText.slice(0, RESPONSE_PREVIEW_MAX_LENGTH);
-    } catch {
-      return '';
-    }
-  }
-
-  private resolveResponseData(payload: ITronGridListResponse<unknown>): readonly unknown[] {
-    if (!Array.isArray(payload.data)) {
-      throw new Error('TRON history response payload has invalid data field.');
-    }
-
-    return payload.data;
-  }
-
-  private resolveNextFingerprint(payload: ITronGridListResponse<unknown>): string | null {
-    const directFingerprint: string | null = this.normalizeString(payload.meta?.fingerprint);
-
-    if (directFingerprint !== null) {
-      return directFingerprint;
-    }
-
-    const nextLink: string | null = this.normalizeString(payload.meta?.links?.next);
-
-    if (nextLink === null) {
-      return null;
-    }
-
-    try {
-      const nextUrl: URL = new URL(nextLink);
-      const nextFingerprint: string | null = nextUrl.searchParams.get('fingerprint');
-
-      if (nextFingerprint === null || nextFingerprint.trim().length === 0) {
-        return null;
-      }
-
-      return nextFingerprint.trim();
-    } catch {
-      return null;
-    }
-  }
-
-  private normalizeString(rawValue: unknown): string | null {
-    if (typeof rawValue !== 'string') {
-      return null;
-    }
-
-    const normalizedValue: string = rawValue.trim();
-
-    if (normalizedValue.length === 0) {
-      return null;
-    }
-
-    return normalizedValue;
   }
 
   private warnWithCooldown(key: string, message: string): void {

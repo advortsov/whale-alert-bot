@@ -17,6 +17,8 @@ type AppConfigStub = {
   readonly tronGridApiBaseUrl: string;
   readonly tronGridApiKey: string | null;
   readonly tronscanTxBaseUrl: string;
+  readonly chainBackoffBaseMs: number;
+  readonly chainBackoffMaxMs: number;
 };
 
 const createRequest = (overrides: Partial<IHistoryRequestDto> = {}): IHistoryRequestDto => ({
@@ -67,6 +69,8 @@ describe('TronGridHistoryAdapter', (): void => {
       tronGridApiBaseUrl: 'https://api.trongrid.io',
       tronGridApiKey: null,
       tronscanTxBaseUrl: 'https://tronscan.org/#/transaction/',
+      chainBackoffBaseMs: 1000,
+      chainBackoffMaxMs: 60_000,
     };
     const adapter: TronGridHistoryAdapter = new TronGridHistoryAdapter(
       appConfigStub as unknown as AppConfigService,
@@ -141,6 +145,8 @@ describe('TronGridHistoryAdapter', (): void => {
       tronGridApiBaseUrl: 'https://api.trongrid.io',
       tronGridApiKey: null,
       tronscanTxBaseUrl: 'https://tronscan.org/#/transaction/',
+      chainBackoffBaseMs: 1000,
+      chainBackoffMaxMs: 60_000,
     };
     const adapter: TronGridHistoryAdapter = new TronGridHistoryAdapter(
       appConfigStub as unknown as AppConfigService,
@@ -212,6 +218,8 @@ describe('TronGridHistoryAdapter', (): void => {
       tronGridApiBaseUrl: 'https://api.trongrid.io',
       tronGridApiKey: 'test-key',
       tronscanTxBaseUrl: 'https://tronscan.org/#/transaction/',
+      chainBackoffBaseMs: 1000,
+      chainBackoffMaxMs: 60_000,
     };
     const adapter: TronGridHistoryAdapter = new TronGridHistoryAdapter(
       appConfigStub as unknown as AppConfigService,
@@ -292,6 +300,8 @@ describe('TronGridHistoryAdapter', (): void => {
         tronGridApiBaseUrl: 'https://api.trongrid.io',
         tronGridApiKey: null,
         tronscanTxBaseUrl: 'https://tronscan.org/#/transaction/',
+        chainBackoffBaseMs: 1000,
+        chainBackoffMaxMs: 60_000,
       } as unknown as AppConfigService,
       new TronAddressCodec(),
       {
@@ -390,6 +400,8 @@ describe('TronGridHistoryAdapter', (): void => {
         tronGridApiBaseUrl: 'https://api.trongrid.io',
         tronGridApiKey: null,
         tronscanTxBaseUrl: 'https://tronscan.org/#/transaction/',
+        chainBackoffBaseMs: 1000,
+        chainBackoffMaxMs: 60_000,
       } as unknown as AppConfigService,
       new TronAddressCodec(),
       {
@@ -502,6 +514,8 @@ describe('TronGridHistoryAdapter', (): void => {
         tronGridApiBaseUrl: 'https://api.trongrid.io',
         tronGridApiKey: null,
         tronscanTxBaseUrl: 'https://tronscan.org/#/transaction/',
+        chainBackoffBaseMs: 1000,
+        chainBackoffMaxMs: 60_000,
       } as unknown as AppConfigService,
       new TronAddressCodec(),
       {
@@ -622,6 +636,8 @@ describe('TronGridHistoryAdapter', (): void => {
         tronGridApiBaseUrl: 'https://api.trongrid.io',
         tronGridApiKey: null,
         tronscanTxBaseUrl: 'https://tronscan.org/#/transaction/',
+        chainBackoffBaseMs: 1000,
+        chainBackoffMaxMs: 60_000,
       } as unknown as AppConfigService,
       new TronAddressCodec(),
       {
@@ -666,6 +682,8 @@ describe('TronGridHistoryAdapter', (): void => {
         tronGridApiBaseUrl: 'https://api.trongrid.io',
         tronGridApiKey: null,
         tronscanTxBaseUrl: 'https://tronscan.org/#/transaction/',
+        chainBackoffBaseMs: 1000,
+        chainBackoffMaxMs: 60_000,
       } as unknown as AppConfigService,
       new TronAddressCodec(),
       {

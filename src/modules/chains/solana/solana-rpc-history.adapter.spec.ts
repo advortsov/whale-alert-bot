@@ -11,6 +11,8 @@ import { HistoryDirectionFilter, HistoryKind } from '../../whales/entities/histo
 type SolanaConfigStub = {
   readonly solanaHeliusHttpUrl: string | null;
   readonly solanaPublicHttpUrl: string | null;
+  readonly chainSolanaBackoffBaseMs: number;
+  readonly chainBackoffMaxMs: number;
 };
 
 const createJsonResponse = (payload: unknown): Response =>
@@ -35,6 +37,8 @@ describe('SolanaRpcHistoryAdapter', (): void => {
     const configStub: SolanaConfigStub = {
       solanaHeliusHttpUrl: null,
       solanaPublicHttpUrl: 'https://public.solana.test',
+      chainSolanaBackoffBaseMs: 1000,
+      chainBackoffMaxMs: 60_000,
     };
     const adapter: SolanaRpcHistoryAdapter = new SolanaRpcHistoryAdapter(
       configStub as unknown as AppConfigService,
@@ -123,6 +127,8 @@ describe('SolanaRpcHistoryAdapter', (): void => {
     const configStub: SolanaConfigStub = {
       solanaHeliusHttpUrl: 'https://helius.solana.test',
       solanaPublicHttpUrl: 'https://public.solana.test',
+      chainSolanaBackoffBaseMs: 1000,
+      chainBackoffMaxMs: 60_000,
     };
     const adapter: SolanaRpcHistoryAdapter = new SolanaRpcHistoryAdapter(
       configStub as unknown as AppConfigService,
@@ -174,6 +180,8 @@ describe('SolanaRpcHistoryAdapter', (): void => {
     const configStub: SolanaConfigStub = {
       solanaHeliusHttpUrl: 'https://helius.solana.test',
       solanaPublicHttpUrl: 'https://public.solana.test',
+      chainSolanaBackoffBaseMs: 1000,
+      chainBackoffMaxMs: 60_000,
     };
     const adapter: SolanaRpcHistoryAdapter = new SolanaRpcHistoryAdapter(
       configStub as unknown as AppConfigService,
@@ -242,6 +250,8 @@ describe('SolanaRpcHistoryAdapter', (): void => {
     const configStub: SolanaConfigStub = {
       solanaHeliusHttpUrl: 'https://helius.solana.test',
       solanaPublicHttpUrl: null,
+      chainSolanaBackoffBaseMs: 1000,
+      chainBackoffMaxMs: 60_000,
     };
     const adapter: SolanaRpcHistoryAdapter = new SolanaRpcHistoryAdapter(
       configStub as unknown as AppConfigService,
@@ -337,6 +347,8 @@ describe('SolanaRpcHistoryAdapter', (): void => {
     const configStub: SolanaConfigStub = {
       solanaHeliusHttpUrl: 'https://helius.solana.test',
       solanaPublicHttpUrl: null,
+      chainSolanaBackoffBaseMs: 1000,
+      chainBackoffMaxMs: 60_000,
     };
     const adapter: SolanaRpcHistoryAdapter = new SolanaRpcHistoryAdapter(
       configStub as unknown as AppConfigService,
@@ -460,6 +472,8 @@ describe('SolanaRpcHistoryAdapter', (): void => {
     const configStub: SolanaConfigStub = {
       solanaHeliusHttpUrl: 'https://helius.solana.test',
       solanaPublicHttpUrl: null,
+      chainSolanaBackoffBaseMs: 1000,
+      chainBackoffMaxMs: 60_000,
     };
     const adapter: SolanaRpcHistoryAdapter = new SolanaRpcHistoryAdapter(
       configStub as unknown as AppConfigService,

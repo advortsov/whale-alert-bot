@@ -8,6 +8,8 @@ import type { BottleneckRateLimiterService } from '../../../modules/blockchain/r
 type AppConfigServiceStub = {
   readonly coingeckoApiBaseUrl: string;
   readonly coingeckoTimeoutMs: number;
+  readonly chainBackoffBaseMs: number;
+  readonly chainBackoffMaxMs: number;
   readonly priceCacheMaxEntries: number;
   readonly priceCacheFreshTtlSec: number;
   readonly priceCacheStaleTtlSec: number;
@@ -16,9 +18,11 @@ type AppConfigServiceStub = {
 const createConfigStub = (): AppConfigServiceStub => ({
   coingeckoApiBaseUrl: 'https://api.coingecko.com/api/v3',
   coingeckoTimeoutMs: 5000,
+  chainBackoffBaseMs: 1000,
+  chainBackoffMaxMs: 60_000,
   priceCacheMaxEntries: 2,
-  priceCacheFreshTtlSec: 1,
-  priceCacheStaleTtlSec: 10,
+  priceCacheFreshTtlSec: 60,
+  priceCacheStaleTtlSec: 600,
 });
 
 describe('CoinGeckoPricingAdapter', (): void => {
@@ -95,7 +99,7 @@ describe('CoinGeckoPricingAdapter', (): void => {
     });
     expect(first?.usdPrice).toBe(3000);
 
-    await vi.advanceTimersByTimeAsync(1500);
+    await vi.advanceTimersByTimeAsync(61_000);
 
     const stale = await adapter.getUsdQuote({
       chainKey: ChainKey.ETHEREUM_MAINNET,
@@ -154,5 +158,49 @@ describe('CoinGeckoPricingAdapter', (): void => {
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
+  it('supports native SOL and TRX quotes', async (): Promise<void> => {
+    const fetchMock: ReturnType<typeof vi.fn> = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async (): Promise<unknown> => ({
+          solana: {
+            usd: 120,
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async (): Promise<unknown> => ({
+          tron: {
+            usd: 0.2,
+          },
+        }),
+      });
+    vi.stubGlobal('fetch', fetchMock);
+    const adapter: CoinGeckoPricingAdapter = new CoinGeckoPricingAdapter(
+      createConfigStub() as unknown as AppConfigService,
+      {
+        schedule: async (_k: unknown, op: () => Promise<unknown>): Promise<unknown> => op(),
+      } as unknown as BottleneckRateLimiterService,
+    );
+
+    const solQuote = await adapter.getUsdQuote({
+      chainKey: ChainKey.SOLANA_MAINNET,
+      tokenAddress: null,
+      tokenSymbol: 'SOL',
+    });
+    const trxQuote = await adapter.getUsdQuote({
+      chainKey: ChainKey.TRON_MAINNET,
+      tokenAddress: null,
+      tokenSymbol: 'TRX',
+    });
+
+    expect(solQuote?.usdPrice).toBe(120);
+    expect(trxQuote?.usdPrice).toBe(0.2);
   });
 });
