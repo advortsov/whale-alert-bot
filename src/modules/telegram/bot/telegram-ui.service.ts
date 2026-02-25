@@ -6,6 +6,7 @@ import { appendVersionQuery } from './telegram-webapp-url.util';
 import {
   CALLBACK_HISTORY_LIMIT,
   ELLIPSIS_LENGTH,
+  GLOBAL_FILTERS_REFRESH_CALLBACK_VALUE,
   SHORT_ADDRESS_PREFIX_LENGTH,
   SHORT_ADDRESS_SUFFIX_OFFSET,
   WALLET_BUTTON_TITLE_MAX_LENGTH,
@@ -120,39 +121,15 @@ export class TelegramUiService {
   }
 
   public buildTrackHintMessage(): string {
-    return [
-      'Добавление адреса:',
-      '/track <eth|sol|tron> <address> [label]',
-      '',
-      'Примеры:',
-      '/track eth 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045 vitalik',
-      '/track sol 11111111111111111111111111111111 system',
-      '/track tron TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7 treasury',
-    ].join('\n');
+    return `Добавление адреса:\n/track <eth|sol|tron> <address> [label]\n\nПримеры:\n/track eth 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045 vitalik\n/track sol 11111111111111111111111111111111 system\n/track tron TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7 treasury`;
   }
 
   public buildHistoryHintMessage(): string {
-    return [
-      'История транзакций:',
-      '/history <address|#id> [limit]',
-      'Примеры:',
-      '/history #1 10',
-      '/history 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045 5',
-      '/history 11111111111111111111111111111111 5',
-      '/history TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7 5',
-    ].join('\n');
+    return `История транзакций:\n/history <address|#id> [limit]\nПримеры:\n/history #1 10\n/history 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045 5\n/history 11111111111111111111111111111111 5\n/history TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7 5`;
   }
 
   public buildUntrackHintMessage(): string {
-    return [
-      'Удаление адреса:',
-      '/untrack <address|id>',
-      'Примеры:',
-      '/untrack #1',
-      '/untrack 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
-      '/untrack 11111111111111111111111111111111',
-      '/untrack TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7',
-    ].join('\n');
+    return `Удаление адреса:\n/untrack <address|id>\nПримеры:\n/untrack #1\n/untrack 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045\n/untrack 11111111111111111111111111111111\n/untrack TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7`;
   }
 
   public formatExecutionResults(results: readonly CommandExecutionResult[]): string {
@@ -270,6 +247,12 @@ export class TelegramUiService {
           callback_data: `${WALLET_HISTORY_CALLBACK_PREFIX}${String(walletId)}`,
         },
       ],
+      [
+        {
+          text: '↩️ К глобальным /filters',
+          callback_data: GLOBAL_FILTERS_REFRESH_CALLBACK_VALUE,
+        },
+      ],
     ];
 
     return Markup.inlineKeyboard(rows);
@@ -285,9 +268,10 @@ export class TelegramUiService {
       `⚙️ Фильтры кошелька #${String(walletFilterState.walletId)} (${labelText})`,
       `Chain: ${walletFilterState.chainKey}`,
       `Address: ${walletFilterState.walletAddress}`,
-      `- transfer: ${walletFilterState.allowTransfer ? 'on' : 'off'}`,
-      `- swap: ${walletFilterState.allowSwap ? 'on' : 'off'}`,
-      `- режим: ${overrideMode}`,
+      `- effective transfer: ${walletFilterState.allowTransfer ? 'on' : 'off'}`,
+      `- effective swap: ${walletFilterState.allowSwap ? 'on' : 'off'}`,
+      `- источник: ${overrideMode}`,
+      '- DEX-фильтры берутся из глобального /filters',
       '',
       'Команды:',
       `/walletfilters #${String(walletFilterState.walletId)}`,
@@ -380,6 +364,16 @@ export class TelegramUiService {
     const rows: InlineKeyboardButton[][] = [
       [
         {
+          text: '⚙️ Фильтры',
+          callback_data: `${WALLET_FILTERS_CALLBACK_PREFIX}${String(walletId)}`,
+        },
+        {
+          text: '🔄 Обновить',
+          callback_data: `${WALLET_MENU_CALLBACK_PREFIX}${String(walletId)}`,
+        },
+      ],
+      [
+        {
           text: '📜 История',
           callback_data: [
             `${WALLET_HISTORY_REFRESH_CALLBACK_PREFIX}${String(walletId)}`,
@@ -396,16 +390,6 @@ export class TelegramUiService {
             HistoryKind.ERC20,
             HistoryDirectionFilter.ALL,
           ].join(':'),
-        },
-      ],
-      [
-        {
-          text: '⚙️ Фильтры',
-          callback_data: `${WALLET_FILTERS_CALLBACK_PREFIX}${String(walletId)}`,
-        },
-        {
-          text: '🔄 Обновить',
-          callback_data: `${WALLET_MENU_CALLBACK_PREFIX}${String(walletId)}`,
         },
       ],
       [

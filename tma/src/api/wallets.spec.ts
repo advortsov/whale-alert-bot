@@ -113,6 +113,15 @@ describe('tma wallets api', (): void => {
           txUrl: 'https://etherscan.io/tx/0xabc',
           assetSymbol: 'ETH',
           chainKey: 'ethereum_mainnet',
+          txType: 'TRANSFER',
+          flowType: 'DEX',
+          flowLabel: 'DEX:uniswap',
+          assetStandard: 'ERC20',
+          dex: 'uniswap',
+          pair: 'ETH/USDT',
+          isError: false,
+          counterpartyAddress: '0xcounterparty',
+          contractAddress: '0xcontract',
         },
         {
           txHash: 123,
@@ -121,20 +130,26 @@ describe('tma wallets api', (): void => {
       nextOffset: 20,
     });
 
-    expect(result).toEqual({
-      items: [
-        {
-          txHash: '0xabc',
-          occurredAt: '2026-02-22T00:00:00.000Z',
-          eventType: 'TRANSFER',
-          direction: 'IN',
-          amountText: '1 ETH',
-          txUrl: 'https://etherscan.io/tx/0xabc',
-          assetSymbol: 'ETH',
-          chainKey: 'ethereum_mainnet',
-        },
-      ],
-      nextOffset: 20,
+    expect(result.nextOffset).toBe(20);
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]).toEqual({
+      txHash: '0xabc',
+      occurredAt: '2026-02-22T00:00:00.000Z',
+      eventType: 'TRANSFER',
+      direction: 'IN',
+      amountText: '1 ETH',
+      txUrl: 'https://etherscan.io/tx/0xabc',
+      assetSymbol: 'ETH',
+      chainKey: 'ethereum_mainnet',
+      txType: 'TRANSFER',
+      flowType: 'DEX',
+      flowLabel: 'DEX:uniswap',
+      assetStandard: 'ERC20',
+      dex: 'uniswap',
+      pair: 'ETH/USDT',
+      isError: false,
+      counterpartyAddress: '0xcounterparty',
+      contractAddress: '0xcontract',
     });
   });
 

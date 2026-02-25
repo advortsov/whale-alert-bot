@@ -77,3 +77,7 @@ export const WALLET_MUTE_CALLBACK_PREFIX: string = 'wallet_mute:';
 export const WALLET_FILTERS_CALLBACK_PREFIX: string = 'wallet_filters:';
 export const WALLET_FILTER_TOGGLE_CALLBACK_PREFIX: string = 'wallet_filter_toggle:';
 export const ALERT_IGNORE_CALLBACK_PREFIX: string = 'alert_ignore_24h:';
+export const GLOBAL_FILTERS_MODE_CALLBACK_PREFIX: string = 'gf:mode:';
+export const GLOBAL_FILTERS_TOGGLE_CALLBACK_PREFIX: string = 'gf:toggle:';
+export const GLOBAL_FILTERS_RESET_CALLBACK_PREFIX: string = 'gf:reset:';
+export const GLOBAL_FILTERS_REFRESH_CALLBACK_VALUE: string = 'gf:refresh';

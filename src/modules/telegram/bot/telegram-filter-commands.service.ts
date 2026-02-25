@@ -1,5 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 
+import { GlobalDexFilterMode } from './telegram-global-filters-callback.interfaces';
+import { TelegramGlobalFiltersUiService } from './telegram-global-filters-ui.service';
 import { TelegramParserService } from './telegram-parser.service';
 import { TelegramUiService } from './telegram-ui.service';
 import { USER_NOT_IDENTIFIED_MESSAGE } from './telegram.constants';
@@ -25,6 +27,9 @@ export class TelegramFilterCommandsServiceDependencies {
 
   @Inject(TelegramUiService)
   public readonly uiService!: TelegramUiService;
+
+  @Inject(TelegramGlobalFiltersUiService)
+  public readonly globalFiltersUiService!: TelegramGlobalFiltersUiService;
 }
 
 @Injectable()
@@ -37,27 +42,67 @@ export class TelegramFilterCommandsService {
     userRef: TelegramUserRef | null,
     commandEntry: ParsedMessageCommand,
     updateMeta: UpdateMeta,
-  ): Promise<string> {
+  ): Promise<CommandExecutionResult> {
     if (userRef === null) {
       this.logger.warn(
         `Filters command rejected: user context is missing line=${commandEntry.lineNumber} updateId=${updateMeta.updateId ?? 'n/a'}`,
       );
-      return USER_NOT_IDENTIFIED_MESSAGE;
+      return {
+        lineNumber: commandEntry.lineNumber,
+        message: USER_NOT_IDENTIFIED_MESSAGE,
+        replyOptions: null,
+      };
     }
 
     const resolvedArgs = this.resolveFiltersArgs(commandEntry.args);
 
     if (resolvedArgs.mode === 'show') {
-      return this.deps.trackingService.getUserAlertFilters(userRef);
+      const settingsResult = await this.deps.trackingService.getSettings(userRef);
+      return {
+        lineNumber: commandEntry.lineNumber,
+        message: this.deps.globalFiltersUiService.formatGlobalDexFiltersMessage(
+          settingsResult,
+          GlobalDexFilterMode.INCLUDE,
+        ),
+        replyOptions: this.deps.globalFiltersUiService.buildGlobalDexFiltersInlineKeyboard(
+          settingsResult,
+          GlobalDexFilterMode.INCLUDE,
+        ),
+      };
     }
 
     if (resolvedArgs.mode === 'error') {
-      return resolvedArgs.message;
+      return {
+        lineNumber: commandEntry.lineNumber,
+        message: resolvedArgs.message,
+        replyOptions: null,
+      };
     }
 
     const enabled: boolean = resolvedArgs.enabled;
     const target: AlertFilterToggleTarget = resolvedArgs.target;
-    return this.deps.trackingService.setEventTypeFilter(userRef, target, enabled);
+    const resultMessage: string = await this.deps.trackingService.setEventTypeFilter(
+      userRef,
+      target,
+      enabled,
+    );
+    const settingsResult = await this.deps.trackingService.getSettings(userRef);
+
+    return {
+      lineNumber: commandEntry.lineNumber,
+      message: [
+        resultMessage,
+        '',
+        this.deps.globalFiltersUiService.formatGlobalDexFiltersMessage(
+          settingsResult,
+          GlobalDexFilterMode.INCLUDE,
+        ),
+      ].join('\n'),
+      replyOptions: this.deps.globalFiltersUiService.buildGlobalDexFiltersInlineKeyboard(
+        settingsResult,
+        GlobalDexFilterMode.INCLUDE,
+      ),
+    };
   }
 
   public async executeFilterCommand(

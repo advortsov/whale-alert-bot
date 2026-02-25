@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 
+import { buildHistoryRetryMessage, isRateLimitOrTimeout } from './tracking-history-errors.util';
 import { TrackingHistoryServiceDependencies } from './tracking-history.service.dependencies';
 import { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
 import type { HistoryCacheEntry } from '../entities/history-cache.interfaces';
@@ -8,7 +9,6 @@ import type { IHistoryPageDto } from '../entities/history-item.dto';
 import type { HistoryPageResult } from '../entities/history-page.interfaces';
 import {
   type HistoryRateLimitDecision,
-  HistoryRateLimitReason,
   HistoryRequestSource,
 } from '../entities/history-rate-limiter.interfaces';
 import type {
@@ -131,7 +131,7 @@ export class TrackingHistoryService {
     );
 
     if (!decision.allowed) {
-      throw new Error(this.buildHistoryRetryMessage(decision));
+      throw new Error(buildHistoryRetryMessage(decision));
     }
   }
 
@@ -160,7 +160,7 @@ export class TrackingHistoryService {
       return this.deps.historyFormatter.buildStaleMessage(staleEntry.message);
     }
 
-    throw new Error(this.buildHistoryRetryMessage(context.decision));
+    throw new Error(buildHistoryRetryMessage(context.decision));
   }
 
   private async loadHistoryWithFallback(context: ILoadHistoryWithFallbackContext): Promise<string> {
@@ -180,7 +180,7 @@ export class TrackingHistoryService {
         `history_fetch_failed telegramId=${context.telegramId} source=${context.source} address=${context.normalizedAddress} limit=${String(context.historyParams.limit)} reason=${errorMessage}`,
       );
 
-      if (!this.isRateLimitOrTimeout(errorMessage)) {
+      if (!isRateLimitOrTimeout(errorMessage)) {
         throw error;
       }
       return this.resolveRateLimitedFallback(context);
@@ -279,7 +279,7 @@ export class TrackingHistoryService {
       });
     } catch (error: unknown) {
       const errorMessage: string = error instanceof Error ? error.message : String(error);
-      if (!this.isRateLimitOrTimeout(errorMessage)) {
+      if (!isRateLimitOrTimeout(errorMessage)) {
         throw error;
       }
       const staleResult: HistoryPageResult | null = this.tryBuildHotOffsetPage(context, true);
@@ -310,14 +310,17 @@ export class TrackingHistoryService {
     this.logger.debug(
       `history_source_selected source=local chain=${context.chainKey} address=${context.normalizedAddress} offset=0 limit=${String(context.historyParams.limit)}`,
     );
-    const message: string = this.deps.historyFormatter.formatWalletEventsHistoryMessage(
-      context.normalizedAddress,
+    const items = this.deps.trackingHistoryPageService.mapWalletEventsToListItems(
       localHistoryPage.pageEvents,
+      context.chainKey,
+    );
+    const message: string = this.deps.historyFormatter.formatHistoryListMessage(
+      context.normalizedAddress,
+      items,
       {
         offset: 0,
         kind: context.historyParams.kind,
         direction: context.historyParams.direction,
-        chainKey: context.chainKey,
       },
     );
     this.cacheHistory(context.normalizedAddress, context.historyParams, message);
@@ -341,9 +344,18 @@ export class TrackingHistoryService {
     this.logger.debug(
       `history_source_selected source=${source} chain=${context.chainKey} address=${context.normalizedAddress} offset=0 limit=${String(context.historyParams.limit)}`,
     );
-    const message: string = this.deps.historyFormatter.formatHistoryMessage(
-      context.normalizedAddress,
+    const items = this.deps.trackingHistoryPageService.mapExplorerItemsToListItems(
       hotLookup.page.items,
+      context.chainKey,
+    );
+    const message: string = this.deps.historyFormatter.formatHistoryListMessage(
+      context.normalizedAddress,
+      items,
+      {
+        offset: 0,
+        kind: context.historyParams.kind,
+        direction: context.historyParams.direction,
+      },
     );
     if (!allowStale) {
       this.cacheHistory(context.normalizedAddress, context.historyParams, message);
@@ -367,9 +379,18 @@ export class TrackingHistoryService {
         direction: context.historyParams.direction,
         minAmountUsd: null,
       });
-    const historyMessage: string = this.deps.historyFormatter.formatHistoryMessage(
-      context.normalizedAddress,
+    const items = this.deps.trackingHistoryPageService.mapExplorerItemsToListItems(
       historyPage.items,
+      context.chainKey,
+    );
+    const historyMessage: string = this.deps.historyFormatter.formatHistoryListMessage(
+      context.normalizedAddress,
+      items,
+      {
+        offset: 0,
+        kind: context.historyParams.kind,
+        direction: context.historyParams.direction,
+      },
     );
     this.cacheHistory(context.normalizedAddress, context.historyParams, historyMessage);
     return historyMessage;
@@ -429,13 +450,18 @@ export class TrackingHistoryService {
     page: IHistoryPageDto,
     offset: number,
   ): HistoryPageResult {
-    const message: string = this.deps.historyFormatter.formatHistoryMessage(
-      target.address,
-      page.items,
-    );
     const items = this.deps.trackingHistoryPageService.mapExplorerItemsToListItems(
       page.items,
       target.chainKey,
+    );
+    const message: string = this.deps.historyFormatter.formatHistoryListMessage(
+      target.address,
+      items,
+      {
+        offset,
+        kind: historyParams.kind,
+        direction: historyParams.direction,
+      },
     );
 
     return {
@@ -461,27 +487,5 @@ export class TrackingHistoryService {
       kind: historyParams.kind,
       direction: historyParams.direction,
     });
-  }
-
-  private buildHistoryRetryMessage(decision: HistoryRateLimitDecision): string {
-    const retryAfterSec: number = decision.retryAfterSec ?? 1;
-
-    if (decision.reason === HistoryRateLimitReason.CALLBACK_COOLDOWN) {
-      return `Слишком часто нажимаешь кнопку истории. Повтори через ${String(retryAfterSec)} сек.`;
-    }
-
-    return `Слишком много запросов к истории. Повтори через ${String(retryAfterSec)} сек.`;
-  }
-
-  private isRateLimitOrTimeout(errorMessage: string): boolean {
-    const normalizedMessage: string = errorMessage.toLowerCase();
-
-    return (
-      normalizedMessage.includes('rate limit') ||
-      normalizedMessage.includes('http 429') ||
-      normalizedMessage.includes('timeout') ||
-      normalizedMessage.includes('aborted') ||
-      normalizedMessage.includes('too many requests')
-    );
   }
 }

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
+import { HistoryCardClassifierService } from './history-card-classifier.service';
 import { TrackingHistoryFormatterService } from './tracking-history-formatter.service';
 import { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
 import { WalletEventsRepository } from '../../../database/repositories/wallet-events.repository';
@@ -21,6 +22,7 @@ export class TrackingHistoryPageService {
   public constructor(
     private readonly walletEventsRepository: WalletEventsRepository,
     private readonly historyFormatter: TrackingHistoryFormatterService,
+    private readonly historyCardClassifierService: HistoryCardClassifierService,
   ) {}
 
   public async loadLocalHistoryPage(
@@ -70,8 +72,9 @@ export class TrackingHistoryPageService {
         event.tokenSymbol !== null && event.tokenSymbol.trim().length > 0
           ? event.tokenSymbol
           : null;
+      const cardTraits = this.historyCardClassifierService.classifyWalletEvent(chainKey, event);
 
-      return {
+      const baseItem: IWalletHistoryListItem = {
         txHash: event.txHash,
         occurredAt: event.occurredAt.toISOString(),
         eventType: event.eventType,
@@ -80,7 +83,18 @@ export class TrackingHistoryPageService {
         txUrl: this.historyFormatter.buildTxUrlByChain(event.txHash, chainKey),
         assetSymbol,
         chainKey,
+        txType: cardTraits.txType,
+        flowType: cardTraits.flowType,
+        flowLabel: cardTraits.flowLabel,
+        assetStandard: cardTraits.assetStandard,
+        dex: cardTraits.dex,
+        pair: cardTraits.pair,
+        isError: cardTraits.isError,
+        counterpartyAddress: cardTraits.counterpartyAddress,
+        contractAddress: cardTraits.contractAddress,
       };
+
+      return baseItem;
     });
   }
 
@@ -92,8 +106,9 @@ export class TrackingHistoryPageService {
       const amountText: string = this.historyFormatter.buildExplorerHistoryAmountText(item);
       const txUrl: string =
         item.txLink ?? this.historyFormatter.buildTxUrlByChain(item.txHash, chainKey);
+      const cardTraits = this.historyCardClassifierService.classifyExplorerItem(chainKey, item);
 
-      return {
+      const baseItem: IWalletHistoryListItem = {
         txHash: item.txHash,
         occurredAt: new Date(item.timestampSec * 1000).toISOString(),
         eventType: item.eventType,
@@ -102,7 +117,18 @@ export class TrackingHistoryPageService {
         txUrl,
         assetSymbol: item.assetSymbol,
         chainKey,
+        txType: cardTraits.txType,
+        flowType: cardTraits.flowType,
+        flowLabel: cardTraits.flowLabel,
+        assetStandard: cardTraits.assetStandard,
+        dex: cardTraits.dex,
+        pair: cardTraits.pair,
+        isError: cardTraits.isError,
+        counterpartyAddress: cardTraits.counterpartyAddress,
+        contractAddress: cardTraits.contractAddress,
       };
+
+      return baseItem;
     });
   }
 

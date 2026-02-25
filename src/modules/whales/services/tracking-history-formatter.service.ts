@@ -4,12 +4,24 @@ import { formatUnits } from 'ethers';
 import { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
 import { AppConfigService } from '../../../config/app-config.service';
 import type { WalletEventHistoryView } from '../../../database/repositories/wallet-events.repository.interfaces';
+import {
+  HistoryAssetStandard,
+  HistoryFlowType,
+  HistoryTxType,
+} from '../entities/history-card.interfaces';
 import type { IHistoryItemDto } from '../entities/history-item.dto';
 import { HistoryDirectionFilter, HistoryKind } from '../entities/history-request.dto';
+import type { IWalletHistoryListItem } from '../entities/wallet-history-list-item.dto';
 
 const ASSET_VALUE_PRECISION = 6;
 const SHORT_HASH_PREFIX_LENGTH = 10;
 const SHORT_HASH_SUFFIX_OFFSET = -8;
+
+interface IHistoryMessageMeta {
+  readonly offset: number;
+  readonly kind: HistoryKind | null;
+  readonly direction: HistoryDirectionFilter | null;
+}
 
 @Injectable()
 export class TrackingHistoryFormatterService {
@@ -19,33 +31,40 @@ export class TrackingHistoryFormatterService {
     normalizedAddress: string,
     transactions: readonly IHistoryItemDto[],
   ): string {
-    if (transactions.length === 0) {
-      return `История для ${normalizedAddress} пуста.`;
-    }
+    const items: readonly IWalletHistoryListItem[] = transactions.map(
+      (transaction: IHistoryItemDto): IWalletHistoryListItem => {
+        const direction: string = this.resolveDirectionToken(transaction.direction);
+        const txType: HistoryTxType = this.resolveTxTypeToken(transaction.eventType);
+        const flowType: HistoryFlowType =
+          txType === HistoryTxType.SWAP ? HistoryFlowType.DEX : HistoryFlowType.UNKNOWN;
 
-    const rows: string[] = transactions.map((tx, index: number): string => {
-      const date: Date = new Date(tx.timestampSec * 1000);
-      const formattedValue: string = this.formatAssetValue(tx.valueRaw, tx.assetDecimals);
-      const statusIcon: string = tx.isError ? '🔴' : '🟢';
-      const normalizedDirection: string = String(tx.direction).toUpperCase();
-      const directionIcon: string = normalizedDirection === 'OUT' ? '↗️ OUT' : '↘️ IN';
-      const escapedAssetSymbol: string = this.escapeHtml(tx.assetSymbol);
-      const txUrl: string = tx.txLink ?? this.buildTxUrl(tx.txHash);
-      const eventType: string = this.escapeHtml(tx.eventType);
+        return {
+          txHash: transaction.txHash,
+          occurredAt: new Date(transaction.timestampSec * 1000).toISOString(),
+          eventType: transaction.eventType,
+          direction,
+          amountText: this.buildExplorerHistoryAmountText(transaction),
+          txUrl: transaction.txLink ?? this.buildTxUrl(transaction.txHash),
+          assetSymbol: transaction.assetSymbol,
+          chainKey: ChainKey.ETHEREUM_MAINNET,
+          txType,
+          flowType,
+          flowLabel: flowType,
+          assetStandard: this.resolveAssetStandardFromSymbol(transaction.assetSymbol),
+          dex: null,
+          pair: null,
+          isError: transaction.isError,
+          counterpartyAddress: direction === 'IN' ? transaction.from : transaction.to,
+          contractAddress: null,
+        };
+      },
+    );
 
-      return [
-        `<a href="${txUrl}">Tx #${index + 1}</a> ${statusIcon} ${directionIcon} <b>${formattedValue} ${escapedAssetSymbol}</b>`,
-        `📌 <code>${eventType}</code>`,
-        `🕒 <code>${this.formatTimestamp(date)}</code>`,
-        `🔹 <code>${this.shortHash(tx.txHash)}</code>`,
-      ].join('\n');
+    return this.formatHistoryListMessage(normalizedAddress, items, {
+      offset: 0,
+      kind: null,
+      direction: null,
     });
-
-    return [
-      `📜 <b>История</b> <code>${normalizedAddress}</code>`,
-      `Последние ${transactions.length} tx:`,
-      ...rows,
-    ].join('\n\n');
   }
 
   public formatWalletEventsHistoryMessage(
@@ -58,34 +77,91 @@ export class TrackingHistoryFormatterService {
       readonly chainKey: ChainKey;
     },
   ): string {
-    const rows: string[] = events.map((event, index: number): string => {
-      const txChainKey: ChainKey = this.resolveHistoryTxChainKey(
-        event.chainKey,
-        historyParams.chainKey,
-      );
-      const txUrl: string = this.buildTxUrl(event.txHash, txChainKey);
-      const formattedValue: string = this.resolveEventValue(event);
-      const directionLabel: string = this.resolveDirectionLabel(event.direction);
-      const eventTypeLabel: string = this.escapeHtml(event.eventType);
-      const contractShort: string =
-        event.contractAddress !== null ? this.shortHash(event.contractAddress) : 'n/a';
+    const items: readonly IWalletHistoryListItem[] = events.map(
+      (event: WalletEventHistoryView): IWalletHistoryListItem => {
+        const chainKey: ChainKey = this.resolveHistoryTxChainKey(
+          event.chainKey,
+          historyParams.chainKey,
+        );
+        const txType: HistoryTxType = this.resolveTxTypeToken(event.eventType);
+        const flowLabel: string = this.resolveEventFlowLabel(event, txType);
 
-      return [
-        `<a href="${txUrl}">Tx #${index + 1}</a> ${directionLabel} <b>${this.escapeHtml(formattedValue)}</b>`,
-        `📌 <code>${eventTypeLabel}</code> • <code>${contractShort}</code>`,
-        `🕒 <code>${this.formatTimestamp(event.occurredAt)}</code>`,
-      ].join('\n');
+        return {
+          txHash: event.txHash,
+          occurredAt: event.occurredAt.toISOString(),
+          eventType: event.eventType,
+          direction: this.resolveDirectionToken(event.direction),
+          amountText: this.buildWalletEventAmountText(event),
+          txUrl: this.buildTxUrl(event.txHash, chainKey),
+          assetSymbol: event.tokenSymbol,
+          chainKey,
+          txType,
+          flowType: this.resolveFlowTypeFromLabel(flowLabel),
+          flowLabel,
+          assetStandard: this.resolveAssetStandardToken(event.assetStandard, event.tokenSymbol),
+          dex: event.dex,
+          pair: event.pair,
+          isError: false,
+          counterpartyAddress: event.counterpartyAddress,
+          contractAddress: event.contractAddress ?? event.tokenAddress,
+        };
+      },
+    );
+
+    return this.formatHistoryListMessage(normalizedAddress, items, {
+      offset: historyParams.offset,
+      kind: historyParams.kind,
+      direction: historyParams.direction,
     });
+  }
 
-    const startIndex: number = historyParams.offset + 1;
-    const endIndex: number = historyParams.offset + events.length;
+  public formatHistoryListMessage(
+    normalizedAddress: string,
+    items: readonly IWalletHistoryListItem[],
+    meta: IHistoryMessageMeta,
+  ): string {
+    if (items.length === 0) {
+      return `История для ${normalizedAddress} пуста.`;
+    }
 
-    return [
-      `📜 <b>История</b> <code>${normalizedAddress}</code>`,
-      `Фильтр: kind=<code>${historyParams.kind}</code>, direction=<code>${historyParams.direction}</code>`,
-      `Локальные события ${startIndex}-${endIndex}:`,
-      ...rows,
-    ].join('\n\n');
+    const rows: readonly string[] = items.map(
+      (item: IWalletHistoryListItem, index: number): string => {
+        const txUrl: string = item.txUrl;
+        const statusToken: string = item.isError ? '[ERROR]' : '[OK]';
+        const badges: string = [
+          `[${item.txType}]`,
+          `[${this.resolveDirectionToken(item.direction)}]`,
+          `[${this.escapeHtml(item.flowLabel)}]`,
+          `[${item.assetStandard}]`,
+          statusToken,
+        ]
+          .map((token: string): string => `<code>${this.escapeHtml(token)}</code>`)
+          .join(' ');
+
+        const counterpartyLine: string =
+          typeof item.counterpartyAddress === 'string' && item.counterpartyAddress.trim().length > 0
+            ? `👤 <code>${this.shortHash(item.counterpartyAddress)}</code>`
+            : '👤 <code>n/a</code>';
+        const contractLine: string =
+          typeof item.contractAddress === 'string' && item.contractAddress.trim().length > 0
+            ? `🧩 <code>${this.shortHash(item.contractAddress)}</code>`
+            : '🧩 <code>n/a</code>';
+
+        return [
+          `<a href="${txUrl}">Tx #${meta.offset + index + 1}</a> <b>${this.escapeHtml(item.amountText)}</b>`,
+          `🏷 ${badges}`,
+          `🕒 <code>${this.formatTimestamp(new Date(item.occurredAt))}</code>`,
+          `🔹 <code>${this.shortHash(item.txHash)}</code> • ${counterpartyLine} • ${contractLine}`,
+        ].join('\n');
+      },
+    );
+
+    const filterRow: string =
+      meta.kind === null || meta.direction === null
+        ? `Последние ${items.length} tx:`
+        : `Фильтр: kind=<code>${meta.kind}</code>, direction=<code>${meta.direction}</code>`;
+
+    return [`📜 <b>История</b> <code>${normalizedAddress}</code>`, filterRow, ...rows].join('\n\n');
   }
 
   public formatWalletCardRecentEvents(
@@ -95,13 +171,21 @@ export class TrackingHistoryFormatterService {
       return ['- пока нет локальных событий'];
     }
 
-    return events.map((event, index: number): string => {
+    return events.map((event: WalletEventHistoryView, index: number): string => {
       const txHashShort: string = this.shortHash(event.txHash);
-      const directionLabel: string = this.resolveDirectionLabel(event.direction);
+      const directionLabel: string = this.resolveDirectionToken(event.direction);
       const eventValue: string = this.resolveEventValue(event);
       const eventTimestamp: string = this.formatTimestamp(event.occurredAt);
+      const flowLabel: string = this.resolveEventFlowLabel(
+        event,
+        this.resolveTxTypeToken(event.eventType),
+      );
+      const assetStandard: string = this.resolveAssetStandardToken(
+        event.assetStandard,
+        event.tokenSymbol,
+      );
 
-      return `${index + 1}. ${directionLabel} ${event.eventType} • ${eventValue} • ${eventTimestamp} • ${txHashShort}`;
+      return `${index + 1}. [${event.eventType}] [${directionLabel}] [${flowLabel}] [${assetStandard}] • ${eventValue} • ${eventTimestamp} • ${txHashShort}`;
     });
   }
 
@@ -129,16 +213,115 @@ export class TrackingHistoryFormatterService {
     return date.toISOString().replace('T', ' ').replace('.000Z', ' UTC');
   }
 
-  private resolveDirectionLabel(direction: string): string {
-    if (direction === 'OUT') {
-      return '↗️ OUT';
+  private resolveDirectionToken(direction: string): string {
+    const normalizedDirection: string = direction.trim().toUpperCase();
+
+    if (normalizedDirection === 'OUT') {
+      return 'OUT';
     }
 
-    if (direction === 'IN') {
-      return '↘️ IN';
+    if (normalizedDirection === 'IN') {
+      return 'IN';
     }
 
-    return '↔️ UNKNOWN';
+    return 'UNKNOWN';
+  }
+
+  private resolveFlowTypeFromLabel(flowLabel: string): HistoryFlowType {
+    if (flowLabel.startsWith('DEX:')) {
+      return HistoryFlowType.DEX;
+    }
+
+    if (flowLabel.startsWith('CEX:')) {
+      return HistoryFlowType.CEX;
+    }
+
+    if (flowLabel === 'CONTRACT') {
+      return HistoryFlowType.CONTRACT;
+    }
+
+    if (flowLabel === 'P2P') {
+      return HistoryFlowType.P2P;
+    }
+
+    return HistoryFlowType.UNKNOWN;
+  }
+
+  private resolveEventFlowLabel(event: WalletEventHistoryView, txType: HistoryTxType): string {
+    if (event.dex !== null && event.dex.trim().length > 0) {
+      return `DEX:${event.dex.trim().toLowerCase()}`;
+    }
+
+    if (
+      event.contractAddress !== null ||
+      event.tokenAddress !== null ||
+      txType === HistoryTxType.CONTRACT
+    ) {
+      return HistoryFlowType.CONTRACT;
+    }
+
+    if (event.counterpartyAddress !== null && txType === HistoryTxType.TRANSFER) {
+      return HistoryFlowType.P2P;
+    }
+
+    return HistoryFlowType.UNKNOWN;
+  }
+
+  private resolveAssetStandardToken(
+    rawStandard: string | null,
+    tokenSymbol: string | null,
+  ): HistoryAssetStandard {
+    const normalizedStandard: string = (rawStandard ?? '').trim().toUpperCase();
+
+    if (normalizedStandard === 'NATIVE') {
+      return HistoryAssetStandard.NATIVE;
+    }
+
+    if (normalizedStandard === 'ERC20') {
+      return HistoryAssetStandard.ERC20;
+    }
+
+    if (normalizedStandard === 'SPL') {
+      return HistoryAssetStandard.SPL;
+    }
+
+    if (normalizedStandard === 'TRC20') {
+      return HistoryAssetStandard.TRC20;
+    }
+
+    if (normalizedStandard === 'TRC10') {
+      return HistoryAssetStandard.TRC10;
+    }
+
+    return this.resolveAssetStandardFromSymbol(tokenSymbol);
+  }
+
+  private resolveAssetStandardFromSymbol(tokenSymbol: string | null): HistoryAssetStandard {
+    const normalizedSymbol: string = (tokenSymbol ?? '').trim().toUpperCase();
+
+    if (normalizedSymbol === 'ETH' || normalizedSymbol === 'SOL' || normalizedSymbol === 'TRX') {
+      return HistoryAssetStandard.NATIVE;
+    }
+
+    if (normalizedSymbol.length === 0) {
+      return HistoryAssetStandard.UNKNOWN;
+    }
+
+    return HistoryAssetStandard.ERC20;
+  }
+
+  private resolveTxTypeToken(eventType: string): HistoryTxType {
+    const normalizedType: string = eventType.trim().toUpperCase();
+
+    if (normalizedType === 'SWAP') {
+      return HistoryTxType.SWAP;
+    }
+
+    if (normalizedType === 'TRANSFER') {
+      return HistoryTxType.TRANSFER;
+    }
+
+    return HistoryTxType.CONTRACT;
   }
 
   private resolveEventValue(event: WalletEventHistoryView): string {
@@ -203,9 +386,21 @@ export class TrackingHistoryFormatterService {
     return fallbackChainKey;
   }
 
-  private shortHash(txHash: string): string {
-    const prefix: string = txHash.slice(0, SHORT_HASH_PREFIX_LENGTH);
-    const suffix: string = txHash.slice(SHORT_HASH_SUFFIX_OFFSET);
+  private shortHash(value: string | null | undefined): string {
+    if (typeof value !== 'string') {
+      return 'n/a';
+    }
+
+    const normalizedValue: string = value.trim();
+
+    if (normalizedValue.length === 0) {
+      return 'n/a';
+    }
+    if (normalizedValue.length <= SHORT_HASH_PREFIX_LENGTH + Math.abs(SHORT_HASH_SUFFIX_OFFSET)) {
+      return normalizedValue;
+    }
+    const prefix: string = normalizedValue.slice(0, SHORT_HASH_PREFIX_LENGTH);
+    const suffix: string = normalizedValue.slice(SHORT_HASH_SUFFIX_OFFSET);
     return `${prefix}...${suffix}`;
   }
 

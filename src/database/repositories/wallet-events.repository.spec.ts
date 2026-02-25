@@ -68,7 +68,7 @@ describe('WalletEventsRepository', (): void => {
     expect(total).toBe(5);
   });
 
-  it('stores tron tracked address without lowercase normalization', async (): Promise<void> => {
+  it('stores tron tracked address and counterparty without lowercase normalization', async (): Promise<void> => {
     const executeTakeFirst = vi.fn().mockResolvedValue(undefined);
     const columns = vi.fn().mockReturnValue({
       doNothing: vi.fn(),
@@ -111,7 +111,7 @@ describe('WalletEventsRepository', (): void => {
       tokenDecimals: 6,
       tokenAmountRaw: '1000000',
       valueFormatted: '1.000000',
-      counterpartyAddress: null,
+      counterpartyAddress: 'TEDVku9LrQDLdbg1ik6HrRtK6Uimg8epSV',
       dex: null,
       pair: null,
     };
@@ -125,6 +125,7 @@ describe('WalletEventsRepository', (): void => {
     expect(values).toHaveBeenCalledWith(
       expect.objectContaining({
         tracked_address: 'TEDVku9LrQDLdbg1ik6HrRtK6Uimg8epSV',
+        counterparty_address: 'TEDVku9LrQDLdbg1ik6HrRtK6Uimg8epSV',
       }),
     );
   });

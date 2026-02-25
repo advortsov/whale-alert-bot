@@ -18,6 +18,26 @@ interface IRawWalletHistoryResult {
   readonly limit?: unknown;
 }
 
+interface IRawWalletHistoryItem {
+  readonly txHash?: unknown;
+  readonly occurredAt?: unknown;
+  readonly eventType?: unknown;
+  readonly direction?: unknown;
+  readonly amountText?: unknown;
+  readonly txUrl?: unknown;
+  readonly assetSymbol?: unknown;
+  readonly chainKey?: unknown;
+  readonly txType?: unknown;
+  readonly flowType?: unknown;
+  readonly flowLabel?: unknown;
+  readonly assetStandard?: unknown;
+  readonly dex?: unknown;
+  readonly pair?: unknown;
+  readonly isError?: unknown;
+  readonly counterpartyAddress?: unknown;
+  readonly contractAddress?: unknown;
+}
+
 interface IRawWalletListResult {
   readonly wallets?: unknown;
   readonly totalCount?: unknown;
@@ -173,12 +193,12 @@ const isNullableStringValue = (rawValue: unknown): rawValue is string | null => 
   return typeof rawValue === 'string' || rawValue === null;
 };
 
-const isHistoryItem = (value: unknown): value is IWalletHistoryItem => {
+const isHistoryItem = (value: unknown): value is IRawWalletHistoryItem => {
   if (typeof value !== 'object' || value === null) {
     return false;
   }
 
-  const item = value as Partial<IWalletHistoryItem>;
+  const item = value as IRawWalletHistoryItem;
 
   return (
     isStringValue(item.txHash) &&
@@ -192,6 +212,28 @@ const isHistoryItem = (value: unknown): value is IWalletHistoryItem => {
   );
 };
 
+const normalizeHistoryItem = (rawValue: IRawWalletHistoryItem): IWalletHistoryItem => {
+  return {
+    txHash: normalizeString(rawValue.txHash, ''),
+    occurredAt: normalizeString(rawValue.occurredAt, ''),
+    eventType: normalizeString(rawValue.eventType, 'TRANSFER'),
+    direction: normalizeString(rawValue.direction, 'UNKNOWN'),
+    amountText: normalizeString(rawValue.amountText, '0'),
+    txUrl: normalizeString(rawValue.txUrl, ''),
+    assetSymbol: normalizeNullableString(rawValue.assetSymbol),
+    chainKey: normalizeString(rawValue.chainKey, UNKNOWN_CHAIN_KEY),
+    txType: normalizeString(rawValue.txType, 'TRANSFER'),
+    flowType: normalizeString(rawValue.flowType, 'UNKNOWN'),
+    flowLabel: normalizeString(rawValue.flowLabel, 'UNKNOWN'),
+    assetStandard: normalizeString(rawValue.assetStandard, 'UNKNOWN'),
+    dex: normalizeNullableString(rawValue.dex),
+    pair: normalizeNullableString(rawValue.pair),
+    isError: rawValue.isError === true,
+    counterpartyAddress: normalizeNullableString(rawValue.counterpartyAddress),
+    contractAddress: normalizeNullableString(rawValue.contractAddress),
+  };
+};
+
 export const normalizeWalletHistoryResult = (raw: unknown): IWalletHistoryResult => {
   if (typeof raw !== 'object' || raw === null) {
     return { items: [], nextOffset: null };
@@ -200,7 +242,9 @@ export const normalizeWalletHistoryResult = (raw: unknown): IWalletHistoryResult
   const candidate = raw as IRawWalletHistoryResult;
   const itemsRaw: unknown = candidate.items;
   const items: readonly IWalletHistoryItem[] = Array.isArray(itemsRaw)
-    ? itemsRaw.filter((item: unknown): item is IWalletHistoryItem => isHistoryItem(item))
+    ? itemsRaw
+        .filter((item: unknown): item is IRawWalletHistoryItem => isHistoryItem(item))
+        .map((item: IRawWalletHistoryItem): IWalletHistoryItem => normalizeHistoryItem(item))
     : [];
 
   let nextOffset: number | null = parseInteger(candidate.nextOffset);

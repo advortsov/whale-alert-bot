@@ -25,6 +25,7 @@ type WalletEventHistoryRow = {
   readonly token_decimals: number | null;
   readonly token_amount_raw: string | null;
   readonly value_formatted: string | null;
+  readonly counterparty_address: string | null;
   readonly dex: string | null;
   readonly pair: string | null;
   readonly occurred_at: Date;
@@ -74,6 +75,7 @@ export class WalletEventsRepository {
       token_decimals: event.tokenDecimals,
       token_amount_raw: event.tokenAmountRaw,
       value_formatted: event.valueFormatted,
+      counterparty_address: event.counterpartyAddress,
       dex: event.dex,
       pair: event.pair,
       occurred_at: occurredAt,
@@ -179,6 +181,7 @@ export class WalletEventsRepository {
         'token_decimals',
         'token_amount_raw',
         'value_formatted',
+        'counterparty_address',
         'dex',
         'pair',
         'occurred_at',
@@ -210,6 +213,7 @@ export class WalletEventsRepository {
       tokenDecimals: row.token_decimals,
       tokenAmountRaw: row.token_amount_raw,
       valueFormatted: row.value_formatted,
+      counterpartyAddress: row.counterparty_address,
       dex: row.dex,
       pair: row.pair,
       occurredAt: row.occurred_at,

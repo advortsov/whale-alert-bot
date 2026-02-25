@@ -244,6 +244,18 @@ export const HISTORY_PAGE_RESULT_SCHEMA: SchemaObject = {
           txUrl: { type: 'string' },
           assetSymbol: { type: 'string', nullable: true },
           chainKey: { type: 'string' },
+          txType: { type: 'string', enum: ['TRANSFER', 'SWAP', 'CONTRACT'] },
+          flowType: { type: 'string', enum: ['DEX', 'CEX', 'CONTRACT', 'P2P', 'UNKNOWN'] },
+          flowLabel: { type: 'string' },
+          assetStandard: {
+            type: 'string',
+            enum: ['NATIVE', 'ERC20', 'SPL', 'TRC20', 'TRC10', 'UNKNOWN'],
+          },
+          dex: { type: 'string', nullable: true },
+          pair: { type: 'string', nullable: true },
+          isError: { type: 'boolean' },
+          counterpartyAddress: { type: 'string', nullable: true },
+          contractAddress: { type: 'string', nullable: true },
         },
         required: [
           'txHash',

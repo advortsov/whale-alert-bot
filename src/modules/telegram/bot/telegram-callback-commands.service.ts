@@ -1,5 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 
+import { GlobalDexFilterMode } from './telegram-global-filters-callback.interfaces';
+import { TelegramGlobalFiltersUiService } from './telegram-global-filters-ui.service';
 import { TelegramUiService } from './telegram-ui.service';
 import {
   CALLBACK_HISTORY_LIMIT,
@@ -14,11 +16,12 @@ import {
 } from './telegram.interfaces';
 import type { HistoryPageResult } from '../../whales/entities/history-page.interfaces';
 import { HistoryRequestSource } from '../../whales/entities/history-rate-limiter.interfaces';
-import type {
-  TelegramUserRef,
-  WalletAlertFilterState,
+import {
+  AlertFilterToggleTarget,
+  type TelegramUserRef,
+  type WalletAlertFilterState,
 } from '../../whales/entities/tracking.interfaces';
-import { AlertFilterToggleTarget } from '../../whales/entities/tracking.interfaces';
+import type { IUserSettingsResult } from '../../whales/interfaces/tracking-settings.result';
 import { TrackingService } from '../../whales/services/tracking.service';
 
 @Injectable()
@@ -28,6 +31,9 @@ export class TelegramCallbackCommandsServiceDependencies {
 
   @Inject(TelegramUiService)
   public readonly uiService!: TelegramUiService;
+
+  @Inject(TelegramGlobalFiltersUiService)
+  public readonly globalFiltersUiService!: TelegramGlobalFiltersUiService;
 }
 
 @Injectable()
@@ -62,6 +68,15 @@ export class TelegramCallbackCommandsService {
       [WalletCallbackAction.FILTERS]: async (
         target: WalletCallbackTarget,
       ): Promise<CommandExecutionResult> => this.executeWalletFiltersAction(userRef, target),
+      [WalletCallbackAction.GLOBAL_FILTERS]: async (
+        target: WalletCallbackTarget,
+      ): Promise<CommandExecutionResult> => this.executeGlobalFiltersAction(userRef, target),
+      [WalletCallbackAction.GLOBAL_FILTERS_DEX_MODE]: async (
+        target: WalletCallbackTarget,
+      ): Promise<CommandExecutionResult> => this.executeGlobalFiltersAction(userRef, target),
+      [WalletCallbackAction.GLOBAL_FILTERS_DEX_TOGGLE]: async (
+        target: WalletCallbackTarget,
+      ): Promise<CommandExecutionResult> => this.executeGlobalFiltersToggleAction(userRef, target),
     };
 
     const handler = handlers[callbackTarget.action];
@@ -210,6 +225,100 @@ export class TelegramCallbackCommandsService {
       message: this.deps.uiService.formatWalletFiltersMessage(walletFilterState),
       replyOptions: this.deps.uiService.buildWalletFiltersInlineKeyboard(walletFilterState),
     };
+  }
+
+  private async executeGlobalFiltersAction(
+    userRef: TelegramUserRef,
+    callbackTarget: WalletCallbackTarget,
+  ): Promise<CommandExecutionResult> {
+    const mode: GlobalDexFilterMode =
+      callbackTarget.globalFilters?.mode ?? GlobalDexFilterMode.INCLUDE;
+    const settingsResult: IUserSettingsResult =
+      await this.deps.trackingService.getSettings(userRef);
+
+    return {
+      lineNumber: 1,
+      message: this.deps.globalFiltersUiService.formatGlobalDexFiltersMessage(settingsResult, mode),
+      replyOptions: this.deps.globalFiltersUiService.buildGlobalDexFiltersInlineKeyboard(
+        settingsResult,
+        mode,
+      ),
+    };
+  }
+
+  private async executeGlobalFiltersToggleAction(
+    userRef: TelegramUserRef,
+    callbackTarget: WalletCallbackTarget,
+  ): Promise<CommandExecutionResult> {
+    const payload = callbackTarget.globalFilters;
+
+    if (payload === null) {
+      throw new Error('Callback global filters payload is missing.');
+    }
+
+    const currentSettings: IUserSettingsResult =
+      await this.deps.trackingService.getSettings(userRef);
+    const includeDexes: string[] = [...currentSettings.settings.includeDexes];
+    const excludeDexes: string[] = [...currentSettings.settings.excludeDexes];
+    const isIncludeMode: boolean = payload.mode === GlobalDexFilterMode.INCLUDE;
+
+    if (payload.isReset) {
+      if (isIncludeMode) {
+        await this.deps.trackingService.setIncludeDexFilter(userRef, 'off');
+      } else {
+        await this.deps.trackingService.setExcludeDexFilter(userRef, 'off');
+      }
+    } else {
+      const dexKey: string = payload.dexKey ?? '';
+
+      if (dexKey.length === 0 || payload.enabled === null) {
+        throw new Error('Callback global filters payload is invalid.');
+      }
+
+      if (isIncludeMode) {
+        this.applyDexToggle(includeDexes, dexKey, payload.enabled);
+        this.applyDexToggle(excludeDexes, dexKey, false);
+      } else {
+        this.applyDexToggle(excludeDexes, dexKey, payload.enabled);
+        this.applyDexToggle(includeDexes, dexKey, false);
+      }
+
+      await this.deps.trackingService.setIncludeDexFilter(
+        userRef,
+        includeDexes.length > 0 ? includeDexes.join(',') : 'off',
+      );
+      await this.deps.trackingService.setExcludeDexFilter(
+        userRef,
+        excludeDexes.length > 0 ? excludeDexes.join(',') : 'off',
+      );
+    }
+
+    const nextSettings: IUserSettingsResult = await this.deps.trackingService.getSettings(userRef);
+
+    return {
+      lineNumber: 1,
+      message: this.deps.globalFiltersUiService.formatGlobalDexFiltersMessage(
+        nextSettings,
+        payload.mode,
+      ),
+      replyOptions: this.deps.globalFiltersUiService.buildGlobalDexFiltersInlineKeyboard(
+        nextSettings,
+        payload.mode,
+      ),
+    };
+  }
+
+  private applyDexToggle(dexes: string[], dexKey: string, enabled: boolean): void {
+    const index: number = dexes.indexOf(dexKey);
+
+    if (enabled && index === -1) {
+      dexes.push(dexKey);
+      return;
+    }
+
+    if (!enabled && index !== -1) {
+      dexes.splice(index, 1);
+    }
   }
 
   private assertWalletId(callbackTarget: WalletCallbackTarget, errorMessage: string): number {

@@ -114,6 +114,7 @@ export interface IWalletEventsTable {
   token_decimals: number | null;
   token_amount_raw: string | null;
   value_formatted: string | null;
+  counterparty_address: string | null;
   dex: string | null;
   pair: string | null;
   occurred_at: TimestampColumn;

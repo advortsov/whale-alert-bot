@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import type { CexAddressBookService } from './cex-address-book.service';
 import type { HistoryCacheService } from './history-cache.service';
+import { HistoryCardClassifierService } from './history-card-classifier.service';
 import type { HistoryHotCacheService } from './history-hot-cache.service';
 import type { HistoryRateLimiterService } from './history-rate-limiter.service';
 import { TrackingAddressService } from './tracking-address.service';
@@ -326,9 +328,14 @@ const createTestContext = (): TestContext => {
   );
   const historyQueryParserService: TrackingHistoryQueryParserService =
     new TrackingHistoryQueryParserService();
+  const historyCardClassifierService: HistoryCardClassifierService =
+    new HistoryCardClassifierService({
+      resolveTag: vi.fn().mockReturnValue(null),
+    } as unknown as CexAddressBookService);
   const trackingHistoryPageService: TrackingHistoryPageService = new TrackingHistoryPageService(
     walletEventsRepositoryStub as unknown as WalletEventsRepository,
     historyFormatter,
+    historyCardClassifierService,
   );
 
   const walletsDeps = new TrackingWalletsServiceDependencies();

@@ -17,6 +17,8 @@ import {
   TelegramFilterCommandsService,
   TelegramFilterCommandsServiceDependencies,
 } from './telegram-filter-commands.service';
+import { TelegramGlobalFiltersCallbackParserService } from './telegram-global-filters-callback-parser.service';
+import { TelegramGlobalFiltersUiService } from './telegram-global-filters-ui.service';
 import { TelegramParserService } from './telegram-parser.service';
 import { TelegramUiService } from './telegram-ui.service';
 import { USER_NOT_IDENTIFIED_MESSAGE } from './telegram.constants';
@@ -59,8 +61,13 @@ export class TelegramUpdate {
     appConfigService: AppConfigService,
   ): TelegramUpdate {
     const parserService: TelegramParserService = new TelegramParserService();
-    const callbackParserService: TelegramCallbackParserService =
-      new TelegramCallbackParserService();
+    const globalFiltersCallbackParserService: TelegramGlobalFiltersCallbackParserService =
+      new TelegramGlobalFiltersCallbackParserService();
+    const callbackParserService: TelegramCallbackParserService = new TelegramCallbackParserService(
+      globalFiltersCallbackParserService,
+    );
+    const globalFiltersUiService: TelegramGlobalFiltersUiService =
+      new TelegramGlobalFiltersUiService();
     const uiService: TelegramUiService = new TelegramUiService(appConfigService);
 
     const basicDeps = new TelegramBasicCommandsServiceDependencies();
@@ -75,10 +82,16 @@ export class TelegramUpdate {
     (filterDeps as { trackingService: TrackingService }).trackingService = trackingService;
     (filterDeps as { parserService: TelegramParserService }).parserService = parserService;
     (filterDeps as { uiService: TelegramUiService }).uiService = uiService;
+    (
+      filterDeps as { globalFiltersUiService: TelegramGlobalFiltersUiService }
+    ).globalFiltersUiService = globalFiltersUiService;
 
     const callbackDeps = new TelegramCallbackCommandsServiceDependencies();
     (callbackDeps as { trackingService: TrackingService }).trackingService = trackingService;
     (callbackDeps as { uiService: TelegramUiService }).uiService = uiService;
+    (
+      callbackDeps as { globalFiltersUiService: TelegramGlobalFiltersUiService }
+    ).globalFiltersUiService = globalFiltersUiService;
 
     const basicCommandsService: TelegramBasicCommandsService = new TelegramBasicCommandsService(
       basicDeps,

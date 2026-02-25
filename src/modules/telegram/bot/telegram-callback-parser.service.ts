@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
+import { TelegramGlobalFiltersCallbackParserService } from './telegram-global-filters-callback-parser.service';
 import {
   ALERT_IGNORE_CALLBACK_PREFIX,
   CALLBACK_HISTORY_LIMIT,
@@ -24,6 +25,10 @@ import { HistoryDirectionFilter, HistoryKind } from '../../whales/entities/histo
 
 @Injectable()
 export class TelegramCallbackParserService {
+  public constructor(
+    private readonly globalFiltersCallbackParserService: TelegramGlobalFiltersCallbackParserService,
+  ) {}
+
   public parseWalletCallbackData(callbackData: string): WalletCallbackTarget | null {
     const parserResults: readonly (WalletCallbackTarget | null)[] = [
       this.parseSimpleWalletAction(callbackData),
@@ -31,6 +36,7 @@ export class TelegramCallbackParserService {
       this.parseIgnoreAction(callbackData),
       this.parseWalletFilterToggleAction(callbackData),
       this.parseWalletFiltersAction(callbackData),
+      this.globalFiltersCallbackParserService.parse(callbackData),
       this.parseWalletHistoryPageAction(callbackData),
       this.parseWalletHistoryRefreshAction(callbackData),
       this.parseWalletHistoryAction(callbackData),
@@ -80,6 +86,7 @@ export class TelegramCallbackParserService {
           actionEntry.action === WalletCallbackAction.HISTORY ? HistoryDirectionFilter.ALL : null,
         filterTarget: null,
         filterEnabled: null,
+        globalFilters: null,
       };
     }
 
@@ -107,6 +114,7 @@ export class TelegramCallbackParserService {
       historyDirection: null,
       filterTarget: null,
       filterEnabled: null,
+      globalFilters: null,
     };
   }
 
@@ -133,6 +141,7 @@ export class TelegramCallbackParserService {
       historyDirection: null,
       filterTarget: null,
       filterEnabled: null,
+      globalFilters: null,
     };
   }
 
@@ -168,6 +177,7 @@ export class TelegramCallbackParserService {
       historyDirection: null,
       filterTarget,
       filterEnabled,
+      globalFilters: null,
     };
   }
 
@@ -194,9 +204,9 @@ export class TelegramCallbackParserService {
       historyDirection: null,
       filterTarget: null,
       filterEnabled: null,
+      globalFilters: null,
     };
   }
-
   private parseWalletHistoryPageAction(callbackData: string): WalletCallbackTarget | null {
     if (!callbackData.startsWith(WALLET_HISTORY_PAGE_CALLBACK_PREFIX)) {
       return null;
@@ -221,6 +231,7 @@ export class TelegramCallbackParserService {
       historyDirection: parsedPayload.historyDirection,
       filterTarget: null,
       filterEnabled: null,
+      globalFilters: null,
     };
   }
 
@@ -266,6 +277,7 @@ export class TelegramCallbackParserService {
       historyDirection,
       filterTarget: null,
       filterEnabled: null,
+      globalFilters: null,
     };
   }
 
@@ -292,6 +304,7 @@ export class TelegramCallbackParserService {
       historyDirection: HistoryDirectionFilter.ALL,
       filterTarget: null,
       filterEnabled: null,
+      globalFilters: null,
     };
   }
 

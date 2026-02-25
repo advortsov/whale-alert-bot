@@ -63,6 +63,15 @@ export interface IWalletHistoryItem {
   readonly txUrl: string;
   readonly assetSymbol: string | null;
   readonly chainKey: string;
+  readonly txType: string;
+  readonly flowType: string;
+  readonly flowLabel: string;
+  readonly assetStandard: string;
+  readonly dex: string | null;
+  readonly pair: string | null;
+  readonly isError: boolean;
+  readonly counterpartyAddress: string | null;
+  readonly contractAddress: string | null;
 }
 
 export interface IWalletHistoryResult {

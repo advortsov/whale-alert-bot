@@ -108,21 +108,20 @@ export class TrackingHistoryPageBuilderService implements ITrackingHistoryPageBu
   }
 
   public buildOffsetHistoryPage(context: IBuildOffsetHistoryPageContext): HistoryPageResult {
-    const message: string = this.historyFormatter.formatWalletEventsHistoryMessage(
-      context.target.address,
-      context.localHistoryPage.pageEvents,
-      {
-        offset: context.historyParams.offset,
-        kind: context.historyParams.kind,
-        direction: context.historyParams.direction,
-        chainKey: context.target.chainKey,
-      },
-    );
     const items: readonly IWalletHistoryListItem[] =
       this.trackingHistoryPageService.mapWalletEventsToListItems(
         context.localHistoryPage.pageEvents,
         context.target.chainKey,
       );
+    const message: string = this.historyFormatter.formatHistoryListMessage(
+      context.target.address,
+      items,
+      {
+        offset: context.historyParams.offset,
+        kind: context.historyParams.kind,
+        direction: context.historyParams.direction,
+      },
+    );
 
     return this.toHistoryPageResult({
       message,
@@ -150,15 +149,20 @@ export class TrackingHistoryPageBuilderService implements ITrackingHistoryPageBu
       direction: context.historyParams.direction,
       minAmountUsd: null,
     });
-    const message: string = this.historyFormatter.formatHistoryMessage(
-      context.target.address,
-      explorerPage.items,
-    );
     const items: readonly IWalletHistoryListItem[] =
       this.trackingHistoryPageService.mapExplorerItemsToListItems(
         explorerPage.items,
         context.target.chainKey,
       );
+    const message: string = this.historyFormatter.formatHistoryListMessage(
+      context.target.address,
+      items,
+      {
+        offset: context.historyParams.offset,
+        kind: context.historyParams.kind,
+        direction: context.historyParams.direction,
+      },
+    );
 
     return this.toHistoryPageResult({
       message,

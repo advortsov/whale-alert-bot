@@ -178,15 +178,7 @@ export class TelegramCommandOrchestratorService {
     commandEntry: ParsedMessageCommand,
     updateMeta: UpdateMeta,
   ): Promise<CommandExecutionResult> {
-    return {
-      lineNumber: commandEntry.lineNumber,
-      message: await this.filterCommandsService.executeFiltersCommand(
-        userRef,
-        commandEntry,
-        updateMeta,
-      ),
-      replyOptions: null,
-    };
+    return this.filterCommandsService.executeFiltersCommand(userRef, commandEntry, updateMeta);
   }
 
   private async executeFilterCommand(

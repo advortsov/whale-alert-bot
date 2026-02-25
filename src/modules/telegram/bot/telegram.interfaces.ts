@@ -1,5 +1,6 @@
 import type { Context } from 'telegraf';
 
+import type { IGlobalFiltersCallbackPayload } from './telegram-global-filters-callback.interfaces';
 import type {
   HistoryDirectionFilter,
   HistoryKind,
@@ -55,6 +56,9 @@ export enum WalletCallbackAction {
   MUTE = 'mute',
   FILTERS = 'filters',
   IGNORE_24H = 'ignore_24h',
+  GLOBAL_FILTERS = 'global_filters',
+  GLOBAL_FILTERS_DEX_MODE = 'global_filters_dex_mode',
+  GLOBAL_FILTERS_DEX_TOGGLE = 'global_filters_dex_toggle',
 }
 
 export enum WalletCallbackFilterTarget {
@@ -72,4 +76,5 @@ export type WalletCallbackTarget = {
   readonly historyDirection: HistoryDirectionFilter | null;
   readonly filterTarget: WalletCallbackFilterTarget | null;
   readonly filterEnabled: boolean | null;
+  readonly globalFilters: IGlobalFiltersCallbackPayload | null;
 };

@@ -14,6 +14,7 @@ import {
 import { AlertSuppressionService } from './services/alert-suppression.service';
 import { CexAddressBookService } from './services/cex-address-book.service';
 import { HistoryCacheService } from './services/history-cache.service';
+import { HistoryCardClassifierService } from './services/history-card-classifier.service';
 import { HistoryExplorerRouterAdapter } from './services/history-explorer-router.adapter';
 import { HistoryHotCacheService } from './services/history-hot-cache.service';
 import { HistoryRateLimiterService } from './services/history-rate-limiter.service';
@@ -87,6 +88,7 @@ import { ObservabilityModule } from '../observability/observability.module';
     AlertDispatcherService,
     // --- Tracking services ---
     HistoryCacheService,
+    HistoryCardClassifierService,
     HistoryHotCacheService,
     HistoryRateLimiterService,
     TrackingAddressService,

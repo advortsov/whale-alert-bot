@@ -103,7 +103,10 @@ describe('TrackingHistoryService', (): void => {
     };
     (
       deps as unknown as {
-        trackingHistoryPageService: { loadLocalHistoryPage: ReturnType<typeof vi.fn> };
+        trackingHistoryPageService: {
+          loadLocalHistoryPage: ReturnType<typeof vi.fn>;
+          mapExplorerItemsToListItems: ReturnType<typeof vi.fn>;
+        };
       }
     ).trackingHistoryPageService = {
       loadLocalHistoryPage: vi.fn().mockResolvedValue({
@@ -111,6 +114,29 @@ describe('TrackingHistoryService', (): void => {
         hasNextPage: false,
         nextOffset: null,
       }),
+      mapExplorerItemsToListItems: vi
+        .fn()
+        .mockImplementation((items: readonly IHistoryItemDto[], chainKey: ChainKey) =>
+          items.map((item: IHistoryItemDto) => ({
+            txHash: item.txHash,
+            occurredAt: new Date(item.timestampSec * 1000).toISOString(),
+            eventType: item.eventType,
+            direction: item.direction,
+            amountText: '1 TRX',
+            txUrl: item.txLink ?? '',
+            assetSymbol: item.assetSymbol,
+            chainKey,
+            txType: 'TRANSFER',
+            flowType: 'UNKNOWN',
+            flowLabel: 'UNKNOWN',
+            assetStandard: 'NATIVE',
+            dex: null,
+            pair: null,
+            isError: item.isError,
+            counterpartyAddress: null,
+            contractAddress: null,
+          })),
+        ),
     };
     (
       deps as unknown as {
@@ -228,7 +254,10 @@ describe('TrackingHistoryService', (): void => {
     };
     (
       deps as unknown as {
-        trackingHistoryPageService: { loadLocalHistoryPage: ReturnType<typeof vi.fn> };
+        trackingHistoryPageService: {
+          loadLocalHistoryPage: ReturnType<typeof vi.fn>;
+          mapExplorerItemsToListItems: ReturnType<typeof vi.fn>;
+        };
       }
     ).trackingHistoryPageService = {
       loadLocalHistoryPage: vi.fn().mockResolvedValue({
@@ -236,6 +265,29 @@ describe('TrackingHistoryService', (): void => {
         hasNextPage: false,
         nextOffset: null,
       }),
+      mapExplorerItemsToListItems: vi
+        .fn()
+        .mockImplementation((items: readonly IHistoryItemDto[], chainKey: ChainKey) =>
+          items.map((item: IHistoryItemDto) => ({
+            txHash: item.txHash,
+            occurredAt: new Date(item.timestampSec * 1000).toISOString(),
+            eventType: item.eventType,
+            direction: item.direction,
+            amountText: '1 SOL',
+            txUrl: item.txLink ?? '',
+            assetSymbol: item.assetSymbol,
+            chainKey,
+            txType: 'TRANSFER',
+            flowType: 'UNKNOWN',
+            flowLabel: 'UNKNOWN',
+            assetStandard: 'NATIVE',
+            dex: null,
+            pair: null,
+            isError: item.isError,
+            counterpartyAddress: null,
+            contractAddress: null,
+          })),
+        ),
     };
     (
       deps as unknown as {

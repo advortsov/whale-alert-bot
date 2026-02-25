@@ -15,6 +15,7 @@ export type WalletEventHistoryView = {
   readonly tokenDecimals: number | null;
   readonly tokenAmountRaw: string | null;
   readonly valueFormatted: string | null;
+  readonly counterpartyAddress: string | null;
   readonly dex: string | null;
   readonly pair: string | null;
   readonly occurredAt: Date;
