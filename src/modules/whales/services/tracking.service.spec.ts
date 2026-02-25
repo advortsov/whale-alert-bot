@@ -634,7 +634,7 @@ describe('TrackingService', (): void => {
 
     const page = await context.service.getAddressHistoryPageWithPolicy(context.userRef, {
       rawAddress: '#3',
-      rawLimit: '10',
+      rawLimit: '1',
       rawOffset: '0',
       source: HistoryRequestSource.COMMAND,
       rawKind: null,
@@ -642,6 +642,7 @@ describe('TrackingService', (): void => {
     });
 
     expect(page.items).toHaveLength(1);
+    expect(context.historyExplorerAdapterStub.loadRecentTransactions).not.toHaveBeenCalled();
     expect(page.items[0]).toMatchObject({
       txHash: '0xlocal1',
       amountText: '99.000000 USDT',

@@ -172,4 +172,41 @@ describe('HistoryHotCacheService', (): void => {
       'tx-2',
     ]);
   });
+
+  it('skips refresh on chain cooldown after 429 failure', async (): Promise<void> => {
+    const appConfigStub: AppConfigStub = {
+      historyHotCacheEnabled: true,
+      historyHotCacheTopWallets: 100,
+      historyHotCacheRefreshIntervalSec: 999,
+      historyHotCachePageLimit: 20,
+      historyHotCacheMaxItemsPerWallet: 200,
+      historyHotCacheTtlSec: 900,
+      historyHotCacheStaleSec: 1800,
+    };
+    const subscriptionsRepositoryStub: SubscriptionsRepositoryStub = {
+      listMostPopularTrackedWallets: vi.fn().mockResolvedValue([
+        {
+          walletId: 1,
+          chainKey: ChainKey.TRON_MAINNET,
+          address: 'TEDVku9LrQDLdbg1ik6HrRtK6Uimg8epSV',
+          subscriberCount: 10,
+        },
+      ]),
+    };
+    const historyExplorerAdapterStub: HistoryExplorerAdapterStub = {
+      loadRecentTransactions: vi.fn().mockRejectedValue(new Error('TRON history HTTP 429')),
+    };
+
+    const service: HistoryHotCacheService = new HistoryHotCacheService(
+      appConfigStub as unknown as AppConfigService,
+      subscriptionsRepositoryStub as unknown as SubscriptionsRepository,
+      historyExplorerAdapterStub as unknown as IHistoryExplorerAdapter,
+      null,
+    );
+
+    await (service as unknown as { refreshTopWallets: () => Promise<unknown> }).refreshTopWallets();
+    await (service as unknown as { refreshTopWallets: () => Promise<unknown> }).refreshTopWallets();
+
+    expect(historyExplorerAdapterStub.loadRecentTransactions).toHaveBeenCalledTimes(1);
+  });
 });

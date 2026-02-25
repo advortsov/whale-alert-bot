@@ -8,7 +8,6 @@ import {
   setHistoryCacheEntry,
 } from './tracking-history-helpers.util';
 import { TrackingHistoryServiceDependencies } from './tracking-history.service.dependencies';
-import { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
 import type { HistoryCacheEntry } from '../entities/history-cache.interfaces';
 import type { IHistoryHotCacheLookupResult } from '../entities/history-hot-cache.interfaces';
 import type { IHistoryPageDto } from '../entities/history-item.dto';
@@ -231,10 +230,7 @@ export class TrackingHistoryService {
     if (localHistoryPage.pageEvents.length === 0) {
       return null;
     }
-    const shouldPreferExplorerOnShortFirstPage: boolean =
-      context.target.chainKey !== ChainKey.ETHEREUM_MAINNET;
     const isShortFirstPage: boolean =
-      shouldPreferExplorerOnShortFirstPage &&
       context.historyParams.offset === 0 &&
       localHistoryPage.pageEvents.length < context.historyParams.limit;
     if (isShortFirstPage) {

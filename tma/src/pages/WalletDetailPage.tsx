@@ -61,13 +61,9 @@ const buildHistoryBadgeLine = (item: IWalletHistoryResult['items'][number]): str
         ? '[USD: n/a]'
         : '[USD: pending]';
 
-  return [
-    `[${direction}]`,
-    `[${flowLabel}]`,
-    `[${assetStandard}]`,
-    statusToken,
-    usdToken,
-  ].join(' ');
+  return [`[${direction}]`, `[${flowLabel}]`, `[${assetStandard}]`, statusToken, usdToken].join(
+    ' ',
+  );
 };
 
 const buildHistoryTitleLine = (item: IWalletHistoryResult['items'][number]): string => {
@@ -257,9 +253,7 @@ export const WalletDetailPage = (): React.JSX.Element => {
                   </Button>
                 }
               >
-                <div className="tma-history-title">
-                  {buildHistoryTitleLine(item)}
-                </div>
+                <div className="tma-history-title">{buildHistoryTitleLine(item)}</div>
                 <div className="tma-history-badges">{buildHistoryBadgeLine(item)}</div>
               </Cell>
             ))

@@ -7,6 +7,15 @@ import {
   type OnModuleInit,
 } from '@nestjs/common';
 
+import {
+  recordHistoryHotCacheMetrics,
+  updateHistoryHotCacheGaugeMetrics,
+} from './history-hot-cache-metrics.util';
+import {
+  getChainCooldownRemainingMs,
+  isRateLimitHistoryError,
+  setChainCooldown,
+} from './history-hot-cache-rate-limit.util';
 import type {
   IHistoryHotCacheChainMetrics,
   IHistoryHotCacheRefreshCounters,
@@ -42,7 +51,7 @@ const DEFAULT_ITEM_COUNT = 0;
 const IDENTITY_DELIMITER = '::';
 const ITEM_MAX_MULTIPLIER = 1;
 const WALLET_COUNT_DIVIDER_FALLBACK = 1;
-const DURATION_MS_TO_SECONDS_DIVIDER = 1000;
+const HOT_CACHE_RATE_LIMIT_COOLDOWN_MS = 180_000;
 
 @Injectable()
 export class HistoryHotCacheService implements OnModuleInit, OnModuleDestroy {
@@ -57,6 +66,7 @@ export class HistoryHotCacheService implements OnModuleInit, OnModuleDestroy {
   private readonly enabled: boolean;
   private intervalHandle: ReturnType<typeof setInterval> | null = null;
   private refreshInProgress: boolean = false;
+  private readonly chainCooldownUntilMs: Map<ChainKey, number> = new Map<ChainKey, number>();
 
   public constructor(
     private readonly appConfigService: AppConfigService,
@@ -171,7 +181,7 @@ export class HistoryHotCacheService implements OnModuleInit, OnModuleDestroy {
         `history_hot_cache_refresh_done processed=${String(result.processedWallets)} success=${String(result.successWallets)} failed=${String(result.failedWallets)} new=${String(result.newItemsTotal)} duplicate=${String(result.duplicateItemsTotal)} durationMs=${String(result.durationMs)}`,
       );
       this.recordMetrics(chainMetricsMap);
-      this.updateCacheGaugeMetrics();
+      this.updateCacheGaugeMetrics(this.getMetricsSnapshot());
 
       return result;
     } finally {
@@ -219,6 +229,18 @@ export class HistoryHotCacheService implements OnModuleInit, OnModuleDestroy {
     chainMetricsMap: Map<ChainKey, IHistoryHotCacheChainMetrics>,
   ): Promise<void> {
     for (const walletRef of walletRefs) {
+      const remainingCooldownMs: number = getChainCooldownRemainingMs(
+        this.chainCooldownUntilMs,
+        walletRef.chainKey,
+        Date.now(),
+      );
+      if (remainingCooldownMs > 0) {
+        this.logger.debug(
+          `history_hot_cache_refresh_skip chain=${walletRef.chainKey} reason=rate_limit_cooldown remainingMs=${String(remainingCooldownMs)}`,
+        );
+        continue;
+      }
+
       counters.processedWallets += 1;
       try {
         const walletStartMs: number = Date.now();
@@ -266,6 +288,19 @@ export class HistoryHotCacheService implements OnModuleInit, OnModuleDestroy {
     metrics.failed += 1;
     chainMetricsMap.set(walletRef.chainKey, metrics);
     const errorMessage: string = error instanceof Error ? error.message : String(error);
+    if (isRateLimitHistoryError(errorMessage)) {
+      const cooldownUpdated: boolean = setChainCooldown(
+        this.chainCooldownUntilMs,
+        walletRef.chainKey,
+        Date.now(),
+        HOT_CACHE_RATE_LIMIT_COOLDOWN_MS,
+      );
+      if (cooldownUpdated) {
+        this.logger.warn(
+          `history_hot_cache_chain_cooldown chain=${walletRef.chainKey} cooldownMs=${String(HOT_CACHE_RATE_LIMIT_COOLDOWN_MS)} reason=rate_limit`,
+        );
+      }
+    }
     this.logger.warn(
       `history_hot_cache_refresh_failed chain=${walletRef.chainKey} walletId=${String(walletRef.walletId)} address=${walletRef.address} reason=${errorMessage}`,
     );
@@ -441,60 +476,13 @@ export class HistoryHotCacheService implements OnModuleInit, OnModuleDestroy {
     if (this.metricsService === null) {
       return;
     }
-
-    for (const [chainKey, metrics] of chainMetricsMap) {
-      if (metrics.success > 0 && metrics.failed > 0) {
-        this.metricsService.historyHotCacheRefreshTotal.inc(
-          { status: 'partial', chain: chainKey },
-          metrics.success + metrics.failed,
-        );
-      } else if (metrics.success > 0) {
-        this.metricsService.historyHotCacheRefreshTotal.inc(
-          { status: 'success', chain: chainKey },
-          metrics.success,
-        );
-      } else if (metrics.failed > 0) {
-        this.metricsService.historyHotCacheRefreshTotal.inc(
-          { status: 'failed', chain: chainKey },
-          metrics.failed,
-        );
-      }
-
-      if (metrics.newItems > 0) {
-        this.metricsService.historyHotCacheNewItemsTotal.inc({ chain: chainKey }, metrics.newItems);
-      }
-
-      if (metrics.duplicateItems > 0) {
-        this.metricsService.historyHotCacheDuplicateItemsTotal.inc(
-          { chain: chainKey },
-          metrics.duplicateItems,
-        );
-      }
-
-      if (metrics.durationMs > 0) {
-        this.metricsService.historyHotCacheRefreshDurationSeconds.observe(
-          { chain: chainKey },
-          metrics.durationMs / DURATION_MS_TO_SECONDS_DIVIDER,
-        );
-      }
-    }
+    recordHistoryHotCacheMetrics(this.metricsService, chainMetricsMap);
   }
 
-  private updateCacheGaugeMetrics(): void {
+  private updateCacheGaugeMetrics(snapshot: IHistoryHotCacheMetricsSnapshot): void {
     if (this.metricsService === null) {
       return;
     }
-
-    const snapshot: IHistoryHotCacheMetricsSnapshot = this.getMetricsSnapshot();
-    this.metricsService.historyHotCacheWalletsGauge.set(snapshot.walletsInTopSet);
-
-    const chainKeys: readonly ChainKey[] = Object.values(ChainKey);
-    for (const chainKey of chainKeys) {
-      this.metricsService.historyHotCacheEntryItemsGauge.set({ chain: chainKey }, 0);
-    }
-
-    for (const [chainKey, avgItems] of snapshot.avgItemsByChain) {
-      this.metricsService.historyHotCacheEntryItemsGauge.set({ chain: chainKey }, avgItems);
-    }
+    updateHistoryHotCacheGaugeMetrics(this.metricsService, snapshot);
   }
 }
