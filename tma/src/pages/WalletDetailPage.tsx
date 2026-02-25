@@ -34,7 +34,10 @@ const CHAIN_NAME_BY_KEY: Record<string, string> = {
   tron_mainnet: 'TRON',
 };
 
-const normalizeHistoryToken = (rawValue: string | null | undefined, fallbackValue: string): string => {
+const normalizeHistoryToken = (
+  rawValue: string | null | undefined,
+  fallbackValue: string,
+): string => {
   if (typeof rawValue !== 'string') {
     return fallbackValue;
   }
@@ -44,13 +47,25 @@ const normalizeHistoryToken = (rawValue: string | null | undefined, fallbackValu
 };
 
 const buildHistoryBadgeLine = (item: IWalletHistoryResult['items'][number]): string => {
-  const txType: string = normalizeHistoryToken(item.txType, normalizeHistoryToken(item.eventType, 'UNKNOWN'));
+  const txType: string = normalizeHistoryToken(
+    item.txType,
+    normalizeHistoryToken(item.eventType, 'UNKNOWN'),
+  );
   const direction: string = normalizeHistoryToken(item.direction, 'UNKNOWN');
-  const flowLabel: string = normalizeHistoryToken(item.flowLabel, normalizeHistoryToken(item.flowType, 'UNKNOWN'));
+  const flowLabel: string = normalizeHistoryToken(
+    item.flowLabel,
+    normalizeHistoryToken(item.flowType, 'UNKNOWN'),
+  );
   const assetStandard: string = normalizeHistoryToken(item.assetStandard, 'UNKNOWN');
   const statusToken: string = item.isError ? '[ERROR]' : '[OK]';
 
-  return [`[${txType}]`, `[${direction}]`, `[${flowLabel}]`, `[${assetStandard}]`, statusToken].join(' ');
+  return [
+    `[${txType}]`,
+    `[${direction}]`,
+    `[${flowLabel}]`,
+    `[${assetStandard}]`,
+    statusToken,
+  ].join(' ');
 };
 
 export const WalletDetailPage = (): React.JSX.Element => {

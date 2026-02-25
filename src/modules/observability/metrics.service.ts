@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { collectDefaultMetrics, Counter, Gauge, Histogram, Registry } from 'prom-client';
+
 import { ChainKey } from '../../common/interfaces/chain-key.interfaces';
 
 // Histogram bucket boundaries in seconds for RPC latency distribution
