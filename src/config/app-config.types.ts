@@ -52,6 +52,10 @@ export type AppConfig = {
   readonly priceCacheMaxEntries: number;
   readonly priceCacheFreshTtlSec: number;
   readonly priceCacheStaleTtlSec: number;
+  readonly priceHistoryCacheMaxEntries: number;
+  readonly priceHistoryCacheTtlSec: number;
+  readonly priceHistoryCacheStaleSec: number;
+  readonly priceHistoryRangeMaxAgeDays: number;
   readonly chainMaxLagWarn: number;
   readonly chainMaxQueueWarn: number;
   readonly chainMaxBackoffWarnMs: number;
@@ -81,6 +85,8 @@ export type AppConfig = {
   readonly rateLimitTronPublicMaxConcurrent: number;
   readonly rateLimitCoingeckoMinTimeMs: number;
   readonly rateLimitCoingeckoMaxConcurrent: number;
+  readonly rateLimitCoingeckoHistoryMinTimeMs: number;
+  readonly rateLimitCoingeckoHistoryMaxConcurrent: number;
   readonly rateLimitEthRpcMinTimeMs: number;
   readonly rateLimitEthRpcMaxConcurrent: number;
   readonly jwtSecret: string | null;

@@ -1,15 +1,14 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 
 import {
-  detectSolanaSplTransfer,
   extractSolanaAccountKeys,
   matchSolanaHistoryDirection,
   matchSolanaHistoryKind,
+  parseSolanaSignatureInfo,
   parseSolanaTransactionValue,
-  resolveSolanaDirectionByLamportsDelta,
   resolveSolanaErrorFlag,
   resolveSolanaFromTo,
-  resolveSolanaLamportsDelta,
+  resolveSolanaTransferDetails,
   resolveSolanaTimestampSec,
 } from './solana-history-mapper.util';
 import {
@@ -19,9 +18,7 @@ import {
   SOLANA_SCAN_LIMIT_MAX,
   SOLANA_SIGNATURES_BATCH_DEFAULT,
   SOLANA_SIGNATURES_BATCH_MAX,
-  SOL_NATIVE_DECIMALS,
   SOLSCAN_TX_BASE_URL,
-  SPL_TOKEN_DECIMALS,
   resolveSolanaHistoryLimiterKey,
   resolveSolanaHistoryScanLimit,
   type ISolanaHistoryScanState,
@@ -41,7 +38,6 @@ import {
 import { BottleneckRateLimiterService } from '../../blockchain/rate-limiting/bottleneck-rate-limiter.service';
 import { MetricsService } from '../../observability/metrics.service';
 import {
-  HistoryDirection,
   HistoryItemType,
   type IHistoryItemDto,
   type IHistoryPageDto,
@@ -127,7 +123,7 @@ export class SolanaRpcHistoryAdapter implements IHistoryExplorerAdapter {
       throw new Error('Solana getSignaturesForAddress returned invalid payload.');
     }
 
-    return payload.map((value: unknown): ISolanaSignatureInfo => this.parseSignatureInfo(value));
+    return payload.map((value: unknown): ISolanaSignatureInfo => parseSolanaSignatureInfo(value));
   }
 
   private resolveSignaturesBatchLimit(limit: number): number {
@@ -342,30 +338,6 @@ export class SolanaRpcHistoryAdapter implements IHistoryExplorerAdapter {
     };
   }
 
-  private parseSignatureInfo(value: unknown): ISolanaSignatureInfo {
-    if (!value || typeof value !== 'object') {
-      throw new Error('Solana signature info item is invalid.');
-    }
-
-    const item = value as {
-      readonly signature?: unknown;
-      readonly blockTime?: unknown;
-      readonly err?: unknown;
-    };
-
-    if (typeof item.signature !== 'string' || item.signature.trim().length === 0) {
-      throw new Error('Solana signature info does not contain signature.');
-    }
-
-    const blockTime: number | null = typeof item.blockTime === 'number' ? item.blockTime : null;
-
-    return {
-      signature: item.signature,
-      blockTime,
-      err: item.err ?? null,
-    };
-  }
-
   private async mapSignatureToHistoryItem(
     endpointUrl: string,
     address: string,
@@ -386,23 +358,25 @@ export class SolanaRpcHistoryAdapter implements IHistoryExplorerAdapter {
     const value: ISolanaTransactionValue = parseSolanaTransactionValue(payload);
     const accountKeys: readonly string[] = extractSolanaAccountKeys(value);
     const [fromAddress, toAddress] = resolveSolanaFromTo(accountKeys);
-    const deltaLamports: number = resolveSolanaLamportsDelta(accountKeys, value, address);
-    const direction: HistoryDirection = resolveSolanaDirectionByLamportsDelta(deltaLamports);
-    const isSplTransfer: boolean = detectSolanaSplTransfer(value);
+    const transferDetails = resolveSolanaTransferDetails(accountKeys, value, address);
     const timestampSec: number = resolveSolanaTimestampSec(value, signatureInfo);
     const hasError: boolean = resolveSolanaErrorFlag(value, signatureInfo);
+
+    if (transferDetails === null) {
+      return null;
+    }
 
     return {
       txHash: signatureInfo.signature,
       timestampSec,
       from: fromAddress,
       to: toAddress,
-      valueRaw: Math.abs(deltaLamports).toString(),
+      valueRaw: transferDetails.valueRaw,
       isError: hasError,
-      assetSymbol: isSplTransfer ? 'SPL' : 'SOL',
-      assetDecimals: isSplTransfer ? SPL_TOKEN_DECIMALS : SOL_NATIVE_DECIMALS,
+      assetSymbol: transferDetails.assetSymbol,
+      assetDecimals: transferDetails.assetDecimals,
       eventType: HistoryItemType.TRANSFER,
-      direction,
+      direction: transferDetails.direction,
       txLink: `${SOLSCAN_TX_BASE_URL}${signatureInfo.signature}`,
     };
   }

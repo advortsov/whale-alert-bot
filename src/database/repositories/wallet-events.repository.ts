@@ -28,6 +28,13 @@ type WalletEventHistoryRow = {
   readonly counterparty_address: string | null;
   readonly dex: string | null;
   readonly pair: string | null;
+  readonly usd_price: number | null;
+  readonly usd_amount: number | null;
+  readonly usd_unavailable: boolean;
+  readonly swap_from_symbol: string | null;
+  readonly swap_from_amount_text: string | null;
+  readonly swap_to_symbol: string | null;
+  readonly swap_to_amount_text: string | null;
   readonly occurred_at: Date;
 };
 
@@ -78,6 +85,13 @@ export class WalletEventsRepository {
       counterparty_address: event.counterpartyAddress,
       dex: event.dex,
       pair: event.pair,
+      usd_price: event.usdPrice,
+      usd_amount: event.usdAmount,
+      usd_unavailable: event.usdUnavailable,
+      swap_from_symbol: event.swapFromSymbol,
+      swap_from_amount_text: event.swapFromAmountText,
+      swap_to_symbol: event.swapToSymbol,
+      swap_to_amount_text: event.swapToAmountText,
       occurred_at: occurredAt,
     };
 
@@ -184,6 +198,13 @@ export class WalletEventsRepository {
         'counterparty_address',
         'dex',
         'pair',
+        'usd_price',
+        'usd_amount',
+        'usd_unavailable',
+        'swap_from_symbol',
+        'swap_from_amount_text',
+        'swap_to_symbol',
+        'swap_to_amount_text',
         'occurred_at',
       ])
       .where('chain_key', '=', chainKey);
@@ -216,6 +237,13 @@ export class WalletEventsRepository {
       counterpartyAddress: row.counterparty_address,
       dex: row.dex,
       pair: row.pair,
+      usdPrice: row.usd_price,
+      usdAmount: row.usd_amount,
+      usdUnavailable: row.usd_unavailable,
+      swapFromSymbol: row.swap_from_symbol,
+      swapFromAmountText: row.swap_from_amount_text,
+      swapToSymbol: row.swap_to_symbol,
+      swapToAmountText: row.swap_to_amount_text,
       occurredAt: row.occurred_at,
     };
   }

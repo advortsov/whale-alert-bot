@@ -72,6 +72,13 @@ export interface IWalletHistoryItem {
   readonly isError: boolean;
   readonly counterpartyAddress: string | null;
   readonly contractAddress: string | null;
+  readonly usdPrice: number | null;
+  readonly usdAmount: number | null;
+  readonly usdUnavailable: boolean;
+  readonly swapFromSymbol: string | null;
+  readonly swapFromAmountText: string | null;
+  readonly swapToSymbol: string | null;
+  readonly swapToAmountText: string | null;
 }
 
 export interface IWalletHistoryResult {

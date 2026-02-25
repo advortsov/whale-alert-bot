@@ -118,6 +118,10 @@ const mapApiConfig = (
   | 'priceCacheMaxEntries'
   | 'priceCacheFreshTtlSec'
   | 'priceCacheStaleTtlSec'
+  | 'priceHistoryCacheMaxEntries'
+  | 'priceHistoryCacheTtlSec'
+  | 'priceHistoryCacheStaleSec'
+  | 'priceHistoryRangeMaxAgeDays'
   | 'alertMinSendIntervalSec'
   | 'tokenMetaCacheTtlSec'
 > => ({
@@ -134,6 +138,10 @@ const mapApiConfig = (
   priceCacheMaxEntries: parsedEnv.PRICE_CACHE_MAX_ENTRIES,
   priceCacheFreshTtlSec: parsedEnv.PRICE_CACHE_FRESH_TTL_SEC,
   priceCacheStaleTtlSec: parsedEnv.PRICE_CACHE_STALE_TTL_SEC,
+  priceHistoryCacheMaxEntries: parsedEnv.PRICE_HISTORY_CACHE_MAX_ENTRIES,
+  priceHistoryCacheTtlSec: parsedEnv.PRICE_HISTORY_CACHE_TTL_SEC,
+  priceHistoryCacheStaleSec: parsedEnv.PRICE_HISTORY_CACHE_STALE_SEC,
+  priceHistoryRangeMaxAgeDays: parsedEnv.PRICE_HISTORY_RANGE_MAX_AGE_DAYS,
   alertMinSendIntervalSec: parsedEnv.ALERT_MIN_SEND_INTERVAL_SEC,
   tokenMetaCacheTtlSec: parsedEnv.TOKEN_META_CACHE_TTL_SEC,
 });
@@ -184,6 +192,8 @@ const mapRateLimitConfig = (
   | 'rateLimitTronPublicMaxConcurrent'
   | 'rateLimitCoingeckoMinTimeMs'
   | 'rateLimitCoingeckoMaxConcurrent'
+  | 'rateLimitCoingeckoHistoryMinTimeMs'
+  | 'rateLimitCoingeckoHistoryMaxConcurrent'
   | 'rateLimitEthRpcMinTimeMs'
   | 'rateLimitEthRpcMaxConcurrent'
   | 'jwtSecret'
@@ -203,6 +213,8 @@ const mapRateLimitConfig = (
   rateLimitTronPublicMaxConcurrent: parsedEnv.RATE_LIMIT_TRON_PUBLIC_MAX_CONCURRENT,
   rateLimitCoingeckoMinTimeMs: parsedEnv.RATE_LIMIT_COINGECKO_MIN_TIME_MS,
   rateLimitCoingeckoMaxConcurrent: parsedEnv.RATE_LIMIT_COINGECKO_MAX_CONCURRENT,
+  rateLimitCoingeckoHistoryMinTimeMs: parsedEnv.RATE_LIMIT_COINGECKO_HISTORY_MIN_TIME_MS,
+  rateLimitCoingeckoHistoryMaxConcurrent: parsedEnv.RATE_LIMIT_COINGECKO_HISTORY_MAX_CONCURRENT,
   rateLimitEthRpcMinTimeMs: parsedEnv.RATE_LIMIT_ETH_RPC_MIN_TIME_MS,
   rateLimitEthRpcMaxConcurrent: parsedEnv.RATE_LIMIT_ETH_RPC_MAX_CONCURRENT,
   jwtSecret: parsedEnv.JWT_SECRET ?? null,

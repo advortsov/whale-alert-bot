@@ -39,13 +39,17 @@ import { ADDRESS_CODEC_REGISTRY } from '../../common/interfaces/address/address-
 import { ALERT_DISPATCHER } from '../../common/interfaces/alerts/alert-dispatcher-port.tokens';
 import { HISTORY_EXPLORER_ADAPTER } from '../../common/interfaces/explorers/explorer-port.tokens';
 import { TOKEN_METADATA_ADAPTER } from '../../common/interfaces/token-metadata/token-metadata-port.tokens';
-import { TOKEN_PRICING_PORT } from '../../common/interfaces/token-pricing/token-pricing-port.tokens';
+import {
+  TOKEN_HISTORICAL_PRICING_PORT,
+  TOKEN_PRICING_PORT,
+} from '../../common/interfaces/token-pricing/token-pricing-port.tokens';
 import { DatabaseModule } from '../../database/database.module';
 import { RateLimitingModule } from '../blockchain/rate-limiting/rate-limiting.module';
 import { AddressCodecRegistry } from '../chains/address-codec.registry';
 import { ChainsModule } from '../chains/chains.module';
 import { EthereumTokenMetadataAdapter } from '../chains/ethereum/ethereum-token-metadata.adapter';
 import { SolanaRpcHistoryAdapter } from '../chains/solana/solana-rpc-history.adapter';
+import { CoinGeckoHistoricalPricingAdapter } from '../integrations/coingecko/coingecko-historical-pricing.adapter';
 import { CoinGeckoPricingAdapter } from '../integrations/coingecko/coingecko-pricing.adapter';
 import { EtherscanHistoryAdapter } from '../integrations/etherscan/etherscan-history.adapter';
 import { TronGridHistoryAdapter } from '../integrations/trongrid/tron-grid-history.adapter';
@@ -72,8 +76,13 @@ import { ObservabilityModule } from '../observability/observability.module';
     // --- Token adapters ---
     EthereumTokenMetadataAdapter,
     CoinGeckoPricingAdapter,
+    CoinGeckoHistoricalPricingAdapter,
     { provide: TOKEN_METADATA_ADAPTER, useExisting: EthereumTokenMetadataAdapter },
     { provide: TOKEN_PRICING_PORT, useExisting: CoinGeckoPricingAdapter },
+    {
+      provide: TOKEN_HISTORICAL_PRICING_PORT,
+      useExisting: CoinGeckoHistoricalPricingAdapter,
+    },
     // --- Alerts services ---
     TokenMetadataService,
     AlertEnrichmentService,
@@ -107,6 +116,7 @@ import { ObservabilityModule } from '../observability/observability.module';
   ],
   exports: [
     TrackingService,
+    TOKEN_HISTORICAL_PRICING_PORT,
     TokenMetadataService,
     AlertEnrichmentService,
     AlertSuppressionService,

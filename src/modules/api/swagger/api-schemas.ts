@@ -256,6 +256,13 @@ export const HISTORY_PAGE_RESULT_SCHEMA: SchemaObject = {
           isError: { type: 'boolean' },
           counterpartyAddress: { type: 'string', nullable: true },
           contractAddress: { type: 'string', nullable: true },
+          usdPrice: { type: 'number', nullable: true },
+          usdAmount: { type: 'number', nullable: true },
+          usdUnavailable: { type: 'boolean' },
+          swapFromSymbol: { type: 'string', nullable: true },
+          swapFromAmountText: { type: 'string', nullable: true },
+          swapToSymbol: { type: 'string', nullable: true },
+          swapToAmountText: { type: 'string', nullable: true },
         },
         required: [
           'txHash',

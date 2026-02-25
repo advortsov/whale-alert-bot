@@ -223,6 +223,22 @@ export class AppConfigService {
     return this.config.priceCacheStaleTtlSec;
   }
 
+  public get priceHistoryCacheMaxEntries(): number {
+    return this.config.priceHistoryCacheMaxEntries;
+  }
+
+  public get priceHistoryCacheTtlSec(): number {
+    return this.config.priceHistoryCacheTtlSec;
+  }
+
+  public get priceHistoryCacheStaleSec(): number {
+    return this.config.priceHistoryCacheStaleSec;
+  }
+
+  public get priceHistoryRangeMaxAgeDays(): number {
+    return this.config.priceHistoryRangeMaxAgeDays;
+  }
+
   public get alertMinSendIntervalSec(): number {
     return this.config.alertMinSendIntervalSec;
   }
@@ -325,6 +341,14 @@ export class AppConfigService {
 
   public get rateLimitCoingeckoMaxConcurrent(): number {
     return this.config.rateLimitCoingeckoMaxConcurrent;
+  }
+
+  public get rateLimitCoingeckoHistoryMinTimeMs(): number {
+    return this.config.rateLimitCoingeckoHistoryMinTimeMs;
+  }
+
+  public get rateLimitCoingeckoHistoryMaxConcurrent(): number {
+    return this.config.rateLimitCoingeckoHistoryMaxConcurrent;
   }
 
   public get rateLimitEthRpcMinTimeMs(): number {

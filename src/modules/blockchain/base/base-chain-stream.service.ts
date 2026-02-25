@@ -1,5 +1,6 @@
 import { Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 
+import { enrichClassifiedEventWithUsd } from './base-chain-stream-usd.util';
 import type {
   IBaseChainStreamDependencies,
   IChainRuntimeSnapshot,
@@ -10,6 +11,7 @@ import type { IBlockEnvelope, ITransactionEnvelope } from './block-stream.interf
 import type { ISubscriptionHandle } from './rpc-adapter.interfaces';
 import { QueueOverflowPolicy } from './stream-policy.interfaces';
 import { ClassifiedEventType, type ClassifiedEvent } from '../../../common/interfaces/chain.types';
+import { isZeroClassifiedEvent } from '../../whales/services/history-value.util';
 
 const QUEUE_RETAIN_RATIO = 0.3;
 const QUEUE_RETAIN_MIN = 10;
@@ -33,6 +35,7 @@ export abstract class BaseChainStreamService implements OnModuleInit, OnModuleDe
   protected readonly processedEventsRepository: IBaseChainStreamDependencies['processedEventsRepository'];
   protected readonly walletEventsRepository: IBaseChainStreamDependencies['walletEventsRepository'];
   protected readonly alertDispatcherService: IBaseChainStreamDependencies['alertDispatcherService'];
+  protected readonly tokenHistoricalPricingPort: IBaseChainStreamDependencies['tokenHistoricalPricingPort'];
 
   protected constructor(dependencies: IBaseChainStreamDependencies) {
     this.providerFailoverService = dependencies.providerFailoverService;
@@ -41,6 +44,7 @@ export abstract class BaseChainStreamService implements OnModuleInit, OnModuleDe
     this.processedEventsRepository = dependencies.processedEventsRepository;
     this.walletEventsRepository = dependencies.walletEventsRepository;
     this.alertDispatcherService = dependencies.alertDispatcherService;
+    this.tokenHistoricalPricingPort = dependencies.tokenHistoricalPricingPort;
     this.logger = new Logger(this.constructor.name);
   }
 
@@ -337,6 +341,12 @@ export abstract class BaseChainStreamService implements OnModuleInit, OnModuleDe
       return;
     }
 
+    if (isZeroClassifiedEvent(classifiedEvent)) {
+      this.logDebug(`processMatchedTransaction skip zero-value txHash=${matched.txHash}`);
+      await this.processedEventsRepository.markProcessed(processedKey);
+      return;
+    }
+
     this.logInfo(
       `processMatchedTransaction classified eventType=${classifiedEvent.eventType} txHash=${matched.txHash} address=${matched.trackedAddress}`,
     );
@@ -344,12 +354,18 @@ export abstract class BaseChainStreamService implements OnModuleInit, OnModuleDe
     const occurredAt: Date =
       matched.blockTimestampSec !== null ? new Date(matched.blockTimestampSec * 1000) : new Date();
 
-    await this.walletEventsRepository.saveEvent({
+    const eventWithUsd: ClassifiedEvent = await enrichClassifiedEventWithUsd({
+      chainKey: config.chainKey,
       event: classifiedEvent,
+      occurredAt,
+      tokenHistoricalPricingPort: this.tokenHistoricalPricingPort,
+    });
+    await this.walletEventsRepository.saveEvent({
+      event: eventWithUsd,
       occurredAt,
     });
     await this.processedEventsRepository.markProcessed(processedKey);
-    await this.alertDispatcherService.dispatch(classifiedEvent);
+    await this.alertDispatcherService.dispatch(eventWithUsd);
     this.logDebug(`processMatchedTransaction dispatched txHash=${matched.txHash}`);
   }
 
@@ -479,10 +495,3 @@ export abstract class BaseChainStreamService implements OnModuleInit, OnModuleDe
     this.logger.debug(`${this.getConfig().logPrefix} ${message}`);
   }
 }
-
-export type {
-  IBaseChainStreamDependencies,
-  IChainRuntimeSnapshot,
-  IChainStreamConfig,
-  IMatchedTransaction,
-} from './base-chain-stream.interfaces';

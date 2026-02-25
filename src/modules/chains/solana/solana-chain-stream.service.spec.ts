@@ -9,6 +9,7 @@ import {
   EventDirection,
   type ClassifiedEvent,
 } from '../../../common/interfaces/chain.types';
+import type { ITokenHistoricalPricingPort } from '../../../common/interfaces/token-pricing/token-pricing.interfaces';
 import type { AppConfigService } from '../../../config/app-config.service';
 import type { ChainCheckpointsRepository } from '../../../database/repositories/chain-checkpoints.repository';
 import type { ProcessedEventsRepository } from '../../../database/repositories/processed-events.repository';
@@ -152,6 +153,9 @@ describe('SolanaChainStreamService', (): void => {
         dispatchedEvents.push(event);
       },
     } as unknown as AlertDispatcherService;
+    const tokenHistoricalPricingPort: ITokenHistoricalPricingPort = {
+      getUsdQuoteAt: async () => null,
+    };
     const appConfigService: AppConfigService = {
       solanaWatcherEnabled: true,
       chainBlockQueueMax: 20,
@@ -169,6 +173,7 @@ describe('SolanaChainStreamService', (): void => {
       processedEventsRepository,
       walletEventsRepository,
       alertDispatcherService,
+      tokenHistoricalPricingPort,
       solanaEventClassifierService,
     });
 
@@ -239,6 +244,9 @@ describe('SolanaChainStreamService', (): void => {
     const alertDispatcherService: AlertDispatcherService = {
       dispatch: dispatchMock,
     } as unknown as AlertDispatcherService;
+    const tokenHistoricalPricingPort: ITokenHistoricalPricingPort = {
+      getUsdQuoteAt: async () => null,
+    };
     const appConfigService: AppConfigService = {
       solanaWatcherEnabled: true,
       chainBlockQueueMax: 20,
@@ -256,6 +264,7 @@ describe('SolanaChainStreamService', (): void => {
       processedEventsRepository,
       walletEventsRepository,
       alertDispatcherService,
+      tokenHistoricalPricingPort,
       solanaEventClassifierService,
     });
 
@@ -327,6 +336,9 @@ describe('SolanaChainStreamService', (): void => {
     const alertDispatcherService: AlertDispatcherService = {
       dispatch: dispatchMock,
     } as unknown as AlertDispatcherService;
+    const tokenHistoricalPricingPort: ITokenHistoricalPricingPort = {
+      getUsdQuoteAt: async () => null,
+    };
     const appConfigService: AppConfigService = {
       solanaWatcherEnabled: true,
       chainBlockQueueMax: 120,
@@ -344,6 +356,7 @@ describe('SolanaChainStreamService', (): void => {
       processedEventsRepository,
       walletEventsRepository,
       alertDispatcherService,
+      tokenHistoricalPricingPort,
       solanaEventClassifierService,
     });
 

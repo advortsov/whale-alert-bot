@@ -93,6 +93,13 @@ export class TronEventClassifierService implements IChainEventClassifier {
         counterpartyAddress,
         dex: null,
         pair: null,
+        usdPrice: null,
+        usdAmount: null,
+        usdUnavailable: true,
+        swapFromSymbol: null,
+        swapFromAmountText: null,
+        swapToSymbol: null,
+        swapToAmountText: null,
       };
     }
 
@@ -145,6 +152,13 @@ export class TronEventClassifierService implements IChainEventClassifier {
       counterpartyAddress,
       dex: null,
       pair: null,
+      usdPrice: null,
+      usdAmount: null,
+      usdUnavailable: true,
+      swapFromSymbol: null,
+      swapFromAmountText: null,
+      swapToSymbol: null,
+      swapToAmountText: null,
     };
   }
 
@@ -182,6 +196,13 @@ export class TronEventClassifierService implements IChainEventClassifier {
       counterpartyAddress,
       dex: null,
       pair: null,
+      usdPrice: null,
+      usdAmount: null,
+      usdUnavailable: true,
+      swapFromSymbol: null,
+      swapFromAmountText: null,
+      swapToSymbol: null,
+      swapToAmountText: null,
     };
   }
 

@@ -122,11 +122,13 @@ export class EtherscanHistoryAdapter implements IHistoryExplorerAdapter {
       return [];
     }
 
-    return response.result.map((value: unknown) =>
+    const mappedItems: readonly IHistoryItemDto[] = response.result.map((value: unknown) =>
       action === EtherscanHistoryAction.TX_LIST
         ? this.mapNormalTransaction(value, request.address)
         : this.mapTokenTransaction(value, request.address),
     );
+
+    return mappedItems.filter((item: IHistoryItemDto): boolean => !this.isZeroValue(item.valueRaw));
   }
 
   private applyDirectionFilter(
@@ -184,6 +186,14 @@ export class EtherscanHistoryAdapter implements IHistoryExplorerAdapter {
     }
 
     return Math.floor(offset / limit) + 1;
+  }
+
+  private isZeroValue(valueRaw: string): boolean {
+    try {
+      return BigInt(valueRaw) === BigInt(0);
+    } catch {
+      return valueRaw.trim() === '0';
+    }
   }
 
   private mapNormalTransaction(value: unknown, address: string): IHistoryItemDto {

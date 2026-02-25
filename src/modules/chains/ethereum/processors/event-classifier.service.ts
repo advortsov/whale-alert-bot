@@ -42,17 +42,6 @@ export class EventClassifierService {
         continue;
       }
 
-      const transferEvent: ClassifiedEvent | null = this.classifyTransferLog(
-        event,
-        log,
-        topic0,
-        normalizedTrackedAddress,
-      );
-
-      if (transferEvent !== null) {
-        return transferEvent;
-      }
-
       const swapEvent: ClassifiedEvent | null = this.classifySwapLog(
         event,
         log,
@@ -62,6 +51,17 @@ export class EventClassifierService {
 
       if (swapEvent !== null) {
         return swapEvent;
+      }
+
+      const transferEvent: ClassifiedEvent | null = this.classifyTransferLog(
+        event,
+        log,
+        topic0,
+        normalizedTrackedAddress,
+      );
+
+      if (transferEvent !== null) {
+        return transferEvent;
       }
     }
 
@@ -189,6 +189,13 @@ export class EventClassifierService {
       counterpartyAddress,
       dex: null,
       pair: null,
+      usdPrice: null,
+      usdAmount: null,
+      usdUnavailable: true,
+      swapFromSymbol: null,
+      swapFromAmountText: null,
+      swapToSymbol: null,
+      swapToAmountText: null,
     };
   }
 
@@ -215,6 +222,13 @@ export class EventClassifierService {
       counterpartyAddress: null,
       dex: this.mapDex(topic0),
       pair: null,
+      usdPrice: null,
+      usdAmount: null,
+      usdUnavailable: true,
+      swapFromSymbol: null,
+      swapFromAmountText: null,
+      swapToSymbol: null,
+      swapToAmountText: null,
     };
   }
 
@@ -236,6 +250,13 @@ export class EventClassifierService {
       counterpartyAddress: null,
       dex: null,
       pair: null,
+      usdPrice: null,
+      usdAmount: null,
+      usdUnavailable: true,
+      swapFromSymbol: null,
+      swapFromAmountText: null,
+      swapToSymbol: null,
+      swapToAmountText: null,
     };
   }
 }

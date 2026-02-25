@@ -56,6 +56,13 @@ export class TrackingHistoryFormatterService {
           isError: transaction.isError,
           counterpartyAddress: direction === 'IN' ? transaction.from : transaction.to,
           contractAddress: null,
+          usdPrice: null,
+          usdAmount: null,
+          usdUnavailable: true,
+          swapFromSymbol: null,
+          swapFromAmountText: null,
+          swapToSymbol: null,
+          swapToAmountText: null,
         };
       },
     );
@@ -104,6 +111,13 @@ export class TrackingHistoryFormatterService {
           isError: false,
           counterpartyAddress: event.counterpartyAddress,
           contractAddress: event.contractAddress ?? event.tokenAddress,
+          usdPrice: event.usdPrice,
+          usdAmount: event.usdAmount,
+          usdUnavailable: event.usdUnavailable,
+          swapFromSymbol: event.swapFromSymbol,
+          swapFromAmountText: event.swapFromAmountText,
+          swapToSymbol: event.swapToSymbol,
+          swapToAmountText: event.swapToAmountText,
         };
       },
     );

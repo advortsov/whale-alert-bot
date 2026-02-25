@@ -132,6 +132,13 @@ describe('TrackingHistoryService', (): void => {
             assetStandard: 'NATIVE',
             dex: null,
             pair: null,
+            usdPrice: null,
+            usdAmount: null,
+            usdUnavailable: true,
+            swapFromSymbol: null,
+            swapFromAmountText: null,
+            swapToSymbol: null,
+            swapToAmountText: null,
             isError: item.isError,
             counterpartyAddress: null,
             contractAddress: null,
@@ -170,6 +177,13 @@ describe('TrackingHistoryService', (): void => {
         },
       }),
       getStalePage: vi.fn().mockReturnValue(null),
+    };
+    (
+      deps as unknown as {
+        tokenHistoricalPricingPort: { getUsdQuoteAt: ReturnType<typeof vi.fn> };
+      }
+    ).tokenHistoricalPricingPort = {
+      getUsdQuoteAt: vi.fn().mockResolvedValue(null),
     };
 
     const service: TrackingHistoryService = new TrackingHistoryService(deps);
@@ -283,6 +297,13 @@ describe('TrackingHistoryService', (): void => {
             assetStandard: 'NATIVE',
             dex: null,
             pair: null,
+            usdPrice: null,
+            usdAmount: null,
+            usdUnavailable: true,
+            swapFromSymbol: null,
+            swapFromAmountText: null,
+            swapToSymbol: null,
+            swapToAmountText: null,
             isError: item.isError,
             counterpartyAddress: null,
             contractAddress: null,
@@ -321,6 +342,13 @@ describe('TrackingHistoryService', (): void => {
           nextOffset: null,
         },
       }),
+    };
+    (
+      deps as unknown as {
+        tokenHistoricalPricingPort: { getUsdQuoteAt: ReturnType<typeof vi.fn> };
+      }
+    ).tokenHistoricalPricingPort = {
+      getUsdQuoteAt: vi.fn().mockResolvedValue(null),
     };
 
     const service: TrackingHistoryService = new TrackingHistoryService(deps);

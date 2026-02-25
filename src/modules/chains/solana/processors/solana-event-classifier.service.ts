@@ -59,6 +59,13 @@ export class SolanaEventClassifierService implements IChainEventClassifier {
       counterpartyAddress,
       dex: null,
       pair: null,
+      usdPrice: null,
+      usdAmount: null,
+      usdUnavailable: true,
+      swapFromSymbol: null,
+      swapFromAmountText: null,
+      swapToSymbol: null,
+      swapToAmountText: null,
     };
 
     return { event };

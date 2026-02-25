@@ -91,6 +91,24 @@ describe('SolanaRpcHistoryAdapter', (): void => {
             meta: {
               preBalances: [5_000_000_000, 0],
               postBalances: [4_000_000_000, 0],
+              preTokenBalances: [
+                {
+                  owner: 'tracked-sol-address',
+                  uiTokenAmount: {
+                    amount: '2000000',
+                    decimals: 6,
+                  },
+                },
+              ],
+              postTokenBalances: [
+                {
+                  owner: 'tracked-sol-address',
+                  uiTokenAmount: {
+                    amount: '1000000',
+                    decimals: 6,
+                  },
+                },
+              ],
               err: null,
               logMessages: [
                 'Program log: transfer',
@@ -130,7 +148,7 @@ describe('SolanaRpcHistoryAdapter', (): void => {
       timestampSec: 1_739_150_000,
       from: 'tracked-sol-address',
       to: 'receiver-sol-address',
-      valueRaw: '1000000000',
+      valueRaw: '1000000',
       isError: false,
       assetSymbol: 'SPL',
       assetDecimals: 6,

@@ -57,4 +57,11 @@ export type ClassifiedEvent = {
   readonly counterpartyAddress: string | null;
   readonly dex: string | null;
   readonly pair: string | null;
+  readonly usdPrice: number | null;
+  readonly usdAmount: number | null;
+  readonly usdUnavailable: boolean;
+  readonly swapFromSymbol: string | null;
+  readonly swapFromAmountText: string | null;
+  readonly swapToSymbol: string | null;
+  readonly swapToAmountText: string | null;
 };

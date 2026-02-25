@@ -34,6 +34,13 @@ describe('AlertMessageFormatter', (): void => {
       counterpartyAddress: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
       dex: null,
       pair: null,
+      usdPrice: null,
+      usdAmount: null,
+      usdUnavailable: true,
+      swapFromSymbol: null,
+      swapFromAmountText: null,
+      swapToSymbol: null,
+      swapToAmountText: null,
     };
 
     const result: string = formatter.format(event, {

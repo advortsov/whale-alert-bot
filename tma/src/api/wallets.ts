@@ -36,6 +36,13 @@ interface IRawWalletHistoryItem {
   readonly isError?: unknown;
   readonly counterpartyAddress?: unknown;
   readonly contractAddress?: unknown;
+  readonly usdPrice?: unknown;
+  readonly usdAmount?: unknown;
+  readonly usdUnavailable?: unknown;
+  readonly swapFromSymbol?: unknown;
+  readonly swapFromAmountText?: unknown;
+  readonly swapToSymbol?: unknown;
+  readonly swapToAmountText?: unknown;
 }
 
 interface IRawWalletListResult {
@@ -116,6 +123,22 @@ const normalizeNullableString = (rawValue: unknown): string | null => {
 
   const normalizedValue: string = rawValue.trim();
   return normalizedValue.length > 0 ? normalizedValue : null;
+};
+
+const normalizeNullableNumber = (rawValue: unknown): number | null => {
+  if (typeof rawValue === 'number' && Number.isFinite(rawValue)) {
+    return rawValue;
+  }
+
+  if (typeof rawValue === 'string') {
+    const parsedValue: number = Number.parseFloat(rawValue.trim());
+
+    if (Number.isFinite(parsedValue)) {
+      return parsedValue;
+    }
+  }
+
+  return null;
 };
 
 const normalizeWalletSummary = (rawValue: unknown): IWalletSummaryDto | null => {
@@ -231,6 +254,13 @@ const normalizeHistoryItem = (rawValue: IRawWalletHistoryItem): IWalletHistoryIt
     isError: rawValue.isError === true,
     counterpartyAddress: normalizeNullableString(rawValue.counterpartyAddress),
     contractAddress: normalizeNullableString(rawValue.contractAddress),
+    usdPrice: normalizeNullableNumber(rawValue.usdPrice),
+    usdAmount: normalizeNullableNumber(rawValue.usdAmount),
+    usdUnavailable: rawValue.usdUnavailable === true,
+    swapFromSymbol: normalizeNullableString(rawValue.swapFromSymbol),
+    swapFromAmountText: normalizeNullableString(rawValue.swapFromAmountText),
+    swapToSymbol: normalizeNullableString(rawValue.swapToSymbol),
+    swapToAmountText: normalizeNullableString(rawValue.swapToAmountText),
   };
 };
 

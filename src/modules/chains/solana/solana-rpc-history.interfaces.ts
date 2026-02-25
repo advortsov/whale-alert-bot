@@ -15,8 +15,22 @@ export interface ISolanaTransactionData {
 export interface ISolanaTransactionMeta {
   readonly preBalances?: readonly number[];
   readonly postBalances?: readonly number[];
+  readonly preTokenBalances?: readonly ISolanaTokenBalance[];
+  readonly postTokenBalances?: readonly ISolanaTokenBalance[];
   readonly err?: unknown;
   readonly logMessages?: readonly string[] | null;
+}
+
+export interface ISolanaUiTokenAmount {
+  readonly amount?: string;
+  readonly decimals?: number;
+}
+
+export interface ISolanaTokenBalance {
+  readonly accountIndex?: number;
+  readonly owner?: string;
+  readonly mint?: string;
+  readonly uiTokenAmount?: ISolanaUiTokenAmount;
 }
 
 export interface ISolanaTransactionValue {

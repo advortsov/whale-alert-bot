@@ -117,6 +117,13 @@ export interface IWalletEventsTable {
   counterparty_address: string | null;
   dex: string | null;
   pair: string | null;
+  usd_price: number | null;
+  usd_amount: number | null;
+  usd_unavailable: boolean;
+  swap_from_symbol: string | null;
+  swap_from_amount_text: string | null;
+  swap_to_symbol: string | null;
+  swap_to_amount_text: string | null;
   occurred_at: TimestampColumn;
   created_at: TimestampColumn;
 }

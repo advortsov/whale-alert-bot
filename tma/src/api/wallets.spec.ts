@@ -122,6 +122,13 @@ describe('tma wallets api', (): void => {
           isError: false,
           counterpartyAddress: '0xcounterparty',
           contractAddress: '0xcontract',
+          usdPrice: 2745.55,
+          usdAmount: 2745.55,
+          usdUnavailable: false,
+          swapFromSymbol: null,
+          swapFromAmountText: null,
+          swapToSymbol: null,
+          swapToAmountText: null,
         },
         {
           txHash: 123,
@@ -150,6 +157,13 @@ describe('tma wallets api', (): void => {
       isError: false,
       counterpartyAddress: '0xcounterparty',
       contractAddress: '0xcontract',
+      usdPrice: 2745.55,
+      usdAmount: 2745.55,
+      usdUnavailable: false,
+      swapFromSymbol: null,
+      swapFromAmountText: null,
+      swapToSymbol: null,
+      swapToAmountText: null,
     });
   });
 

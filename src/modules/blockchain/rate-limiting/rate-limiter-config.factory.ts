@@ -46,5 +46,10 @@ export function buildLimiterConfigs(
     maxConcurrent: config.rateLimitCoingeckoMaxConcurrent,
   });
 
+  map.set(LimiterKey.COINGECKO_HISTORY, {
+    minTime: config.rateLimitCoingeckoHistoryMinTimeMs,
+    maxConcurrent: config.rateLimitCoingeckoHistoryMaxConcurrent,
+  });
+
   return map;
 }

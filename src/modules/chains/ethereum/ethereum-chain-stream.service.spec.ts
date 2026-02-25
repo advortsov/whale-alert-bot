@@ -10,6 +10,7 @@ import {
   type ClassifiedEvent,
   type ObservedTransaction,
 } from '../../../common/interfaces/chain.types';
+import type { ITokenHistoricalPricingPort } from '../../../common/interfaces/token-pricing/token-pricing.interfaces';
 import type { AppConfigService } from '../../../config/app-config.service';
 import type { ChainCheckpointsRepository } from '../../../database/repositories/chain-checkpoints.repository';
 import type { ProcessedEventsRepository } from '../../../database/repositories/processed-events.repository';
@@ -167,6 +168,13 @@ describe('ChainStreamService', (): void => {
         counterpartyAddress: null,
         dex: null,
         pair: null,
+        usdPrice: null,
+        usdAmount: null,
+        usdUnavailable: true,
+        swapFromSymbol: null,
+        swapFromAmountText: null,
+        swapToSymbol: null,
+        swapToAmountText: null,
       }),
     } as unknown as EventClassifierService;
     const dispatched: ClassifiedEvent[] = [];
@@ -175,6 +183,9 @@ describe('ChainStreamService', (): void => {
         dispatched.push(event);
       },
     } as unknown as AlertDispatcherService;
+    const tokenHistoricalPricingPort: ITokenHistoricalPricingPort = {
+      getUsdQuoteAt: async () => null,
+    };
     const appConfigService: AppConfigService = {
       chainWatcherEnabled: true,
       chainBlockQueueMax: 20,
@@ -206,6 +217,7 @@ describe('ChainStreamService', (): void => {
       walletEventsRepository,
       eventClassifierService,
       alertDispatcherService,
+      tokenHistoricalPricingPort,
     });
 
     await service.onModuleInit();
@@ -289,11 +301,21 @@ describe('ChainStreamService', (): void => {
         counterpartyAddress: null,
         dex: null,
         pair: null,
+        usdPrice: null,
+        usdAmount: null,
+        usdUnavailable: true,
+        swapFromSymbol: null,
+        swapFromAmountText: null,
+        swapToSymbol: null,
+        swapToAmountText: null,
       }),
     } as unknown as EventClassifierService;
     const alertDispatcherService: AlertDispatcherService = {
       dispatch: async (): Promise<void> => undefined,
     } as unknown as AlertDispatcherService;
+    const tokenHistoricalPricingPort: ITokenHistoricalPricingPort = {
+      getUsdQuoteAt: async () => null,
+    };
     const appConfigService: AppConfigService = {
       chainWatcherEnabled: true,
       chainBlockQueueMax: 20,
@@ -325,6 +347,7 @@ describe('ChainStreamService', (): void => {
       walletEventsRepository,
       eventClassifierService,
       alertDispatcherService,
+      tokenHistoricalPricingPort,
     });
 
     await service.onModuleInit();
@@ -430,11 +453,21 @@ describe('ChainStreamService', (): void => {
         counterpartyAddress: null,
         dex: null,
         pair: null,
+        usdPrice: null,
+        usdAmount: null,
+        usdUnavailable: true,
+        swapFromSymbol: null,
+        swapFromAmountText: null,
+        swapToSymbol: null,
+        swapToAmountText: null,
       }),
     } as unknown as EventClassifierService;
     const alertDispatcherService: AlertDispatcherService = {
       dispatch: async (): Promise<void> => undefined,
     } as unknown as AlertDispatcherService;
+    const tokenHistoricalPricingPort: ITokenHistoricalPricingPort = {
+      getUsdQuoteAt: async () => null,
+    };
     const appConfigService: AppConfigService = {
       chainWatcherEnabled: true,
       chainBlockQueueMax: 20,
@@ -466,6 +499,7 @@ describe('ChainStreamService', (): void => {
       walletEventsRepository,
       eventClassifierService,
       alertDispatcherService,
+      tokenHistoricalPricingPort,
     });
 
     await service.onModuleInit();

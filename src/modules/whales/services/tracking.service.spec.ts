@@ -24,6 +24,7 @@ import type { IAddressCodecRegistry } from '../../../common/interfaces/address/a
 import type { IAddressCodec } from '../../../common/interfaces/address/address-codec.interfaces';
 import { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
 import type { IHistoryExplorerAdapter } from '../../../common/interfaces/explorers/history-explorer.interfaces';
+import type { ITokenHistoricalPricingPort } from '../../../common/interfaces/token-pricing/token-pricing.interfaces';
 import type { AppConfigService } from '../../../config/app-config.service';
 import type { AlertMutesRepository } from '../../../database/repositories/alert-mutes.repository';
 import type { SubscriptionsRepository } from '../../../database/repositories/subscriptions.repository';
@@ -112,6 +113,10 @@ type WalletEventsRepositoryStub = {
   readonly listRecentByTrackedAddress: ReturnType<typeof vi.fn>;
 };
 
+type TokenHistoricalPricingPortStub = {
+  readonly getUsdQuoteAt: ReturnType<typeof vi.fn>;
+};
+
 type TestContext = {
   readonly userRef: TelegramUserRef;
   readonly usersRepositoryStub: UsersRepositoryStub;
@@ -127,6 +132,7 @@ type TestContext = {
   readonly userWalletAlertPreferencesRepositoryStub: UserWalletAlertPreferencesRepositoryStub;
   readonly alertMutesRepositoryStub: AlertMutesRepositoryStub;
   readonly walletEventsRepositoryStub: WalletEventsRepositoryStub;
+  readonly tokenHistoricalPricingPortStub: TokenHistoricalPricingPortStub;
   readonly appConfigServiceStub: AppConfigServiceStub;
   readonly service: TrackingService;
 };
@@ -193,6 +199,9 @@ const createTestContext = (): TestContext => {
   };
   const walletEventsRepositoryStub: WalletEventsRepositoryStub = {
     listRecentByTrackedAddress: vi.fn(),
+  };
+  const tokenHistoricalPricingPortStub: TokenHistoricalPricingPortStub = {
+    getUsdQuoteAt: vi.fn(),
   };
   const appConfigServiceStub: AppConfigServiceStub = {
     etherscanTxBaseUrl: 'https://etherscan.io/tx/',
@@ -306,6 +315,7 @@ const createTestContext = (): TestContext => {
     updated_at: new Date('2026-02-01T00:00:00.000Z'),
   });
   walletEventsRepositoryStub.listRecentByTrackedAddress.mockResolvedValue([]);
+  tokenHistoricalPricingPortStub.getUsdQuoteAt.mockResolvedValue(null);
   alertMutesRepositoryStub.findActiveMute.mockResolvedValue(null);
   alertMutesRepositoryStub.deleteMute.mockResolvedValue(true);
   alertMutesRepositoryStub.upsertMute.mockResolvedValue({
@@ -408,6 +418,10 @@ const createTestContext = (): TestContext => {
   (
     historyDeps as { trackingHistoryPageService: TrackingHistoryPageService }
   ).trackingHistoryPageService = trackingHistoryPageService;
+  (
+    historyDeps as { tokenHistoricalPricingPort: ITokenHistoricalPricingPort }
+  ).tokenHistoricalPricingPort =
+    tokenHistoricalPricingPortStub as unknown as ITokenHistoricalPricingPort;
   const historyPageBuilderService: TrackingHistoryPageBuilderService =
     new TrackingHistoryPageBuilderService(
       historyExplorerAdapterStub as unknown as IHistoryExplorerAdapter,
@@ -445,6 +459,7 @@ const createTestContext = (): TestContext => {
     userWalletAlertPreferencesRepositoryStub,
     alertMutesRepositoryStub,
     walletEventsRepositoryStub,
+    tokenHistoricalPricingPortStub,
     appConfigServiceStub,
     service,
   };
@@ -606,6 +621,13 @@ describe('TrackingService', (): void => {
         valueFormatted: '99.000000',
         dex: null,
         pair: null,
+        usdPrice: null,
+        usdAmount: null,
+        usdUnavailable: true,
+        swapFromSymbol: null,
+        swapFromAmountText: null,
+        swapToSymbol: null,
+        swapToAmountText: null,
         occurredAt: new Date('2026-02-23T00:00:00.000Z'),
       },
     ]);
@@ -765,6 +787,13 @@ describe('TrackingService', (): void => {
         valueFormatted: '1.0',
         dex: null,
         pair: null,
+        usdPrice: null,
+        usdAmount: null,
+        usdUnavailable: true,
+        swapFromSymbol: null,
+        swapFromAmountText: null,
+        swapToSymbol: null,
+        swapToAmountText: null,
         occurredAt: new Date('2026-02-23T00:00:00.000Z'),
       },
     ]);
@@ -831,6 +860,13 @@ describe('TrackingService', (): void => {
         valueFormatted: '0.5',
         dex: null,
         pair: null,
+        usdPrice: null,
+        usdAmount: null,
+        usdUnavailable: true,
+        swapFromSymbol: null,
+        swapFromAmountText: null,
+        swapToSymbol: null,
+        swapToAmountText: null,
         occurredAt: new Date('2026-02-22T00:00:00.000Z'),
       },
     ]);
@@ -897,6 +933,13 @@ describe('TrackingService', (): void => {
         valueFormatted: '1.0',
         dex: null,
         pair: null,
+        usdPrice: null,
+        usdAmount: null,
+        usdUnavailable: true,
+        swapFromSymbol: null,
+        swapFromAmountText: null,
+        swapToSymbol: null,
+        swapToAmountText: null,
         occurredAt: new Date('2026-02-10T10:00:00.000Z'),
       },
     ]);
@@ -945,6 +988,13 @@ describe('TrackingService', (): void => {
         valueFormatted: '1.2',
         dex: null,
         pair: null,
+        usdPrice: null,
+        usdAmount: null,
+        usdUnavailable: true,
+        swapFromSymbol: null,
+        swapFromAmountText: null,
+        swapToSymbol: null,
+        swapToAmountText: null,
         occurredAt: new Date('2026-02-10T11:00:00.000Z'),
       },
     ]);

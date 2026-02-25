@@ -85,6 +85,13 @@ describe('HistoryCardClassifierService', (): void => {
       tokenSymbol: null,
       assetStandard: null,
       pair: null,
+      usdPrice: null,
+      usdAmount: null,
+      usdUnavailable: true,
+      swapFromSymbol: null,
+      swapFromAmountText: null,
+      swapToSymbol: null,
+      swapToAmountText: null,
     } as never);
     const unknownResult = service.classifyExplorerItem(ChainKey.TRON_MAINNET, {
       txHash: 't1',

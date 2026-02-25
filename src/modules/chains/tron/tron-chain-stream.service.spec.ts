@@ -10,6 +10,7 @@ import {
   EventDirection,
   type ClassifiedEvent,
 } from '../../../common/interfaces/chain.types';
+import type { ITokenHistoricalPricingPort } from '../../../common/interfaces/token-pricing/token-pricing.interfaces';
 import type { AppConfigService } from '../../../config/app-config.service';
 import type { ChainCheckpointsRepository } from '../../../database/repositories/chain-checkpoints.repository';
 import type { ProcessedEventsRepository } from '../../../database/repositories/processed-events.repository';
@@ -142,6 +143,9 @@ describe('TronChainStreamService', (): void => {
         dispatchedEvents.push(event);
       },
     } as unknown as AlertDispatcherService;
+    const tokenHistoricalPricingPort: ITokenHistoricalPricingPort = {
+      getUsdQuoteAt: async () => null,
+    };
     const appConfigService: AppConfigService = {
       tronWatcherEnabled: true,
       chainBlockQueueMax: 20,
@@ -160,6 +164,7 @@ describe('TronChainStreamService', (): void => {
       processedEventsRepository,
       walletEventsRepository,
       alertDispatcherService,
+      tokenHistoricalPricingPort,
       tronEventClassifierService,
     });
 
@@ -230,6 +235,9 @@ describe('TronChainStreamService', (): void => {
     const alertDispatcherService: AlertDispatcherService = {
       dispatch: dispatchMock,
     } as unknown as AlertDispatcherService;
+    const tokenHistoricalPricingPort: ITokenHistoricalPricingPort = {
+      getUsdQuoteAt: async () => null,
+    };
     const appConfigService: AppConfigService = {
       tronWatcherEnabled: true,
       chainBlockQueueMax: 20,
@@ -248,6 +256,7 @@ describe('TronChainStreamService', (): void => {
       processedEventsRepository,
       walletEventsRepository,
       alertDispatcherService,
+      tokenHistoricalPricingPort,
       tronEventClassifierService,
     });
 
@@ -315,6 +324,9 @@ describe('TronChainStreamService', (): void => {
     const alertDispatcherService: AlertDispatcherService = {
       dispatch: dispatchMock,
     } as unknown as AlertDispatcherService;
+    const tokenHistoricalPricingPort: ITokenHistoricalPricingPort = {
+      getUsdQuoteAt: async () => null,
+    };
     const appConfigService: AppConfigService = {
       tronWatcherEnabled: true,
       chainBlockQueueMax: 120,
@@ -333,6 +345,7 @@ describe('TronChainStreamService', (): void => {
       processedEventsRepository,
       walletEventsRepository,
       alertDispatcherService,
+      tokenHistoricalPricingPort,
       tronEventClassifierService,
     });
 

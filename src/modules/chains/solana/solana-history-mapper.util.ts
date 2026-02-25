@@ -1,5 +1,7 @@
+import { SOL_NATIVE_DECIMALS, SPL_TOKEN_DECIMALS } from './solana-rpc-history.constants';
 import type {
   ISolanaSignatureInfo,
+  ISolanaTokenBalance,
   ISolanaTransactionValue,
 } from './solana-rpc-history.interfaces';
 import { HistoryDirection, type IHistoryItemDto } from '../../whales/entities/history-item.dto';
@@ -7,12 +9,43 @@ import { HistoryDirectionFilter, HistoryKind } from '../../whales/entities/histo
 
 const SPL_TOKEN_PROGRAM_SUBSTRING = 'tokenkeg';
 
+export interface ISolanaTransferDetails {
+  readonly assetDecimals: number;
+  readonly assetSymbol: string;
+  readonly direction: HistoryDirection;
+  readonly valueRaw: string;
+}
+
 export const parseSolanaTransactionValue = (payload: unknown): ISolanaTransactionValue => {
   if (typeof payload !== 'object') {
     throw new Error('Solana getTransaction returned invalid payload.');
   }
 
   return payload as ISolanaTransactionValue;
+};
+
+export const parseSolanaSignatureInfo = (value: unknown): ISolanaSignatureInfo => {
+  if (!value || typeof value !== 'object') {
+    throw new Error('Solana signature info item is invalid.');
+  }
+
+  const item = value as {
+    readonly blockTime?: unknown;
+    readonly err?: unknown;
+    readonly signature?: unknown;
+  };
+
+  if (typeof item.signature !== 'string' || item.signature.trim().length === 0) {
+    throw new Error('Solana signature info does not contain signature.');
+  }
+
+  const blockTime: number | null = typeof item.blockTime === 'number' ? item.blockTime : null;
+
+  return {
+    signature: item.signature,
+    blockTime,
+    err: item.err ?? null,
+  };
 };
 
 export const resolveSolanaLamportsDelta = (
@@ -35,6 +68,10 @@ export const resolveSolanaLamportsDelta = (
 };
 
 export const resolveSolanaDirectionByLamportsDelta = (deltaLamports: number): HistoryDirection => {
+  if (deltaLamports === 0) {
+    return HistoryDirection.UNKNOWN;
+  }
+
   return deltaLamports >= 0 ? HistoryDirection.IN : HistoryDirection.OUT;
 };
 
@@ -55,6 +92,106 @@ export const detectSolanaSplTransfer = (value: ISolanaTransactionValue): boolean
   return logMessages.some((message: string): boolean =>
     message.toLowerCase().includes(SPL_TOKEN_PROGRAM_SUBSTRING),
   );
+};
+
+const parseTokenAmountRaw = (tokenBalance: ISolanaTokenBalance | null): bigint | null => {
+  if (tokenBalance === null) {
+    return null;
+  }
+
+  const amountRaw: string | undefined = tokenBalance.uiTokenAmount?.amount;
+
+  if (typeof amountRaw !== 'string') {
+    return null;
+  }
+
+  try {
+    return BigInt(amountRaw);
+  } catch {
+    return null;
+  }
+};
+
+const selectTokenBalanceByOwner = (
+  balances: readonly ISolanaTokenBalance[] | undefined,
+  owner: string,
+): ISolanaTokenBalance | null => {
+  if (balances === undefined) {
+    return null;
+  }
+
+  const normalizedOwner: string = owner.trim();
+  const matched = balances.find(
+    (balance: ISolanaTokenBalance): boolean =>
+      typeof balance.owner === 'string' && balance.owner === normalizedOwner,
+  );
+
+  return matched ?? null;
+};
+
+const resolveSplDirection = (
+  splDeltaRaw: bigint | null,
+  nativeDirection: HistoryDirection,
+): HistoryDirection => {
+  if (splDeltaRaw === null || splDeltaRaw === BigInt(0)) {
+    return nativeDirection;
+  }
+
+  return splDeltaRaw > BigInt(0) ? HistoryDirection.IN : HistoryDirection.OUT;
+};
+
+const resolveSplValueRaw = (splDeltaRaw: bigint | null): string => {
+  if (splDeltaRaw === null) {
+    return BigInt(0).toString();
+  }
+
+  return (splDeltaRaw < BigInt(0) ? -splDeltaRaw : splDeltaRaw).toString();
+};
+
+export const resolveSolanaSplAmountDeltaRaw = (
+  value: ISolanaTransactionValue,
+  trackedAddress: string,
+): bigint | null => {
+  const preBalance: ISolanaTokenBalance | null = selectTokenBalanceByOwner(
+    value.meta?.preTokenBalances,
+    trackedAddress,
+  );
+  const postBalance: ISolanaTokenBalance | null = selectTokenBalanceByOwner(
+    value.meta?.postTokenBalances,
+    trackedAddress,
+  );
+  const preAmountRaw: bigint = parseTokenAmountRaw(preBalance) ?? BigInt(0);
+  const postAmountRaw: bigint = parseTokenAmountRaw(postBalance) ?? BigInt(0);
+
+  return postAmountRaw - preAmountRaw;
+};
+
+export const resolveSolanaTransferDetails = (
+  accountKeys: readonly string[],
+  value: ISolanaTransactionValue,
+  trackedAddress: string,
+): ISolanaTransferDetails | null => {
+  const deltaLamports: number = resolveSolanaLamportsDelta(accountKeys, value, trackedAddress);
+  const isSplTransfer: boolean = detectSolanaSplTransfer(value);
+  const splDeltaRaw: bigint | null = isSplTransfer
+    ? resolveSolanaSplAmountDeltaRaw(value, trackedAddress)
+    : null;
+  const nativeDirection: HistoryDirection = resolveSolanaDirectionByLamportsDelta(deltaLamports);
+  const direction: HistoryDirection = resolveSplDirection(splDeltaRaw, nativeDirection);
+  const valueRaw: string = isSplTransfer
+    ? resolveSplValueRaw(splDeltaRaw)
+    : Math.abs(deltaLamports).toString();
+
+  if (valueRaw === '0') {
+    return null;
+  }
+
+  return {
+    valueRaw,
+    direction,
+    assetSymbol: isSplTransfer ? 'SPL' : 'SOL',
+    assetDecimals: isSplTransfer ? SPL_TOKEN_DECIMALS : SOL_NATIVE_DECIMALS,
+  };
 };
 
 export const extractSolanaAccountKeys = (value: ISolanaTransactionValue): readonly string[] => {

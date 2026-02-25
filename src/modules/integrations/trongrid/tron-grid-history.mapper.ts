@@ -103,6 +103,10 @@ export class TronGridHistoryMapper {
       return null;
     }
 
+    if (this.isZeroValue(context.valueRaw)) {
+      return null;
+    }
+
     return {
       txHash: context.txHash,
       timestampSec: context.timestampSec,
@@ -132,6 +136,10 @@ export class TronGridHistoryMapper {
     const fromAddress: string = this.normalizeTronAddress(item.from);
     const toAddress: string = this.normalizeTronAddress(item.to);
     const valueRaw: string = this.normalizeUnsignedValue(item.value) ?? '0';
+
+    if (this.isZeroValue(valueRaw)) {
+      return null;
+    }
     const symbol: string = this.normalizeString(item.token_info?.symbol) ?? 'TRC20';
     const decimals: number = this.normalizeTokenDecimals(item.token_info?.decimals);
 
@@ -197,6 +205,14 @@ export class TronGridHistoryMapper {
     }
 
     return context.valueRaw === '0';
+  }
+
+  private isZeroValue(valueRaw: string): boolean {
+    try {
+      return BigInt(valueRaw) === BigInt(0);
+    } catch {
+      return valueRaw.trim() === '0';
+    }
   }
 
   private resolveContractType(contract: ITronGridNativeContractItem): string {

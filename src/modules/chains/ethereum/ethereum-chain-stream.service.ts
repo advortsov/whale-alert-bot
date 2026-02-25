@@ -10,6 +10,8 @@ import {
   type ClassifiedEvent,
   type ObservedTransaction,
 } from '../../../common/interfaces/chain.types';
+import { TOKEN_HISTORICAL_PRICING_PORT } from '../../../common/interfaces/token-pricing/token-pricing-port.tokens';
+import type { ITokenHistoricalPricingPort } from '../../../common/interfaces/token-pricing/token-pricing.interfaces';
 import { AppConfigService } from '../../../config/app-config.service';
 import { ChainCheckpointsRepository } from '../../../database/repositories/chain-checkpoints.repository';
 import { ProcessedEventsRepository } from '../../../database/repositories/processed-events.repository';
@@ -62,6 +64,9 @@ export class ChainStreamServiceDependencies implements IBaseChainStreamDependenc
 
   @Inject(ALERT_DISPATCHER)
   public readonly alertDispatcherService!: IAlertDispatcher;
+
+  @Inject(TOKEN_HISTORICAL_PRICING_PORT)
+  public readonly tokenHistoricalPricingPort!: ITokenHistoricalPricingPort;
 }
 
 @Injectable()
@@ -81,6 +86,7 @@ export class ChainStreamService extends BaseChainStreamService {
       processedEventsRepository: dependencies.processedEventsRepository,
       walletEventsRepository: dependencies.walletEventsRepository,
       alertDispatcherService: dependencies.alertDispatcherService,
+      tokenHistoricalPricingPort: dependencies.tokenHistoricalPricingPort,
     };
     super(baseDependencies);
     this.appConfigService = dependencies.appConfigService;

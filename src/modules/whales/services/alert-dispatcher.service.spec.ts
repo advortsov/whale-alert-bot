@@ -105,6 +105,13 @@ const buildEvent = (valueFormatted: string): ClassifiedEvent => {
     counterpartyAddress: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
     dex: null,
     pair: null,
+    usdPrice: null,
+    usdAmount: null,
+    usdUnavailable: true,
+    swapFromSymbol: null,
+    swapFromAmountText: null,
+    swapToSymbol: null,
+    swapToAmountText: null,
   };
 };
 

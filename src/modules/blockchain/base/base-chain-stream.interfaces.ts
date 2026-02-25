@@ -1,5 +1,6 @@
 import type { IAlertDispatcher } from '../../../common/interfaces/alerts/alert-dispatcher.interfaces';
 import type { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
+import type { ITokenHistoricalPricingPort } from '../../../common/interfaces/token-pricing/token-pricing.interfaces';
 import type { ChainCheckpointsRepository } from '../../../database/repositories/chain-checkpoints.repository';
 import type { ProcessedEventsRepository } from '../../../database/repositories/processed-events.repository';
 import type { SubscriptionsRepository } from '../../../database/repositories/subscriptions.repository';
@@ -39,4 +40,5 @@ export interface IBaseChainStreamDependencies {
   readonly processedEventsRepository: ProcessedEventsRepository;
   readonly walletEventsRepository: WalletEventsRepository;
   readonly alertDispatcherService: IAlertDispatcher;
+  readonly tokenHistoricalPricingPort: ITokenHistoricalPricingPort;
 }

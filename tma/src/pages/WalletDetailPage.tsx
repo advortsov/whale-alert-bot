@@ -47,10 +47,6 @@ const normalizeHistoryToken = (
 };
 
 const buildHistoryBadgeLine = (item: IWalletHistoryResult['items'][number]): string => {
-  const txType: string = normalizeHistoryToken(
-    item.txType,
-    normalizeHistoryToken(item.eventType, 'UNKNOWN'),
-  );
   const direction: string = normalizeHistoryToken(item.direction, 'UNKNOWN');
   const flowLabel: string = normalizeHistoryToken(
     item.flowLabel,
@@ -58,14 +54,43 @@ const buildHistoryBadgeLine = (item: IWalletHistoryResult['items'][number]): str
   );
   const assetStandard: string = normalizeHistoryToken(item.assetStandard, 'UNKNOWN');
   const statusToken: string = item.isError ? '[ERROR]' : '[OK]';
+  const usdToken: string =
+    item.usdAmount !== null && item.usdPrice !== null
+      ? `[USD: ${item.usdAmount.toFixed(2)}]`
+      : item.usdUnavailable
+        ? '[USD: n/a]'
+        : '[USD: pending]';
 
   return [
-    `[${txType}]`,
     `[${direction}]`,
     `[${flowLabel}]`,
     `[${assetStandard}]`,
     statusToken,
+    usdToken,
   ].join(' ');
+};
+
+const buildHistoryTitleLine = (item: IWalletHistoryResult['items'][number]): string => {
+  const txType: string = normalizeHistoryToken(
+    item.txType,
+    normalizeHistoryToken(item.eventType, 'UNKNOWN'),
+  );
+
+  if (
+    txType === 'SWAP' &&
+    item.swapFromSymbol !== null &&
+    item.swapToSymbol !== null &&
+    item.swapFromAmountText !== null &&
+    item.swapToAmountText !== null
+  ) {
+    return `${txType} • ${item.swapFromAmountText} ${item.swapFromSymbol} → ${item.swapToAmountText} ${item.swapToSymbol}`;
+  }
+
+  if (txType === 'SWAP' && normalizeHistoryToken(item.amountText, 'SWAP') === 'SWAP') {
+    return item.dex !== null ? `${txType} • ${item.dex}` : txType;
+  }
+
+  return `${txType} • ${item.amountText}`;
 };
 
 export const WalletDetailPage = (): React.JSX.Element => {
@@ -233,8 +258,7 @@ export const WalletDetailPage = (): React.JSX.Element => {
                 }
               >
                 <div className="tma-history-title">
-                  {normalizeHistoryToken(item.txType, item.eventType)} •{' '}
-                  {normalizeHistoryToken(item.direction, 'UNKNOWN')} • {item.amountText}
+                  {buildHistoryTitleLine(item)}
                 </div>
                 <div className="tma-history-badges">{buildHistoryBadgeLine(item)}</div>
               </Cell>

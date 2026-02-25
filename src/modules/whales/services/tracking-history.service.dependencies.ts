@@ -10,6 +10,8 @@ import { TrackingHistoryPageService } from './tracking-history-page.service';
 import { TrackingHistoryQueryParserService } from './tracking-history-query-parser.service';
 import { HISTORY_EXPLORER_ADAPTER } from '../../../common/interfaces/explorers/explorer-port.tokens';
 import type { IHistoryExplorerAdapter } from '../../../common/interfaces/explorers/history-explorer.interfaces';
+import { TOKEN_HISTORICAL_PRICING_PORT } from '../../../common/interfaces/token-pricing/token-pricing-port.tokens';
+import type { ITokenHistoricalPricingPort } from '../../../common/interfaces/token-pricing/token-pricing.interfaces';
 import { UsersRepository } from '../../../database/repositories/users.repository';
 
 @Injectable()
@@ -31,6 +33,9 @@ export class TrackingHistoryServiceDependencies {
 
   @Inject(TrackingHistoryPageService)
   public readonly trackingHistoryPageService!: TrackingHistoryPageService;
+
+  @Inject(TOKEN_HISTORICAL_PRICING_PORT)
+  public readonly tokenHistoricalPricingPort!: ITokenHistoricalPricingPort;
 
   @Inject(TrackingHistoryPageBuilderService)
   public readonly historyPageBuilderService!: TrackingHistoryPageBuilderService;

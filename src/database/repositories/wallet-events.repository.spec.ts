@@ -114,6 +114,13 @@ describe('WalletEventsRepository', (): void => {
       counterpartyAddress: 'TEDVku9LrQDLdbg1ik6HrRtK6Uimg8epSV',
       dex: null,
       pair: null,
+      usdPrice: null,
+      usdAmount: null,
+      usdUnavailable: true,
+      swapFromSymbol: null,
+      swapFromAmountText: null,
+      swapToSymbol: null,
+      swapToAmountText: null,
     };
 
     await repository.saveEvent({

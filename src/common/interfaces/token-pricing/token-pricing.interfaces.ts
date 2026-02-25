@@ -26,3 +26,29 @@ export interface IPriceQuoteDto {
 export interface ITokenPricingPort {
   getUsdQuote(request: IPriceRequestDto): Promise<IPriceQuoteDto | null>;
 }
+
+export enum HistoricalPriceSource {
+  RANGE = 'range',
+  DAILY = 'daily',
+}
+
+export interface IHistoricalPriceRequestDto {
+  readonly chainKey: ChainKey;
+  readonly tokenAddress: string | null;
+  readonly tokenSymbol: string | null;
+  readonly timestampSec: number;
+}
+
+export interface IHistoricalPriceQuoteDto {
+  readonly chainKey: ChainKey;
+  readonly tokenAddress: string | null;
+  readonly tokenSymbol: string | null;
+  readonly usdPrice: number;
+  readonly source: HistoricalPriceSource;
+  readonly resolvedAtSec: number;
+  readonly stale: boolean;
+}
+
+export interface ITokenHistoricalPricingPort {
+  getUsdQuoteAt(request: IHistoricalPriceRequestDto): Promise<IHistoricalPriceQuoteDto | null>;
+}

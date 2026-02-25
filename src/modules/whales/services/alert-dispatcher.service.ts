@@ -149,15 +149,16 @@ export class AlertDispatcherService implements IAlertDispatcher {
     event: ClassifiedEvent,
     chainKey: ChainKey,
   ): Promise<IEventUsdContext> {
-    const value: number | null = event.valueFormatted
-      ? Number.parseFloat(event.valueFormatted)
-      : null;
+    const existingUsdAmount: number | null = this.resolveExistingUsdAmount(event);
 
-    if (value === null || Number.isNaN(value) || value <= 0) {
-      return {
-        usdAmount: null,
-        usdUnavailable: true,
-      };
+    if (existingUsdAmount !== null) {
+      return this.buildResolvedUsdContext(existingUsdAmount);
+    }
+
+    const value: number | null = this.parsePositiveValue(event.valueFormatted);
+
+    if (value === null) {
+      return this.buildUnavailableUsdContext();
     }
 
     const quote = await this.tokenPricingPort.getUsdQuote({
@@ -167,15 +168,49 @@ export class AlertDispatcherService implements IAlertDispatcher {
     });
 
     if (quote === null || !Number.isFinite(quote.usdPrice) || quote.usdPrice <= 0) {
-      return {
-        usdAmount: null,
-        usdUnavailable: true,
-      };
+      return this.buildUnavailableUsdContext();
     }
 
+    return this.buildResolvedUsdContext(value * quote.usdPrice);
+  }
+
+  private resolveExistingUsdAmount(event: ClassifiedEvent): number | null {
+    if (event.usdAmount === null) {
+      return null;
+    }
+
+    if (!Number.isFinite(event.usdAmount) || event.usdAmount <= 0) {
+      return null;
+    }
+
+    return event.usdAmount;
+  }
+
+  private parsePositiveValue(rawValue: string | null): number | null {
+    if (typeof rawValue !== 'string' || rawValue.trim().length === 0) {
+      return null;
+    }
+
+    const parsedValue: number = Number.parseFloat(rawValue);
+
+    if (!Number.isFinite(parsedValue) || parsedValue <= 0) {
+      return null;
+    }
+
+    return parsedValue;
+  }
+
+  private buildResolvedUsdContext(usdAmount: number): IEventUsdContext {
     return {
-      usdAmount: value * quote.usdPrice,
+      usdAmount,
       usdUnavailable: false,
+    };
+  }
+
+  private buildUnavailableUsdContext(): IEventUsdContext {
+    return {
+      usdAmount: null,
+      usdUnavailable: true,
     };
   }
 

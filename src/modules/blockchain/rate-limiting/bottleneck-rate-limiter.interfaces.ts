@@ -7,6 +7,7 @@ export enum LimiterKey {
   TRON_PUBLIC = 'tron_public',
   ETHERSCAN = 'etherscan',
   COINGECKO = 'coingecko',
+  COINGECKO_HISTORY = 'coingecko_history',
 }
 
 // Bottleneck priority: lower number = higher priority (0–9 range)

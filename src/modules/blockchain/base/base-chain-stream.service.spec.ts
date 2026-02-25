@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import {
-  BaseChainStreamService,
-  type IChainRuntimeSnapshot,
-  type IChainStreamConfig,
-  type IBaseChainStreamDependencies,
-  type IMatchedTransaction,
-} from './base-chain-stream.service';
+import type {
+  IBaseChainStreamDependencies,
+  IChainRuntimeSnapshot,
+  IChainStreamConfig,
+  IMatchedTransaction,
+} from './base-chain-stream.interfaces';
+import { BaseChainStreamService } from './base-chain-stream.service';
 import type { IBlockEnvelope, IReceiptEnvelope } from './block-stream.interfaces';
 import type { ISubscriptionHandle, ProviderOperation } from './rpc-adapter.interfaces';
 import type { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
@@ -17,6 +17,7 @@ import {
   EventDirection,
   AssetStandard,
 } from '../../../common/interfaces/chain.types';
+import type { ITokenHistoricalPricingPort } from '../../../common/interfaces/token-pricing/token-pricing.interfaces';
 import type { ChainCheckpointsRepository } from '../../../database/repositories/chain-checkpoints.repository';
 import type { ProcessedEventsRepository } from '../../../database/repositories/processed-events.repository';
 import type { SubscriptionsRepository } from '../../../database/repositories/subscriptions.repository';
@@ -51,6 +52,13 @@ function makeClassifiedEvent(txHash: string): ClassifiedEvent {
     counterpartyAddress: null,
     dex: null,
     pair: null,
+    usdPrice: null,
+    usdAmount: null,
+    usdUnavailable: true,
+    swapFromSymbol: null,
+    swapFromAmountText: null,
+    swapToSymbol: null,
+    swapToAmountText: null,
   };
 }
 
@@ -117,6 +125,9 @@ class TestChainStreamService extends BaseChainStreamService {
       processedEventsRepository,
       walletEventsRepository,
       alertDispatcherService,
+      tokenHistoricalPricingPort: {
+        getUsdQuoteAt: async () => null,
+      } as unknown as ITokenHistoricalPricingPort,
     };
     super(dependencies);
     this.stub = options.stub;
@@ -208,8 +219,10 @@ function createMocks(): {
   walletEventsRepository: WalletEventsRepository;
   subscriptionsRepository: SubscriptionsRepository;
   alertDispatcherService: AlertDispatcherService;
+  tokenHistoricalPricingPort: ITokenHistoricalPricingPort;
   dispatchedEvents: ClassifiedEvent[];
   saveEventMock: ReturnType<typeof vi.fn>;
+  markProcessedMock: ReturnType<typeof vi.fn>;
 } {
   const providerStub = new TestProviderStub();
   const providerFailoverService = {
@@ -225,9 +238,10 @@ function createMocks(): {
     saveLastProcessedBlock: vi.fn().mockResolvedValue(undefined),
   } as unknown as ChainCheckpointsRepository;
 
+  const markProcessedMock: ReturnType<typeof vi.fn> = vi.fn().mockResolvedValue(undefined);
   const processedEventsRepository = {
     hasProcessed: async (): Promise<boolean> => false,
-    markProcessed: vi.fn().mockResolvedValue(undefined),
+    markProcessed: markProcessedMock,
   } as unknown as ProcessedEventsRepository;
 
   const saveEventMock = vi.fn().mockResolvedValue(undefined);
@@ -245,6 +259,9 @@ function createMocks(): {
       dispatchedEvents.push(event);
     },
   } as unknown as AlertDispatcherService;
+  const tokenHistoricalPricingPort = {
+    getUsdQuoteAt: async () => null,
+  } as unknown as ITokenHistoricalPricingPort;
 
   return {
     providerStub,
@@ -254,8 +271,10 @@ function createMocks(): {
     walletEventsRepository,
     subscriptionsRepository,
     alertDispatcherService,
+    tokenHistoricalPricingPort,
     dispatchedEvents,
     saveEventMock,
+    markProcessedMock,
   };
 }
 
@@ -301,6 +320,56 @@ describe('BaseChainStreamService', (): void => {
     expect(mocks.saveEventMock).toHaveBeenCalledTimes(1);
     expect(mocks.dispatchedEvents).toHaveLength(1);
     expect(mocks.dispatchedEvents[0]?.txHash).toBe('0xabc');
+
+    await service.onModuleDestroy();
+  });
+
+  it('skips zero-value transaction persistence and still marks it processed', async (): Promise<void> => {
+    const mocks = createMocks();
+    mocks.providerStub.setBlock(43, {
+      number: 43,
+      timestampSec: 1_739_400_000,
+      transactions: [
+        {
+          hash: '0xzero',
+          from: TRACKED_ADDRESS,
+          to: '0xbbbb',
+          blockTimestampSec: 1_739_400_000,
+        },
+      ],
+    });
+    const zeroEvent: ClassifiedEvent = {
+      ...makeClassifiedEvent('0xzero'),
+      tokenAmountRaw: '0',
+      tokenDecimals: 18,
+      tokenSymbol: 'ETH',
+    };
+    const service = new TestChainStreamService(
+      mocks.providerFailoverService,
+      mocks.chainCheckpointsRepository,
+      mocks.subscriptionsRepository,
+      mocks.processedEventsRepository,
+      mocks.walletEventsRepository,
+      mocks.alertDispatcherService,
+      {
+        stub: mocks.providerStub,
+        trackedAddresses: [TRACKED_ADDRESS],
+        classifyResult: zeroEvent,
+      },
+    );
+
+    await service.onModuleInit();
+
+    if (mocks.providerStub.blockHandler === null) {
+      throw new Error('Block handler not registered');
+    }
+
+    await mocks.providerStub.blockHandler(43);
+    await sleep(30);
+
+    expect(mocks.saveEventMock).not.toHaveBeenCalled();
+    expect(mocks.dispatchedEvents).toHaveLength(0);
+    expect(mocks.markProcessedMock).toHaveBeenCalledTimes(1);
 
     await service.onModuleDestroy();
   });

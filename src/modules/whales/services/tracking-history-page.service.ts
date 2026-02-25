@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import { HistoryCardClassifierService } from './history-card-classifier.service';
+import { isZeroExplorerHistoryItem, isZeroWalletEventHistory } from './history-value.util';
 import { TrackingHistoryFormatterService } from './tracking-history-formatter.service';
 import { ChainKey } from '../../../common/interfaces/chain-key.interfaces';
 import { WalletEventsRepository } from '../../../database/repositories/wallet-events.repository';
@@ -66,70 +67,89 @@ export class TrackingHistoryPageService {
     events: readonly WalletEventHistoryView[],
     fallbackChainKey: ChainKey,
   ): readonly IWalletHistoryListItem[] {
-    return events.map((event: WalletEventHistoryView): IWalletHistoryListItem => {
-      const chainKey: ChainKey = this.resolveChainKey(event.chainKey, fallbackChainKey);
-      const assetSymbol: string | null =
-        event.tokenSymbol !== null && event.tokenSymbol.trim().length > 0
-          ? event.tokenSymbol
-          : null;
-      const cardTraits = this.historyCardClassifierService.classifyWalletEvent(chainKey, event);
+    return events
+      .filter((event: WalletEventHistoryView): boolean => !isZeroWalletEventHistory(event))
+      .map((event: WalletEventHistoryView): IWalletHistoryListItem => {
+        const chainKey: ChainKey = this.resolveChainKey(event.chainKey, fallbackChainKey);
+        const assetSymbol: string | null =
+          event.tokenSymbol !== null && event.tokenSymbol.trim().length > 0
+            ? event.tokenSymbol
+            : null;
+        const cardTraits = this.historyCardClassifierService.classifyWalletEvent(chainKey, event);
 
-      const baseItem: IWalletHistoryListItem = {
-        txHash: event.txHash,
-        occurredAt: event.occurredAt.toISOString(),
-        eventType: event.eventType,
-        direction: event.direction,
-        amountText: this.historyFormatter.buildWalletEventAmountText(event),
-        txUrl: this.historyFormatter.buildTxUrlByChain(event.txHash, chainKey),
-        assetSymbol,
-        chainKey,
-        txType: cardTraits.txType,
-        flowType: cardTraits.flowType,
-        flowLabel: cardTraits.flowLabel,
-        assetStandard: cardTraits.assetStandard,
-        dex: cardTraits.dex,
-        pair: cardTraits.pair,
-        isError: cardTraits.isError,
-        counterpartyAddress: cardTraits.counterpartyAddress,
-        contractAddress: cardTraits.contractAddress,
-      };
+        const baseItem: IWalletHistoryListItem = {
+          txHash: event.txHash,
+          occurredAt: event.occurredAt.toISOString(),
+          eventType: event.eventType,
+          direction: event.direction,
+          amountText: this.historyFormatter.buildWalletEventAmountText(event),
+          txUrl: this.historyFormatter.buildTxUrlByChain(event.txHash, chainKey),
+          assetSymbol,
+          chainKey,
+          txType: cardTraits.txType,
+          flowType: cardTraits.flowType,
+          flowLabel: cardTraits.flowLabel,
+          assetStandard: cardTraits.assetStandard,
+          dex: cardTraits.dex,
+          pair: cardTraits.pair,
+          isError: cardTraits.isError,
+          counterpartyAddress: cardTraits.counterpartyAddress,
+          contractAddress: cardTraits.contractAddress,
+          usdPrice: event.usdPrice,
+          usdAmount: event.usdAmount,
+          usdUnavailable:
+            event.usdUnavailable || event.usdPrice === null || event.usdAmount === null,
+          swapFromSymbol: event.swapFromSymbol,
+          swapFromAmountText: event.swapFromAmountText,
+          swapToSymbol: event.swapToSymbol,
+          swapToAmountText: event.swapToAmountText,
+        };
 
-      return baseItem;
-    });
+        return baseItem;
+      });
   }
 
   public mapExplorerItemsToListItems(
     items: readonly IHistoryItemDto[],
     chainKey: ChainKey,
   ): readonly IWalletHistoryListItem[] {
-    return items.map((item: IHistoryItemDto): IWalletHistoryListItem => {
-      const amountText: string = this.historyFormatter.buildExplorerHistoryAmountText(item);
-      const txUrl: string =
-        item.txLink ?? this.historyFormatter.buildTxUrlByChain(item.txHash, chainKey);
-      const cardTraits = this.historyCardClassifierService.classifyExplorerItem(chainKey, item);
+    return items
+      .filter((item: IHistoryItemDto): boolean => !isZeroExplorerHistoryItem(item))
+      .map((item: IHistoryItemDto): IWalletHistoryListItem => {
+        const amountText: string = this.historyFormatter.buildExplorerHistoryAmountText(item);
+        const txUrl: string =
+          item.txLink ?? this.historyFormatter.buildTxUrlByChain(item.txHash, chainKey);
+        const cardTraits = this.historyCardClassifierService.classifyExplorerItem(chainKey, item);
 
-      const baseItem: IWalletHistoryListItem = {
-        txHash: item.txHash,
-        occurredAt: new Date(item.timestampSec * 1000).toISOString(),
-        eventType: item.eventType,
-        direction: item.direction,
-        amountText,
-        txUrl,
-        assetSymbol: item.assetSymbol,
-        chainKey,
-        txType: cardTraits.txType,
-        flowType: cardTraits.flowType,
-        flowLabel: cardTraits.flowLabel,
-        assetStandard: cardTraits.assetStandard,
-        dex: cardTraits.dex,
-        pair: cardTraits.pair,
-        isError: cardTraits.isError,
-        counterpartyAddress: cardTraits.counterpartyAddress,
-        contractAddress: cardTraits.contractAddress,
-      };
+        const baseItem: IWalletHistoryListItem = {
+          txHash: item.txHash,
+          occurredAt: new Date(item.timestampSec * 1000).toISOString(),
+          eventType: item.eventType,
+          direction: item.direction,
+          amountText,
+          txUrl,
+          assetSymbol: item.assetSymbol,
+          chainKey,
+          txType: cardTraits.txType,
+          flowType: cardTraits.flowType,
+          flowLabel: cardTraits.flowLabel,
+          assetStandard: cardTraits.assetStandard,
+          dex: cardTraits.dex,
+          pair: cardTraits.pair,
+          isError: cardTraits.isError,
+          counterpartyAddress: cardTraits.counterpartyAddress,
+          contractAddress: cardTraits.contractAddress,
+          usdPrice: null,
+          usdAmount: null,
+          usdUnavailable: true,
+          swapFromSymbol: null,
+          swapFromAmountText: null,
+          swapToSymbol: null,
+          swapToAmountText: null,
+        };
 
-      return baseItem;
-    });
+        return baseItem;
+      });
   }
 
   private filterLocalEvents(
@@ -137,6 +157,10 @@ export class TrackingHistoryPageService {
     historyParams: IParsedHistoryQueryParams,
   ): readonly WalletEventHistoryView[] {
     return rawEvents.filter((event: WalletEventHistoryView): boolean => {
+      if (isZeroWalletEventHistory(event)) {
+        return false;
+      }
+
       if (historyParams.direction === HistoryDirectionFilter.IN && event.direction !== 'IN') {
         return false;
       }
